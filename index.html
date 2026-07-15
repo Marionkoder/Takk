@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="nb">
 <head>
 <meta charset="UTF-8">
@@ -679,7 +679,7 @@ function modalHTML(){
 
   } else if(step==='event'||step==='event_edit'){
     var isEditE=step==='event_edit';
-    var mOpts=MND_FULL.map(function(m,i){return'<option value="'+(i+1)+'"'+(Number(f.month)===i+1?' selected':'')+'>'+cap(m)+'</option>';}).join('');
+    var mOpts=MND_FULL.map(function(m,i){return'<option value="'+(i+1)+'"'+(Number(f.month)===i+1?' selected':'')+'>'+m+'</option>';}).join('');
     var yOpts='';for(var y=curYear;y<=curYear+5;y++){yOpts+='<option value="'+y+'"'+(Number(f.year)===y?' selected':'')+'>'+y+'</option>';}
     var dOpts='<option value=""'+(!f.day?' selected':'')+'>—</option>';
     for(var dd=1;dd<=31;dd++){dOpts+='<option value="'+dd+'"'+(Number(f.day)===dd?' selected':'')+'>'+dd+'.</option>';}
@@ -1078,6 +1078,8 @@ function rapportViewHTML(){
   var ym=y+'-'+pad(m);
   var prevM=m===1?12:m-1,prevY=m===1?y-1:y;
   var nextM=m===12?1:m+1,nextY=m===12?y+1:y;
+  var secLbl=function(t){return'<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+t+'</div>';};
+  var secNote=function(t){return'<div style="padding:4px 14px 10px;font-size:12px;color:var(--muted)">'+t+'</div>';};
 
   var h='<div style="display:flex;align-items:center;gap:6px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goRapport('+prevM+','+prevY+')">\u2039</button>'
@@ -1091,9 +1093,12 @@ function rapportViewHTML(){
   var mEvents=monthEventsFor(m,y);
   var doneE=mEvents.filter(function(e){return evDone(e,y);});
 
-  h+='<div class="view-sub" style="text-align:center">'+monthEntries.length+' innlegg \u00b7 '
-    +doneR.length+' av '+monthRoutines.length+' rutiner \u00b7 '
-    +doneE.length+' av '+mEvents.length+' hendelser</div>';
+  h+='<div class="view-sub" style="padding-top:10px;font-weight:600">M\u00e5neden i tall</div>'
+    +'<div class="card"><div style="display:flex;justify-content:space-around;text-align:center;padding:12px 10px">'
+    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+monthEntries.length+'</div><div style="font-size:11px;color:var(--muted)">innlegg</div></div>'
+    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneR.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+monthRoutines.length+'</span></div><div style="font-size:11px;color:var(--muted)">rutiner</div></div>'
+    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneE.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+mEvents.length+'</span></div><div style="font-size:11px;color:var(--muted)">hendelser</div></div>'
+    +'</div></div>';
 
   if(!goals.length){
     h+='<div class="card"><div class="empty">Ingen form\u00e5l enn\u00e5. Legg til under Planlegging, s\u00e5 bygges rapporten rundt dem.</div></div>';
@@ -1104,11 +1109,19 @@ function rapportViewHTML(){
     var gr=monthRoutines.filter(function(r){return(r.goalIds||[]).includes(g.id);});
     var ge=mEvents.filter(function(e){return(e.goalIds||[]).includes(g.id);});
     var gent=monthEntries.filter(function(e){return goalCatMatch(g,e.cats);});
+    var total=gr.length+ge.length;
+    var done=gr.filter(function(r){return(r.log||[]).includes(ym);}).length
+            +ge.filter(function(e){return evDone(e,y);}).length;
 
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:700;color:var(--red)">'+esc(g.name)+'</div><div class="card">';
+    h+='<div class="card" style="margin-top:14px">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)">'
+      +'<span style="font-weight:700;flex:1;color:var(--red)">'+esc(g.name)+'</span>'
+      +(total?'<span style="font-size:12px;color:var(--rose)">'+done+'/'+total+' \u2713</span>':'')
+      +'</div>';
 
-    if(gr.length||ge.length){
-      h+='<div style="padding:10px 14px;border-bottom:1px solid var(--line)">';
+    h+=secLbl('Rutiner og hendelser');
+    if(total){
+      h+='<div style="padding:2px 14px 10px">';
       gr.forEach(function(r){
         var d=(r.log||[]).includes(ym);
         h+='<div style="font-size:13px;padding:2px 0">'+(d?'<span style="color:var(--red);font-weight:700">\u2713</span>':'<span style="color:var(--rose)">\u25cb</span>')+' '+esc(r.name)+'</div>';
@@ -1119,24 +1132,28 @@ function rapportViewHTML(){
       });
       h+='</div>';
     } else {
-      h+='<div style="padding:10px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)">Ingen rutiner eller hendelser knyttet til dette form\u00e5let denne m\u00e5neden.</div>';
+      h+=secNote('Ingenting knyttet til dette form\u00e5let denne m\u00e5neden.');
     }
 
     if(!(g.cats||[]).length){
-      h+='<div style="padding:10px 14px;font-size:12px;color:var(--muted)">Koble form\u00e5let til kategorier (via \u270e under Planlegging) for \u00e5 se takknemligheten det gir.</div>';
-    } else if(gent.length){
-      h+='<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">Takknemlighet \u00b7 '+gent.length+'</div>'
-        +gent.map(entryRowHTML).join('');
+      h+=secLbl('Takknemlighet')
+        +secNote('Koble form\u00e5let til kategorier (via \u270e under Planlegging) for \u00e5 se takknemligheten det gir.');
     } else {
-      h+='<div style="padding:10px 14px;font-size:12px;color:var(--muted)">Ingen innlegg i tilknyttede kategorier denne m\u00e5neden.</div>';
+      h+=secLbl('Takknemlighet \u00b7 '+gent.length);
+      h+=gent.length?gent.map(entryRowHTML).join(''):secNote('Ingen innlegg i tilknyttede kategorier denne m\u00e5neden.');
     }
     h+='</div>';
   });
 
-  var covered=monthEntries.filter(function(e){return goals.some(function(g){return goalCatMatch(g,e.cats);});});
-  var rest=monthEntries.length-covered.length;
-  if(rest>0){
-    h+='<div class="view-sub" style="padding-top:12px">'+rest+' av m\u00e5nedens innlegg h\u00f8rer ikke til noe form\u00e5l \u2014 kanskje et tegn p\u00e5 gleder du ikke har planlagt deg til.</div>';
+  var rest=monthEntries.filter(function(e){return!goals.some(function(g){return goalCatMatch(g,e.cats);});});
+  if(rest.length){
+    h+='<div class="card" style="margin-top:14px">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)">'
+      +'<span style="font-weight:700;flex:1">Utenfor form\u00e5lene</span>'
+      +'<span style="font-size:12px;color:var(--rose)">'+rest.length+' innlegg</span></div>'
+      +secNote('Gleder du ikke har planlagt deg til.')
+      +rest.map(entryRowHTML).join('')
+      +'</div>';
   }
   return h;
 }
@@ -1164,7 +1181,7 @@ function planleggingViewHTML(){
       if(open){
         h+='<div style="padding:0 14px 12px 34px">';
         if(g.text){
-          h+='<div style="font-size:13px;color:var(--muted);white-space:pre-wrap;margin-bottom:8px">'+esc(g.text)+'</div>';
+          h+='<div style="font-size:12px;font-style:italic;color:var(--muted);white-space:pre-wrap;margin-bottom:8px">'+esc(g.text)+'</div>';
         }
         if(linkedR.length){
           h+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);margin:6px 0 3px">Rutiner</div>';
