@@ -969,25 +969,16 @@ function rutinerViewHTML(){
   var monthEvents=monthEventsFor(m,curYear).filter(function(e){return inCat(e.cats);})
     .sort(function(a,b){return(a.day||99)-(b.day||99)||nbSort(a.name,b.name);});
 
-  if(!monthRoutines.length&&!monthEvents.length){
-    h+='<div class="card"><div class="empty">'+(routines.length||events.length
-      ?'Ingenting her denne måneden'+(catName2?' i denne kategorien':'')+'.'
-      :'Legg til rutiner og hendelser under Planlegging.')+'</div></div>';
-    return h;
-  }
-
   if(monthRoutines.length){
     h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Rutiner <span style="font-weight:400;color:var(--rose)">· trykk når gjort denne måneden</span></div>'
       +'<div class="card">'+routineChipsHTML(monthRoutines,ym)+'</div>';
   }
 
-  if(monthEvents.length){
+  {
     h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Hendelser</div>';
     var dated=monthEvents.filter(function(e){return e.day;});
     var undated=monthEvents.filter(function(e){return!e.day;});
-    if(dated.length){
-      h+='<div class="card">'+dayListHTML(m,curYear,dated)+'</div>';
-    }
+    h+='<div class="card">'+dayListHTML(m,curYear,dated)+'</div>';
     if(undated.length){
       h+='<div class="view-sub" style="padding-top:6px">I løpet av måneden</div><div class="card">';
       undated.forEach(function(e){
