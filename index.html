@@ -336,7 +336,40 @@ function toggleInvMissing(){invShowMissing=!invShowMissing;render();}
 function toggleInvItem(invId,itemId){
   var inv=invById(invId);if(!inv)return;
   var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
-  it.have=!it.have;save();render();
+  it.have=!it.have;
+  if(it.syncId){
+    inventories.forEach(function(iv){(iv.items||[]).forEach(function(x){
+      if(x.syncId===it.syncId)x.have=it.have;
+    });});
+  }
+  save();render();
+}
+function itemOnList(item,targetInv){
+  if(!item.syncId)return null;
+  return(targetInv.items||[]).find(function(x){return x.syncId===item.syncId;})||null;
+}
+function toggleItemOnList(invId,itemId,targetInvId){
+  var inv=invById(invId);var target=invById(targetInvId);if(!inv||!target)return;
+  var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
+  if(!it.syncId)it.syncId=it.id;
+  var existing=itemOnList(it,target);
+  if(existing){
+    target.items=(target.items||[]).filter(function(x){return x.id!==existing.id;});
+  } else {
+    var values={};
+    (target.fields||[]).forEach(function(tf){
+      var srcField=(inv.fields||[]).find(function(sf){return sf.name.toLowerCase()===tf.name.toLowerCase();});
+      if(srcField&&(it.values||{})[srcField.id])values[tf.id]=it.values[srcField.id];
+    });
+    target.items=(target.items||[]).concat([{
+      id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),
+      sectionId:null,name:it.name,note:it.note||'',values:values,have:!!it.have,
+      syncId:it.syncId,
+      goalIds:[].concat(it.goalIds||[]),resultIds:[].concat(it.resultIds||[]),
+      routineIds:[].concat(it.routineIds||[]),eventIds:[].concat(it.eventIds||[])
+    }]);
+  }
+  save();render();
 }
 function openInvModal(){modal={step:'inv',form:{name:'',goalIds:[],resultIds:[],fields:[],_newField:''}};render();}
 function openEditInv(id){
@@ -952,6 +985,17 @@ function modalHTML(){
           return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormEventId(\''+q(e.id)+'\')">'+esc(e.name)+' \u00b7 hendelse</button>';
         }).join('')
         +'</div>':'')
+      +(isEditT&&inventories.length>1?(function(){
+        var curInv=invById(f.invId);
+        var curItem=curInv?(curInv.items||[]).find(function(x){return x.id===f.id;}):null;
+        if(!curItem)return'';
+        var chips=inventories.filter(function(iv){return iv.id!==f.invId;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(iv){
+          var on=!!itemOnList(curItem,iv);
+          return'<button class="chip'+(on?' on':'')+'" onclick="toggleItemOnList(\''+q(f.invId)+'\',\''+q(f.id)+'\',\''+q(iv.id)+'\')">'+esc(iv.name)+'</button>';
+        }).join('');
+        return'<label class="field-lbl">Finnes ogs\u00e5 p\u00e5</label><div class="chips">'+chips+'</div>'
+          +'<div class="hint">Haken synkroniseres p\u00e5 tvers av listene \u2014 har du den ett sted, har du den overalt. Variabler med samme navn kopieres med; plassering under overskrift og \u00f8vrige felter styres per liste.</div>';
+      })():'')
       +(isEditT?'<button class="save-btn" style="background:transparent;border:1.5px solid var(--salmon);color:var(--red)" onclick="invItemToLater()">Send til Senere-lista</button>':'')
       +(isEditT?'<button class="del-full-btn" onclick="deleteInvItem()">Slett punkt</button>':'')
       +'<button class="save-btn" onclick="'+(isEditT?'saveEditInvItem()':'submitInvItem()')+'" '+((f.name||'').trim()?'':'disabled')+'>Lagre</button>';
@@ -1804,6 +1848,11 @@ function inventarViewHTML(){
       +(vals?'<div class="entry-date">'+vals+'</div>':'')
       +(it.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(it.note)+'</div>':'')
       +(function(){var ln=invItemLinkNames(it);return ln.length?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(ln.join(' \u00b7 '))+'</div>':'';})()
+      +(function(){
+        if(!it.syncId)return'';
+        var others=inventories.filter(function(iv){return iv.id!==inv.id&&(iv.items||[]).some(function(x){return x.syncId===it.syncId;});}).map(function(iv){return iv.name;});
+        return others.length?'<div style="font-size:11px;color:var(--rose)">Ogs\u00e5 p\u00e5: '+esc(others.join(' \u00b7 '))+'</div>':'';
+      })()
       +'</div>'
       +(it.have?'':'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="invRowToLater(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u2192 Senere</button>')
       +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u270e</button>'
@@ -1874,6 +1923,14 @@ function planleggingViewHTML(){
           h+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);margin:6px 0 3px">Planer og hendelser</div>';
           linkedE.forEach(function(e){h+='<div style="font-size:13px;padding:2px 0">'+esc(e.name)+' <span style="color:var(--muted);font-size:11px">· '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert år':' '+e.year)+'</span></div>';});
         }
+        var vInvs=inventories.filter(function(iv){return(iv.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
+        if(vInvs.length){
+          h+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);margin:6px 0 3px">Inventarlister</div>';
+          vInvs.forEach(function(iv){
+            var ic=invCounts(iv);
+            h+='<div style="font-size:13px;padding:2px 0"><button class="icon-btn" style="font-size:12px;padding:1px 8px" onclick="event.stopPropagation();goInventar(\''+q(iv.id)+'\')">'+esc(iv.name)+' \u00b7 '+ic.have+'/'+ic.total+' \u203a</button></div>';
+          });
+        }
         var linkedL=laters.filter(function(l){return(l.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
         if(linkedL.length){
           h+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);margin:6px 0 3px">Senere</div>';
@@ -1895,9 +1952,14 @@ function planleggingViewHTML(){
     h+='<div class="card">';
     results.slice().sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);}).forEach(function(r){
       var v=goalById(r.valueId);
+      var rInvs=inventories.filter(function(iv){return(iv.resultIds||[]).includes(r.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
       h+='<div class="entry-row"><div class="entry-body">'
         +'<div class="entry-text"'+(r.achieved?' style="opacity:.55"':'')+'>'+esc(r.name)+resultDeadlineHTML(r)+'</div>'
         +(v?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(v.name)+'</div>':'')
+        +rInvs.map(function(iv){
+          var ic=invCounts(iv);
+          return'<div class="entry-date"><button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(iv.name)+' \u00b7 '+ic.have+'/'+ic.total+(ic.missing?' \u00b7 <span style="color:var(--amber)">mangler '+ic.missing+'</span>':'')+' \u203a</button></div>';
+        }).join('')
         +'</div>'
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditResult(\''+q(r.id)+'\')">\u270e</button>'
         +'</div>';
