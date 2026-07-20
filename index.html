@@ -670,10 +670,12 @@ function toggleProjectDone(invId){
   save();render();
 }
 function invLinked(f){return((f.goalIds||[]).length+(f.resultIds||[]).length+(f.eventIds||[]).length)>0;}
-function openInvModal(){modal={step:'inv',form:{name:'',type:'inventar',startDate:'',endDate:'',goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
+function invValid(f){return(f.name||'').trim().length>0&&invLinked(f)&&(f.type!=='prosjekt'||!!f.catId);}
+function openInvModal(){modal={step:'inv',form:{name:'',type:'inventar',startDate:'',endDate:'',catId:'',hoursTotal:'',varValues:{},goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
+function openProjModal(){modal={step:'inv',form:{name:'',type:'prosjekt',_lockType:true,startDate:'',endDate:'',catId:'',hoursTotal:'',varValues:{},goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
 function openEditInv(id){
   var inv=invById(id);if(!inv)return;
-  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',startDate:inv.startDate||'',endDate:inv.endDate||'',goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
+  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',_lockType:(inv.type||'inventar')==='prosjekt',startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',hoursTotal:inv.hoursTotal||'',varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
 }
 function fieldNumKind(fd){
   var n=(fd.name||'').trim().toLowerCase();
@@ -700,35 +702,35 @@ function addInvField(){
 }
 function removeInvField(fid){mf().fields=(mf().fields||[]).filter(function(x){return x.id!==fid;});render();}
 function submitInv(){
-  var f=mf();var name=(f.name||'').trim();if(!name||!invLinked(f))return;
-  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',startDate:f.startDate||'',endDate:f.endDate||'',goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:[],items:[]};
+  var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
+  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',startDate:f.startDate||'',endDate:f.endDate||'',catId:f.catId||'',hoursTotal:numVal(f.hoursTotal)||'',varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:[],items:[]};
   inventories.push(inv);save();closeModal();goInventar(inv.id);
 }
 function saveEditInv(){
-  var f=mf();var name=(f.name||'').trim();if(!name||!invLinked(f))return;
+  var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var inv=invById(f.id);if(!inv)return;
-  inv.name=name;inv.type=f.type||'inventar';inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
+  inv.name=name;inv.type=f.type||'inventar';inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=f.catId||'';inv.hoursTotal=numVal(f.hoursTotal)||'';inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
   save();closeModal();
 }
 function deleteInv(id){
   inventories=inventories.filter(function(i){return i.id!==id;});
   save();closeModal();goPlanlegging();
 }
-function openInvSecModal(invId){modal={step:'invsec',form:{invId:invId,name:''}};render();}
+function openInvSecModal(invId){modal={step:'invsec',form:{invId:invId,name:'',startDate:'',endDate:'',hours:''}};render();}
 function openEditInvSec(invId,secId){
   var inv=invById(invId);var sec=(inv.sections||[]).find(function(x){return x.id===secId;});if(!sec)return;
-  modal={step:'invsec_edit',form:{invId:invId,id:secId,name:sec.name}};render();
+  modal={step:'invsec_edit',form:{invId:invId,id:secId,name:sec.name,startDate:sec.startDate||'',endDate:sec.endDate||'',hours:sec.hours||''}};render();
 }
 function submitInvSec(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
   var inv=invById(f.invId);if(!inv)return;
-  inv.sections=(inv.sections||[]).concat([{id:'is'+Date.now()+Math.random().toString(36).slice(2,6),name:n}]);
+  inv.sections=(inv.sections||[]).concat([{id:'is'+Date.now()+Math.random().toString(36).slice(2,6),name:n,startDate:f.startDate||'',endDate:f.endDate||'',hours:numVal(f.hours)||''}]);
   save();closeModal();
 }
 function saveEditInvSec(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
   var inv=invById(f.invId);var sec=(inv.sections||[]).find(function(x){return x.id===f.id;});if(!sec)return;
-  sec.name=n;save();closeModal();
+  sec.name=n;sec.startDate=f.startDate||'';sec.endDate=f.endDate||'';sec.hours=numVal(f.hours)||'';save();closeModal();
 }
 function deleteInvSec(){
   var f=mf();var inv=invById(f.invId);if(!inv)return;
@@ -1143,7 +1145,7 @@ function updateSaveBtn(){
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId;
   if(step==='invsec'||step==='invsec_edit'||step==='invitem'||step==='invitem_edit')enabled=(mf().name||'').trim().length>0;
-  if(step==='inv'||step==='inv_edit')enabled=(mf().name||'').trim().length>0&&invLinked(mf());
+  if(step==='inv'||step==='inv_edit')enabled=invValid(mf());
   if(step==='deposit')enabled=!!parseKr(mf().amount);
   if(step==='posting')enabled=!!parseKr(mf().amount)&&!!mf().rowId;
   btn.disabled=!enabled;
@@ -1308,38 +1310,51 @@ function modalHTML(){
     var fieldRows=(f.fields||[]).map(function(fd){
       return'<button class="chip on" onclick="removeInvField(\''+q(fd.id)+'\')">'+esc(fd.name)+' \u00d7</button>';
     }).join('');
-    body='<div class="modal-title">'+(isEditI?'Rediger liste':'Ny liste')+'</div>'
+    var isProjM=f.type==='prosjekt';
+    body='<div class="modal-title">'+(isProjM?(isEditI?'Rediger prosjektplan':'Ny prosjektplan'):(isEditI?'Rediger liste':'Ny liste'))+'</div>'
       +'<label class="field-lbl">Navn</label>'
-      +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. Kapselgarderobe, Hyttetur \u2026" oninput="mf().name=this.value;updateSaveBtn()">'
-      +'<label class="field-lbl">Type</label>'
+      +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="'+(isProjM?'F.eks. Strikke kofte, Pusse opp badet \u2026':'F.eks. Kapselgarderobe, Hyttetur \u2026')+'" oninput="mf().name=this.value;updateSaveBtn()">'
+      +(isProjM?'':'<label class="field-lbl">Type</label>'
       +'<div class="chips">'
       +'<button class="chip'+((f.type||'inventar')==='inventar'?' on':'')+'" onclick="mf().type=\'inventar\';render()">Inventarliste</button>'
       +'<button class="chip'+(f.type==='pakke'?' on':'')+'" onclick="mf().type=\'pakke\';render()">Pakkeliste</button>'
-      +'<button class="chip'+(f.type==='prosjekt'?' on':'')+'" onclick="mf().type=\'prosjekt\';render()">Prosjektliste</button>'
       +'</div>'
       +'<div class="hint">'+(f.type==='pakke'
         ?'En pakkeliste kan hente punkter fra inventarlistene, og avhakingen (\u00abpakket\u00bb) kan nullstilles f\u00f8r neste tur \u2014 punktene best\u00e5r.'
-        :f.type==='prosjekt'
-        ?'En prosjektliste har startdato og sluttdato, og punktene er milep\u00e6ler som kan f\u00e5 egne datoer og hakes av underveis.'
-        :'En inventarliste holder oversikt over det du har og mangler.')+'</div>'
-      +(f.type==='prosjekt'
-        ?'<div style="display:flex;gap:10px"><div style="flex:1"><label class="field-lbl">Startdato</label>'
+        :'En inventarliste holder oversikt over det du har og mangler.')+'</div>')
+      +(isProjM
+        ?'<label class="field-lbl">Hovedkategori</label>'
+         +'<div class="chips">'+cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(c){
+            return'<button class="chip'+(f.catId===c.id?' on':'')+'" onclick="mf().catId=\''+q(c.id)+'\';render()">'+esc(c.name)+'</button>';
+          }).join('')+'</div>'
+         +(f.catId?'':'<div class="hint" style="color:var(--amber)">Prosjektplanen m\u00e5 kobles til en hovedkategori \u2014 den gir blant annet fargen i prosjektoversikten.</div>')
+         +'<div style="display:flex;gap:10px"><div style="flex:1"><label class="field-lbl">Startdato</label>'
          +'<input class="inp" type="date" value="'+esc(f.startDate||'')+'" oninput="mf().startDate=this.value"></div>'
          +'<div style="flex:1"><label class="field-lbl">Sluttdato</label>'
          +'<input class="inp" type="date" value="'+esc(f.endDate||'')+'" oninput="mf().endDate=this.value"></div></div>'
+         +'<label class="field-lbl">Forventet tidsbruk totalt <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 timer</span></label>'
+         +'<input class="inp" type="text" inputmode="decimal" style="width:120px" value="'+esc(String(f.hoursTotal||''))+'" placeholder="f.eks. 40" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\');mf().hoursTotal=this.value">'
         :'')
-      +'<label class="field-lbl">Variabler <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 egne felter per punkt, valgfritt</span></label>'
-      +'<div class="chips">'+(fieldRows||'')
-      +((f.type||'inventar')==='inventar'&&!(f.fields||[]).some(function(fd){return(fd.name||'').toLowerCase()==='antall';})
-        ?'<button class="chip-new" onclick="addSuggestedField(\'Antall\')">+ Antall</button>':'')
-      +(f.type==='prosjekt'&&!(f.fields||[]).some(function(fd){return(fd.name||'').toLowerCase()==='forventet timebruk totalt';})
-        ?'<button class="chip-new" onclick="addSuggestedField(\'Forventet timebruk totalt\')">+ Forventet timebruk totalt</button>':'')
-      +'</div>'
+      +'<label class="field-lbl">Variabler <span style="font-weight:400;text-transform:none;letter-spacing:0">'+(isProjM?'\u2013 planens egne felter, f.eks. garn, farge, budsjett':'\u2013 egne felter per punkt, valgfritt')+'</span></label>'
+      +(isProjM
+        ?(f.fields||[]).map(function(fd){
+            var kind=fieldNumKind(fd);
+            var filt=kind==='int'?"this.value=this.value.replace(/[^0-9]/g,\'\');":kind==='dec'?"this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\');":'';
+            return'<div style="display:flex;gap:8px;align-items:center;margin-top:4px">'
+              +'<span style="width:110px;flex-shrink:0;font-size:12px">'+esc(fd.name)+'</span>'
+              +'<input class="inp" type="text"'+(kind?' inputmode="'+(kind==='int'?'numeric':'decimal')+'"':'')+' style="flex:1;margin:0" value="'+esc((f.varValues||{})[fd.id]||'')+'" oninput="'+filt+'mf().varValues[\''+q(fd.id)+'\']=this.value">'
+              +'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="removeInvField(\''+q(fd.id)+'\')">\u00d7</button>'
+              +'</div>';
+          }).join('')
+        :'<div class="chips">'+(fieldRows||'')
+          +((f.type||'inventar')==='inventar'&&!(f.fields||[]).some(function(fd){return(fd.name||'').toLowerCase()==='antall';})
+            ?'<button class="chip-new" onclick="addSuggestedField(\'Antall\')">+ Antall</button>':'')
+          +'</div>')
       +'<div style="display:flex;gap:8px;margin-top:6px">'
       +'<input class="inp" type="text" style="flex:1;margin:0" value="'+esc(f._newField||'')+'" placeholder="F.eks. farge, fiber, st\u00f8rrelse \u2026" oninput="mf()._newField=this.value">'
       +'<button class="icon-btn" style="padding:8px 12px" onclick="addInvField()">Legg til</button>'
       +'</div>'
-      +'<div class="hint">Trykk p\u00e5 en variabel for \u00e5 fjerne den. Verdiene fylles inn per punkt.</div>'
+      +'<div class="hint">'+(isProjM?'Variablene oppsummeres \u00f8verst i prosjektplanen og gjentas ikke i fasene.':'Trykk p\u00e5 en variabel for \u00e5 fjerne den. Verdiene fylles inn per punkt.')+'</div>'
       +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 verdi, resultat eller hendelse, minst \u00e9n</span></label>'
       +'<div class="chips">'+linkChipSection(f)
       +events.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
@@ -1352,9 +1367,19 @@ function modalHTML(){
 
   } else if(step==='invsec'||step==='invsec_edit'){
     var isEditS=step==='invsec_edit';
-    body='<div class="modal-title">'+(isEditS?'Rediger overskrift':'Ny overskrift')+'</div>'
+    var secInv=invById(f.invId);
+    var isProjS=secInv&&(secInv.type||'inventar')==='prosjekt';
+    body='<div class="modal-title">'+(isProjS?(isEditS?'Rediger fase':'Ny fase'):(isEditS?'Rediger overskrift':'Ny overskrift'))+'</div>'
       +'<label class="field-lbl">Navn</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. Sko, Vann og mat \u2026" oninput="mf().name=this.value;updateSaveBtn()">'
+      +(isProjS
+        ?'<div style="display:flex;gap:10px"><div style="flex:1"><label class="field-lbl">Startdato</label>'
+         +'<input class="inp" type="date" value="'+esc(f.startDate||'')+'" oninput="mf().startDate=this.value"></div>'
+         +'<div style="flex:1"><label class="field-lbl">Sluttdato</label>'
+         +'<input class="inp" type="date" value="'+esc(f.endDate||'')+'" oninput="mf().endDate=this.value"></div></div>'
+         +'<label class="field-lbl">Forventet tidsbruk <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 timer</span></label>'
+         +'<input class="inp" type="text" inputmode="decimal" style="width:120px" value="'+esc(String(f.hours||''))+'" placeholder="f.eks. 8" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\');mf().hours=this.value">'
+        :'')
       +(isEditS?confirmBtn('invsec','Slett overskrift og punktene under','deleteInvSec()'):'')
       +'<button class="save-btn" onclick="'+(isEditS?'saveEditInvSec()':'submitInvSec()')+'" '+((f.name||'').trim()?'':'disabled')+'>Lagre</button>';
 
@@ -1374,8 +1399,7 @@ function modalHTML(){
       fieldInputs='<label class="field-lbl">Milep\u00e6lsdato <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
         +'<input class="inp" type="date" style="width:auto" value="'+esc(f.mdate||'')+'" oninput="mf().mdate=this.value;render()">'
         +(f.mdate?'<div class="chips" style="margin-top:6px"><button class="chip'+(f.inCal?' on':'')+'" onclick="mf().inCal=!mf().inCal;render()">'+(f.inCal?'\u2713 Ligger i kalenderen':'Legg inn i kalenderen')+'</button></div>'
-          +'<div class="hint">Med kalendervalget p\u00e5 vises milep\u00e6len p\u00e5 datoen sin i uke-, m\u00e5neds- og \u00e5rsvisningen, og kan hakes av der.</div>':'')
-        +fieldInputs;
+          +'<div class="hint">Med kalendervalget p\u00e5 vises milep\u00e6len p\u00e5 datoen sin i uke-, m\u00e5neds- og \u00e5rsvisningen, og kan hakes av der.</div>':'');
     }
     var isProj=(invT.type||'inventar')==='prosjekt';
     body='<div class="modal-title">'+(isEditT?(isProj?'Rediger milep\u00e6l':'Rediger punkt'):(isProj?'Ny milep\u00e6l':'Nytt punkt'))+'</div>'
@@ -2706,21 +2730,34 @@ function ganttHTML(){
     var a=iv.startDate||iv.endDate,b=iv.endDate||iv.startDate;
     var l=pct(a),r=pct(b);
     var w=Math.max(2,r-l);
-    var col=iv.completedDate?'var(--done-line)':(b<tNow?'var(--amber)':(a<=tNow?'var(--red)':'var(--rose)'));
+    var col=(iv.catId?catColor(iv.catId):null)||'var(--rose)';
+    var overdue=!iv.completedDate&&b<tNow;
+    var barStyle='position:absolute;left:'+l.toFixed(1)+'%;width:'+w.toFixed(1)+'%;top:2px;bottom:2px;border-radius:5px;overflow:hidden;'
+      +(iv.completedDate?'opacity:.45;':'')
+      +(overdue?'box-shadow:inset 0 0 0 1.5px var(--amber);':'');
+    // Fasesegmenter innenfor søylen
+    var phases=(iv.sections||[]).filter(function(sc){return sc.startDate&&sc.endDate;})
+      .sort(function(x,y){return x.startDate<y.startDate?-1:1;});
+    var inner='';
+    if(phases.length){
+      var span2=Math.max(1,new Date(b)-new Date(a));
+      phases.forEach(function(sc,pi){
+        var pl=Math.max(0,Math.min(100,(new Date(sc.startDate)-new Date(a))/span2*100));
+        var prr=Math.max(0,Math.min(100,(new Date(sc.endDate)-new Date(a))/span2*100));
+        inner+='<div style="position:absolute;left:'+pl.toFixed(1)+'%;width:'+Math.max(1,prr-pl).toFixed(1)+'%;top:0;bottom:0;background:'+col+';'+(pi>0?'border-left:1.5px solid #F2EEE5;':'')+'"></div>';
+      });
+      inner='<div style="position:absolute;inset:0;background:'+col+';opacity:.3"></div>'+inner;
+    } else {
+      inner='<div style="position:absolute;inset:0;background:'+col+'"></div>';
+    }
     h+='<div style="display:flex;align-items:center;gap:0;margin-top:6px;cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
       +'<span style="width:88px;flex-shrink:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px'+(iv.completedDate?';color:var(--muted)':'')+'">'+(iv.completedDate?'\u2713 ':'')+esc(iv.name)+'</span>'
       +'<div style="flex:1;position:relative;height:14px;background:var(--bg);border-radius:7px">'
-      +'<div style="position:absolute;left:'+l.toFixed(1)+'%;width:'+w.toFixed(1)+'%;top:2px;bottom:2px;border-radius:5px;background:'+col+'"></div>'
+      +'<div style="'+barStyle+'">'+inner+'</div>'
       +'<div style="position:absolute;left:'+pct(tNow).toFixed(1)+'%;top:-2px;bottom:-2px;width:1.5px;background:var(--ink);opacity:.55"></div>'
       +'</div></div>';
   });
-  h+='<div style="display:flex;gap:12px;margin-top:10px;font-size:9px;color:var(--muted)">'
-    +'<span><span style="display:inline-block;width:14px;height:7px;border-radius:3px;background:var(--red);vertical-align:middle"></span> p\u00e5g\u00e5r</span>'
-    +'<span><span style="display:inline-block;width:14px;height:7px;border-radius:3px;background:var(--rose);vertical-align:middle"></span> kommer</span>'
-    +'<span><span style="display:inline-block;width:14px;height:7px;border-radius:3px;background:var(--amber);vertical-align:middle"></span> frist passert</span>'
-    +'<span><span style="display:inline-block;width:14px;height:7px;border-radius:3px;background:var(--done-line);vertical-align:middle"></span> ferdigstilt</span>'
-    +'<span>| i dag</span>'
-    +'</div>';
+  h+='<div style="margin-top:10px;font-size:9px;color:var(--muted)">Fargen er prosjektets hovedkategori \u00b7 lyse skillestreker er faser \u00b7 \u2713 dempet = ferdigstilt \u00b7 ravgul kant = frist passert \u00b7 | = i dag</div>';
   h+='</div>';
   return h;
 }
@@ -2736,7 +2773,7 @@ function inventarViewHTML(){
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goPlanlegging()">\u2039</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
-    +(isPack?' <span style="font-size:11px;font-weight:400;color:var(--rose)">pakkeliste</span>':isProj?' <span style="font-size:11px;font-weight:400;color:var(--rose)">prosjekt</span>':'')+'</div>'
+    +(isPack?' <span style="font-size:11px;font-weight:400;color:var(--rose)">pakkeliste</span>':isProj?' <span style="font-size:11px;font-weight:400;color:var(--rose)">prosjektplan</span>':'')+'</div>'
     +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="openEditInv(\''+q(inv.id)+'\')">\u270e</button>'
     +'</div>'
     +'<div class="view-sub">'+c.have+' av '+c.total+(isPack?' pakket':isProj?' milep\u00e6ler n\u00e5dd':'')
@@ -2757,6 +2794,21 @@ function inventarViewHTML(){
         +(c.missing?'<span style="font-size:11px;color:var(--muted);align-self:center">'+c.missing+' milep\u00e6l'+(c.missing===1?'':'er')+' gjenst\u00e5r</span>':'')
         +'</div>';
     }
+  }
+  if(isProj){
+    var frameCat=inv.catId?catById(inv.catId):null;
+    var frameRows='';
+    if(frameCat)frameRows+='<div style="display:flex;gap:8px;font-size:13px;padding:2px 0"><span style="width:110px;flex-shrink:0;color:var(--muted)">Kategori</span><span>'+esc(frameCat.name)+'</span></div>';
+    if(inv.hoursTotal){
+      var phaseSum=(inv.sections||[]).reduce(function(a,sc){return a+(Number(sc.hours)||0);},0);
+      frameRows+='<div style="display:flex;gap:8px;font-size:13px;padding:2px 0"><span style="width:110px;flex-shrink:0;color:var(--muted)">Tidsbruk</span><span>'+String(inv.hoursTotal).replace('.',',')+' t forventet'
+        +(phaseSum?' <span style="color:'+(phaseSum>Number(inv.hoursTotal)?'var(--amber)':'var(--muted)')+';font-size:11px">\u00b7 fasene til sammen '+String(phaseSum).replace('.',',')+' t</span>':'')+'</span></div>';
+    }
+    (inv.fields||[]).forEach(function(fd){
+      var v=(inv.varValues||{})[fd.id];
+      if(v)frameRows+='<div style="display:flex;gap:8px;font-size:13px;padding:2px 0"><span style="width:110px;flex-shrink:0;color:var(--muted)">'+esc(fd.name)+'</span><span>'+esc(v)+'</span></div>';
+    });
+    if(frameRows)h+='<div class="card" style="padding:8px 14px;margin-top:8px">'+frameRows+'</div>';
   }
   if(isProj&&(inv.startDate||inv.endDate)&&!inv.completedDate){
     var projLine=(inv.startDate?fmtDate(inv.startDate):'?')+' \u2013 '+(inv.endDate?fmtDate(inv.endDate):'?');
@@ -2786,7 +2838,12 @@ function inventarViewHTML(){
     return'<div class="entry-row">'
       +'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>'
       +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj?'':' style="color:var(--amber)"')+'>'+esc(it.name)
-      +(isProj&&it.date?' <span style="font-size:11px;font-weight:400;color:'+(!it.have&&it.date<isoDate(today)?'var(--amber)':'var(--muted)')+'">\u00b7 '+fmtDate(it.date)+(!it.have&&it.date<isoDate(today)?' \u2014 forfalt':'')+'</span>':'')
+      +(isProj&&it.date?(function(){
+          var ps=it.sectionId?(inv.sections||[]).find(function(x){return x.id===it.sectionId;}):null;
+          var outside=ps&&((ps.startDate&&it.date<ps.startDate)||(ps.endDate&&it.date>ps.endDate));
+          var overdue=!it.have&&it.date<isoDate(today);
+          return' <span style="font-size:11px;font-weight:400;color:'+(overdue||outside?'var(--amber)':'var(--muted)')+'">\u00b7 '+fmtDate(it.date)+(overdue?' \u2014 forfalt':'')+(outside?' \u00b7 utenfor fasen':'')+'</span>';
+        })():'')
       +'</div>'
       +(vals?'<div class="entry-date">'+vals+'</div>':'')
       +(it.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(it.note)+'</div>':'')
@@ -2803,14 +2860,21 @@ function inventarViewHTML(){
   };
 
   var secs=[].concat(inv.sections||[]);
+  if(isProj)secs.sort(function(a,b){return(a.startDate||'9999')<(b.startDate||'9999')?-1:(a.startDate||'9999')>(b.startDate||'9999')?1:nbSort(a.name,b.name);});
   var lone=(inv.items||[]).filter(function(it){return!it.sectionId||!secs.some(function(sc){return sc.id===it.sectionId;});});
   h+='<div class="card">';
   secs.forEach(function(sc){
     var items=(inv.items||[]).filter(function(it){return it.sectionId===sc.id;}).sort(function(a,b){
       if(isProj)return(a.date||'9999')<(b.date||'9999')?-1:(a.date||'9999')>(b.date||'9999')?1:nbSort(a.name,b.name);
       return nbSort(a.name,b.name);});
+    var phaseOut=isProj&&((sc.startDate&&inv.startDate&&sc.startDate<inv.startDate)||(sc.endDate&&inv.endDate&&sc.endDate>inv.endDate));
     h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 2px">'
-      +'<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);flex:1">'+esc(sc.name)+'</span>'
+      +'<span style="flex:1"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+esc(sc.name)+'</span>'
+      +(isProj&&(sc.startDate||sc.endDate||sc.hours)?'<span style="font-size:11px;color:'+(phaseOut?'var(--amber)':'var(--muted)')+'"> \u00b7 '
+        +(sc.startDate?fmtDate(sc.startDate):'?')+(sc.startDate||sc.endDate?' \u2013 '+(sc.endDate?fmtDate(sc.endDate):'?'):'')
+        +(sc.hours?' \u00b7 '+String(sc.hours).replace('.',',')+' t':'')
+        +(phaseOut?' \u00b7 utenfor planen':'')+'</span>':'')
+      +'</span>'
       +(editMode?'<button class="icon-btn" style="font-size:11px;padding:1px 7px" onclick="openEditInvSec(\''+q(inv.id)+'\',\''+q(sc.id)+'\')">\u270e</button>':'')
       +'<button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="openInvItemModal(\''+q(inv.id)+'\',\''+q(sc.id)+'\')">'+(isProj?'+ milep\u00e6l':'+ punkt')+'</button>'
       +'</div>';
@@ -3030,7 +3094,7 @@ function budsjettViewHTML(){
 function planleggingViewHTML(){
   var h='<div class="view-title">Legg inn m\u00e5l, rutiner og planer</div>'
     +'<div class="view-sub">Verdier er slik du vil leve («Jeg tar vare på helsa»). Resultater er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['inventar','Lister'],['senere','Til senere']];
+  var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['prosjekt','Prosjektplaner'],['inventar','Lister'],['senere','Til senere']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
@@ -3216,15 +3280,43 @@ function planleggingViewHTML(){
   }
 
   }
+  if(planTab==='prosjekt'){
+  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Prosjektplaner</div>';
+  h+=ganttHTML();
+  var projRows=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';})
+    .sort(function(a,b){
+      var ca=a.completedDate?1:0,cb=b.completedDate?1:0;
+      return ca-cb||((a.startDate||a.endDate||'9999')<(b.startDate||b.endDate||'9999')?-1:1);
+    });
+  if(projRows.length){
+    h+='<div class="card">';
+    projRows.forEach(function(inv){
+      var c=invCounts(inv);
+      var pCat=inv.catId?catById(inv.catId):null;
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text"'+(inv.completedDate?' style="color:var(--muted)"':'')+'>'+(inv.completedDate?'\u2713 ':'')+esc(inv.name)+'</div>'
+        +'<div class="entry-date">'+(pCat?esc(pCat.name)+' \u00b7 ':'')+c.have+' av '+c.total+' milep\u00e6ler'
+        +(inv.completedDate?' \u00b7 <span style="color:var(--red)">ferdigstilt '+fmtDate(inv.completedDate)+'</span>'
+          :(inv.endDate?' \u00b7 frist '+fmtDate(inv.endDate):''))
+        +'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
+        +'</div>';
+    });
+    h+='</div>';
+  } else {
+    h+='<div class="card"><div class="empty">Ingen prosjektplaner enn\u00e5. En prosjektplan har ramme (datoer, tidsbruk, kategori), faser og milep\u00e6ler.</div></div>';
+  }
+  h+='<button class="add-btn" onclick="openProjModal()">+ Ny prosjektplan</button>';
+  }
+
   if(planTab==='inventar'){
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Lister</div>';
   h+='<div class="chips" style="padding:4px 12px 0">'
-    +[['alle','Alle'],['prosjekt','Prosjektlister'],['pakke','Pakkelister'],['inventar','Inventarlister']].map(function(t){
+    +[['alle','Alle'],['pakke','Pakkelister'],['inventar','Inventarlister']].map(function(t){
       return'<button class="chip'+(listFilter===t[0]?' on':'')+'" onclick="listFilter=\''+t[0]+'\';render()">'+t[1]+'</button>';
     }).join('')+'</div>';
-  if(listFilter==='alle'||listFilter==='prosjekt')h+=ganttHTML();
   var typeOrder={prosjekt:0,pakke:1,inventar:2};
-  var shownInvs=inventories.filter(function(iv){return listFilter==='alle'||(iv.type||'inventar')===listFilter;});
+  var shownInvs=inventories.filter(function(iv){return(iv.type||'inventar')!=='prosjekt'&&(listFilter==='alle'||(iv.type||'inventar')===listFilter);});
   if(shownInvs.length){
     h+='<div class="card">';
     shownInvs.slice().sort(function(a,b){
