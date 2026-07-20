@@ -342,6 +342,8 @@ function projActive(iv){
   return!(iv.items||[]).length||(iv.items||[]).some(function(it){return!it.have;});
 }
 
+var listFilter='alle';
+
 /* ── Navigasjon ── */
 function toggleDrawer(){drawerOpen=!drawerOpen;render();}
 function dToggleMonth(m){dOpenMonth[m]=!dOpenMonth[m];render();}
@@ -429,6 +431,9 @@ function evYearsTag(e,y,light){
 function deleteRoutine(id){routines=routines.filter(function(r){return r.id!==id;});save();closeModal();}
 function deleteEvent(id){events=events.filter(function(e){return e.id!==id;});save();closeModal();}
 function goalById(id){return goals.find(function(g){return g.id===id;});}
+function resultHasRoutine(id){
+  return routines.some(function(rt){return(rt.resultIds||[]).includes(id);});
+}
 function resultById(id){return results.find(function(r){return r.id===id;});}
 function resultsFor(goalId){return results.filter(function(r){return r.valueId===goalId;}).sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);});}
 function monthsLeft(r){return(r.year-curYear)*12+(r.month-curMonth);}
@@ -553,6 +558,13 @@ function setBudgetRowType(rowId,type){
   var row=budgetRows.find(function(b){return b.id===rowId;});if(!row)return;
   row.type=type;save();render();
 }
+function goOm(){view={kind:'om'};drawerOpen=false;render();}
+function omViewHTML(){
+  return'<div class="view-title">Om appen</div>'
+    +'<div class="card" style="padding:16px 18px;font-size:14px;line-height:1.7">'
+    +'Dette er en betaversjon. Alle immaterielle rettigheter tilh\u00f8rer M. All bruk av appen skjer p\u00e5 eget ansvar.'
+    +'</div>';
+}
 function goInnstillinger(){view={kind:'innstillinger'};drawerOpen=false;render();}
 function goKategorier(){view={kind:'kategorier'};drawerOpen=false;render();}
 function goBudsjett(y,q){view={kind:'budsjett',year:y,q:q||'\u00e5r'};drawerOpen=false;render();}
@@ -651,10 +663,25 @@ function toggleItemOnList(invId,itemId,targetInvId){
   }
   save();render();
 }
-function openInvModal(){modal={step:'inv',form:{name:'',type:'inventar',startDate:'',endDate:'',goalIds:[],resultIds:[],fields:[],_newField:''}};render();}
+function invLinked(f){return((f.goalIds||[]).length+(f.resultIds||[]).length+(f.eventIds||[]).length)>0;}
+function openInvModal(){modal={step:'inv',form:{name:'',type:'inventar',startDate:'',endDate:'',goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
 function openEditInv(id){
   var inv=invById(id);if(!inv)return;
-  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',startDate:inv.startDate||'',endDate:inv.endDate||'',goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
+  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',startDate:inv.startDate||'',endDate:inv.endDate||'',goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
+}
+function fieldNumKind(fd){
+  var n=(fd.name||'').trim().toLowerCase();
+  if(n==='antall')return'int';
+  if(n==='forventet timebruk totalt')return'dec';
+  return fd.num||null;
+}
+function numVal(v){return parseFloat(String(v==null?'':v).replace(',','.'))||0;}
+function addSuggestedField(name){
+  var f=mf();
+  f.fields=f.fields||[];
+  if(f.fields.some(function(fd){return(fd.name||'').toLowerCase()===name.toLowerCase();}))return;
+  f.fields.push({id:'fd'+Date.now()+Math.random().toString(36).slice(2,6),name:name});
+  render();
 }
 function addInvField(){
   var f=mf();
@@ -667,14 +694,14 @@ function addInvField(){
 }
 function removeInvField(fid){mf().fields=(mf().fields||[]).filter(function(x){return x.id!==fid;});render();}
 function submitInv(){
-  var f=mf();var name=(f.name||'').trim();if(!name)return;
-  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',startDate:f.startDate||'',endDate:f.endDate||'',goalIds:f.goalIds||[],resultIds:f.resultIds||[],fields:f.fields||[],sections:[],items:[]};
+  var f=mf();var name=(f.name||'').trim();if(!name||!invLinked(f))return;
+  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',startDate:f.startDate||'',endDate:f.endDate||'',goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:[],items:[]};
   inventories.push(inv);save();closeModal();goInventar(inv.id);
 }
 function saveEditInv(){
-  var f=mf();var name=(f.name||'').trim();if(!name)return;
+  var f=mf();var name=(f.name||'').trim();if(!name||!invLinked(f))return;
   var inv=invById(f.id);if(!inv)return;
-  inv.name=name;inv.type=f.type||'inventar';inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.fields=f.fields||[];
+  inv.name=name;inv.type=f.type||'inventar';inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
   save();closeModal();
 }
 function deleteInv(id){
@@ -777,20 +804,20 @@ function goalCatMatch(g,entryCats){
   });
 }
 function toggleGoalOpen(id){openGoals[id]=!openGoals[id];render();}
-function openGoalModal(){modal={step:'goal',form:{name:'',text:'',cats:[],_newSub:'',_newSubParent:'',_newMain:''}};render();}
+function openGoalModal(){modal={step:'goal',form:{name:'',text:'',span:'livet',cats:[],_newSub:'',_newSubParent:'',_newMain:''}};render();}
 function openEditGoal(id){
   var g=goalById(id);if(!g)return;
-  modal={step:'goal_edit',form:{id:id,name:g.name,text:g.text||'',cats:[].concat(g.cats||[]),_newSub:'',_newSubParent:'',_newMain:''}};render();
+  modal={step:'goal_edit',form:{id:id,name:g.name,text:g.text||'',span:g.span||'livet',cats:[].concat(g.cats||[]),_newSub:'',_newSubParent:'',_newMain:''}};render();
 }
 function submitGoal(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
-  goals.push({id:'g'+Date.now()+Math.random().toString(36).slice(2,6),name:name,text:(f.text||'').trim(),cats:f.cats||[]});
+  goals.push({id:'g'+Date.now()+Math.random().toString(36).slice(2,6),name:name,text:(f.text||'').trim(),span:f.span||'livet',cats:f.cats||[]});
   save();closeModal();
 }
 function saveEditGoal(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var g=goalById(f.id);if(!g)return;
-  g.name=name;g.text=(f.text||'').trim();g.cats=f.cats||[];
+  g.name=name;g.text=(f.text||'').trim();g.span=f.span||'livet';g.cats=f.cats||[];
   save();closeModal();
 }
 function deleteGoal(id){
@@ -906,7 +933,7 @@ function openRoutineModal(){
 }
 function openEditRoutine(id){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
-  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),months:[].concat(r.months||[]),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),freq:r.freq||'',ease:r.ease||'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),months:[].concat(r.months||[]),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),freq:r.freq||'',ease:r.ease||'',minutes:r.minutes||'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openBdayModal(){
@@ -1109,7 +1136,8 @@ function updateSaveBtn(){
   }
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId;
-  if(step==='inv'||step==='inv_edit'||step==='invsec'||step==='invsec_edit'||step==='invitem'||step==='invitem_edit')enabled=(mf().name||'').trim().length>0;
+  if(step==='invsec'||step==='invsec_edit'||step==='invitem'||step==='invitem_edit')enabled=(mf().name||'').trim().length>0;
+  if(step==='inv'||step==='inv_edit')enabled=(mf().name||'').trim().length>0&&invLinked(mf());
   if(step==='deposit')enabled=!!parseKr(mf().amount);
   if(step==='posting')enabled=!!parseKr(mf().amount)&&!!mf().rowId;
   btn.disabled=!enabled;
@@ -1295,16 +1323,26 @@ function modalHTML(){
          +'<input class="inp" type="date" value="'+esc(f.endDate||'')+'" oninput="mf().endDate=this.value"></div></div>'
         :'')
       +'<label class="field-lbl">Variabler <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 egne felter per punkt, valgfritt</span></label>'
-      +'<div class="chips">'+(fieldRows||'')+'</div>'
+      +'<div class="chips">'+(fieldRows||'')
+      +((f.type||'inventar')==='inventar'&&!(f.fields||[]).some(function(fd){return(fd.name||'').toLowerCase()==='antall';})
+        ?'<button class="chip-new" onclick="addSuggestedField(\'Antall\')">+ Antall</button>':'')
+      +(f.type==='prosjekt'&&!(f.fields||[]).some(function(fd){return(fd.name||'').toLowerCase()==='forventet timebruk totalt';})
+        ?'<button class="chip-new" onclick="addSuggestedField(\'Forventet timebruk totalt\')">+ Forventet timebruk totalt</button>':'')
+      +'</div>'
       +'<div style="display:flex;gap:8px;margin-top:6px">'
       +'<input class="inp" type="text" style="flex:1;margin:0" value="'+esc(f._newField||'')+'" placeholder="F.eks. farge, fiber, st\u00f8rrelse \u2026" oninput="mf()._newField=this.value">'
       +'<button class="icon-btn" style="padding:8px 12px" onclick="addInvField()">Legg til</button>'
       +'</div>'
       +'<div class="hint">Trykk p\u00e5 en variabel for \u00e5 fjerne den. Verdiene fylles inn per punkt.</div>'
-      +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 verdi eller resultat, valgfritt</span></label>'
-      +'<div class="chips">'+linkChipSection(f)+'</div>'
+      +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 verdi, resultat eller hendelse, minst \u00e9n</span></label>'
+      +'<div class="chips">'+linkChipSection(f)
+      +events.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
+        var on=(f.eventIds||[]).includes(e.id);
+        return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormEventId(\''+q(e.id)+'\')">'+esc(e.name)+' \u00b7 hendelse</button>';
+      }).join('')+'</div>'
+      +(invLinked(f)?'':'<div class="hint" style="color:var(--amber)">Lista m\u00e5 kobles til minst \u00e9n verdi, ett resultat eller \u00e9n hendelse f\u00f8r den kan lagres \u2014 alt i appen skal peke mot noe du vil.</div>')
       +(isEditI?confirmBtn('inv','Slett liste \u2014 med alt innhold','deleteInv(\''+q(f.id)+'\')'):'')
-      +'<button class="save-btn" onclick="'+(isEditI?'saveEditInv()':'submitInv()')+'" '+((f.name||'').trim()?'':'disabled')+'>'+(isEditI?'Lagre endringer':'Opprett liste')+'</button>';
+      +'<button class="save-btn" onclick="'+(isEditI?'saveEditInv()':'submitInv()')+'" '+(((f.name||'').trim()&&invLinked(f))?'':'disabled')+'>'+(isEditI?'Lagre endringer':'Opprett liste')+'</button>';
 
   } else if(step==='invsec'||step==='invsec_edit'){
     var isEditS=step==='invsec_edit';
@@ -1320,8 +1358,11 @@ function modalHTML(){
     var secOpts='<option value=""'+(!f.sectionId?' selected':'')+'>(uten overskrift)</option>'
       +(invT.sections||[]).map(function(sc){return'<option value="'+q(sc.id)+'"'+(f.sectionId===sc.id?' selected':'')+'>'+esc(sc.name)+'</option>';}).join('');
     var fieldInputs=(invT.fields||[]).map(function(fd){
+      var kind=fieldNumKind(fd);
+      var filt=kind==='int'?"this.value=this.value.replace(/[^0-9]/g,'');"
+        :kind==='dec'?"this.value=this.value.replace(/[^0-9.,]/g,'').replace(/([.,].*)[.,]/,'$1');":'';
       return'<label class="field-lbl">'+esc(fd.name)+'</label>'
-        +'<input class="inp" type="text" value="'+esc((f.values||{})[fd.id]||'')+'" oninput="mf().values[\''+q(fd.id)+'\']=this.value">';
+        +'<input class="inp" type="text"'+(kind?' inputmode="'+(kind==='int'?'numeric':'decimal')+'" style="width:140px"':'')+' value="'+esc((f.values||{})[fd.id]||'')+'" oninput="'+filt+'mf().values[\''+q(fd.id)+'\']=this.value">';
     }).join('');
     if((invT.type||'inventar')==='prosjekt'){
       fieldInputs='<label class="field-lbl">Milep\u00e6lsdato <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
@@ -1337,19 +1378,6 @@ function modalHTML(){
       +fieldInputs
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'
-      +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 verdi eller resultat, valgfritt</span></label>'
-      +'<div class="chips">'+linkChipSection(f)+'</div>'
-      +(routines.length||events.length?'<label class="field-lbl">Bidrar til rutiner og planer <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-        +'<div class="chips">'
-        +routines.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(r){
-          var on=(f.routineIds||[]).includes(r.id);
-          return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormRoutineId(\''+q(r.id)+'\')">'+esc(r.name)+'</button>';
-        }).join('')
-        +events.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
-          var on=(f.eventIds||[]).includes(e.id);
-          return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormEventId(\''+q(e.id)+'\')">'+esc(e.name)+' \u00b7 hendelse</button>';
-        }).join('')
-        +'</div>':'')
       +(isEditT&&inventories.length>1?(function(){
         var curInv=invById(f.invId);
         var curItem=curInv?(curInv.items||[]).find(function(x){return x.id===f.id;}):null;
@@ -1523,6 +1551,12 @@ function modalHTML(){
 
   } else if(step==='goal'||step==='goal_edit'){
     var isEditG=step==='goal_edit';
+    var spanChips='<label class="field-lbl">Tidshorisont</label>'
+      +'<div class="chips">'
+      +'<button class="chip'+((f.span||'livet')==='livet'?' on':'')+'" onclick="mf().span=\'livet\';render()">Styringsverdi for resten av livet</button>'
+      +'<button class="chip'+(f.span==='fem'?' on':'')+'" onclick="mf().span=\'fem\';render()">Styringsverdi for de neste fem \u00e5rene</button>'
+      +'</div>'
+      +(f.span==='fem'?'<div class="hint">Fem\u00e5rige styringsverdier skal ha minst ett resultat knyttet til seg \u2014 du f\u00e5r en p\u00e5minnelse til det er p\u00e5 plass.</div>':'');
     var mainCats=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
     var mainChips=mainCats.map(function(m){
       var on=(f.cats||[]).includes(m.id);
@@ -1534,6 +1568,7 @@ function modalHTML(){
     body='<div class="modal-title">'+(isEditG?'Rediger verdi':'Ny verdi')+'</div>'
       +'<label class="field-lbl">Navn</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. Jeg tar godt vare på helsa mi …" oninput="mf().name=this.value;updateSaveBtn()">'
+      +spanChips
       +'<label class="field-lbl">Utdypning <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
       +'<textarea class="inp" rows="5" placeholder="Hvorfor er dette viktig for deg? Hvem vil du være?" oninput="mf().text=this.value">'+esc(f.text||'')+'</textarea>'
       +'<label class="field-lbl">Hovedkategori(er)</label>'
@@ -1555,6 +1590,8 @@ function modalHTML(){
       +'<div class="chips">'+linkChipSection(f)+'</div>'
       +'<label class="field-lbl">Hva gjør dette lettere? <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.ease||'')+'" placeholder="F.eks. joggeskoene står ved døra …" oninput="mf().ease=this.value">'
+      +'<label class="field-lbl">Tid per gang i minutter <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt, brukes i tidsbudsjettet</span></label>'
+      +'<input class="inp" type="text" inputmode="numeric" style="width:120px" value="'+esc(String(f.minutes||''))+'" placeholder="f.eks. 45" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');mf().minutes=this.value">'
       +'<label class="field-lbl">Frekvens</label>'
       +'<div class="chips">'
       +'<button class="chip'+(!f.freq?' on':'')+'" onclick="mf().freq=\'\';render()">Månedlig</button>'
@@ -1652,6 +1689,7 @@ function entryRowHTML(e){
 /* ── Sidemeny ── */
 function sidebarHTML(){
   var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow">☀\ufe0e</span>Dagbok</div>';
+  h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow">\u24d8</span>Om appen</div>';
   h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='kategorier'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow">⚙\ufe0e</span>Innstillinger</div>';
   h+='<div class="side-month'+(view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goBudsjett(curYear)"><span class="s-arrow">\u00a4</span>Budsjett og regnskap</div>';
   h+='<div class="side-title" style="padding-top:12px">Måneder</div>';
@@ -2887,9 +2925,9 @@ function budsjettViewHTML(){
 }
 
 function planleggingViewHTML(){
-  var h='<div class="view-title">Planlegging</div>'
+  var h='<div class="view-title">Legg inn m\u00e5l, rutiner og planer</div>'
     +'<div class="view-sub">Verdier er slik du vil leve («Jeg tar vare på helsa»). Resultater er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['inventar','Lister'],['senere','Til senere']];
+  var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['inventar','Lister'],['tid','Tidsbudsjett'],['senere','Til senere']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
@@ -2910,9 +2948,12 @@ function planleggingViewHTML(){
         +'<span style="flex:1;min-width:0"><span style="font-weight:700;display:block">'+esc(g.name)+'</span>'
         +((g.cats||[]).length?catPillsHTML(g.cats):'')
         +'</span>'
-        +'<span style="font-size:11px;color:var(--rose)">'+linkedR.length+' rutiner · '+linkedE.length+' planer</span>'
+        +'<span style="font-size:11px;color:var(--rose)">'+((g.span||'livet')==='fem'?'5 \u00e5r \u00b7 ':'')+linkedR.length+' rutiner · '+linkedE.length+' planer</span>'
         +(editMode?'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="event.stopPropagation();openEditGoal(\''+q(g.id)+'\')">\u270e</button>':'')
         +'</div>';
+      if((g.span||'livet')==='fem'&&!resultsFor(g.id).length){
+        h+='<div style="padding:0 14px 8px;font-size:12px;color:var(--amber)">\u26a0 Fem\u00e5rig styringsverdi uten resultat \u2014 legg til minst ett resultat som viser at du lever den.</div>';
+      }
       if(open){
         h+='<div style="padding:0 14px 12px 34px">';
         if(g.text){
@@ -2966,6 +3007,7 @@ function planleggingViewHTML(){
       h+='<div class="entry-row"><div class="entry-body">'
         +'<div class="entry-text"'+(r.achieved?' style="opacity:.55"':'')+'>'+esc(r.name)+resultDeadlineHTML(r)+'</div>'
         +(v?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(v.name)+'</div>':'')
+        +(!r.achieved&&!resultHasRoutine(r.id)?'<div class="entry-date" style="color:var(--amber)">\u26a0 Mangler rutine \u2014 et resultat uten rutine er bare et \u00f8nske. Koble en rutine til resultatet.</div>':'')
         +rInvs.map(function(iv){
           var ic=invCounts(iv);
           return'<div class="entry-date"><button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(iv.name)+' \u00b7 '+ic.have+'/'+ic.total+(ic.missing?' \u00b7 <span style="color:var(--amber)">mangler '+ic.missing+'</span>':'')+' \u203a</button></div>';
@@ -3073,9 +3115,18 @@ function planleggingViewHTML(){
   }
   if(planTab==='inventar'){
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Lister</div>';
-  if(inventories.length){
+  h+='<div class="chips" style="padding:4px 12px 0">'
+    +[['alle','Alle'],['prosjekt','Prosjektlister'],['pakke','Pakkelister'],['inventar','Inventarlister']].map(function(t){
+      return'<button class="chip'+(listFilter===t[0]?' on':'')+'" onclick="listFilter=\''+t[0]+'\';render()">'+t[1]+'</button>';
+    }).join('')+'</div>';
+  var typeOrder={prosjekt:0,pakke:1,inventar:2};
+  var shownInvs=inventories.filter(function(iv){return listFilter==='alle'||(iv.type||'inventar')===listFilter;});
+  if(shownInvs.length){
     h+='<div class="card">';
-    inventories.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(inv){
+    shownInvs.slice().sort(function(a,b){
+      var ta=typeOrder[a.type||'inventar'],tb2=typeOrder[b.type||'inventar'];
+      return ta-tb2||nbSort(a.name,b.name);
+    }).forEach(function(inv){
       var c=invCounts(inv);
       h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
         +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+((inv.type||'inventar')==='pakke'?' <span style="font-size:10px;color:var(--rose)">\u00b7 pakkeliste</span>':(inv.type||'inventar')==='prosjekt'?' <span style="font-size:10px;color:var(--rose)">\u00b7 prosjekt</span>':'')+'</div>'
@@ -3088,6 +3139,64 @@ function planleggingViewHTML(){
   h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
 
   }
+  if(planTab==='tid'){
+    var free=tbFreeHours();
+    var inpRow=function(lbl,key,unit){
+      return'<div style="display:flex;align-items:center;gap:8px;padding:4px 14px">'
+        +'<span style="flex:1;font-size:13px">'+lbl+'</span>'
+        +'<input class="inp" type="text" inputmode="decimal" style="width:70px;margin:0;text-align:right" value="'+esc(String(tb[key]))+'" onchange="this.value=this.value.replace(/[^0-9.,]/g,\'\');setTb(\''+key+'\',numVal(this.value))">'
+        +'<span style="width:52px;font-size:11px;color:var(--muted)">'+unit+'</span></div>';
+    };
+    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Tiden din</div>'
+      +'<div class="card" style="padding:8px 0">'
+      +inpRow('S\u00f8vn','sleep','t/d\u00f8gn')
+      +inpRow('Jobb, inkludert reise','work','t/uke')
+      +inpRow('M\u00e5ltider og stell','meals','t/d\u00f8gn')
+      +inpRow('Hvile og buffer','rest','t/uke')
+      +'<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--line);font-weight:700;font-size:13px">'
+      +'<span style="flex:1">Til disposisjon for m\u00e5lene dine</span><span>'+free.toFixed(1).replace('.',',')+' t/uke</span></div>'
+      +'</div>';
+
+    var rHours=0;var rRows='';
+    routines.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(r){
+      var hw=routineWeeklyHours(r);
+      if(hw>0){rHours+=hw;rRows+='<div style="display:flex;gap:8px;padding:3px 14px;font-size:13px"><span style="flex:1">'+esc(r.name)+'</span><span style="color:var(--muted)">'+hw.toFixed(1).replace('.',',')+' t</span></div>';}
+    });
+    var noTime=routines.filter(function(r){return!Number(r.minutes);}).length;
+
+    var pHours=0;var pRows='';
+    inventories.filter(projActive).forEach(function(iv){
+      var hf=(iv.fields||[]).find(function(fd){return(fd.name||'').toLowerCase()==='forventet timebruk totalt';});
+      if(!hf)return;
+      var remH=0;(iv.items||[]).forEach(function(it){if(!it.have)remH+=numVal((it.values||{})[hf.id]);});
+      if(!remH)return;
+      var weeksLeft=iv.endDate?Math.max(1,(new Date(iv.endDate)-today)/604800000):4;
+      var hw=remH/weeksLeft;
+      pHours+=hw;
+      pRows+='<div style="display:flex;gap:8px;padding:3px 14px;font-size:13px"><span style="flex:1">'+esc(iv.name)+' <span style="color:var(--muted);font-size:11px">\u00b7 '+remH.toFixed(0)+' t igjen'+(iv.endDate?' p\u00e5 '+Math.ceil(weeksLeft)+' uker':'')+'</span></span><span style="color:var(--muted)">'+hw.toFixed(1).replace('.',',')+' t</span></div>';
+    });
+
+    var used=rHours+pHours;var margin=free-used;
+    h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Det du har lovet deg selv</div>'
+      +'<div class="card" style="padding:6px 0">'
+      +(rRows?'<div style="padding:4px 14px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">Rutiner</div>'+rRows:'')
+      +(pRows?'<div style="padding:8px 14px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">Aktive prosjekter</div>'+pRows:'')
+      +(!rRows&&!pRows?'<div class="empty">Ingen tidsanslag enn\u00e5. Gi rutinene minutter per gang, og prosjektmilep\u00e6lene variabelen \u00abForventet timebruk totalt\u00bb.</div>':'')
+      +'<div style="display:flex;gap:8px;padding:8px 14px;border-top:1px solid var(--line);font-weight:700;font-size:13px">'
+      +'<span style="flex:1">Sum lovet</span><span>'+used.toFixed(1).replace('.',',')+' t/uke</span></div>'
+      +'<div style="display:flex;gap:8px;padding:2px 14px 8px;font-weight:700;font-size:13px;color:'+(margin<0?'var(--amber)':'var(--red)')+'">'
+      +'<span style="flex:1">Margin</span><span>'+margin.toFixed(1).replace('.',',')+' t/uke</span></div>'
+      +'</div>';
+    if(margin<0){
+      h+='<div class="hint-box" style="color:var(--amber)">Du har lovet deg selv mer tid enn du har. Planer som ikke f\u00e5r plass i uka, blir brutte l\u00f8fter \u2014 kutt, utsett eller gj\u00f8r rutiner sjeldnere til marginen er positiv.</div>';
+    } else if(used>0&&margin<2){
+      h+='<div class="hint-box">Marginen er knapp. La det v\u00e6re litt slingringsmonn \u2014 uker blir sjelden som planlagt.</div>';
+    }
+    if(noTime){
+      h+='<div class="hint">'+noTime+' rutine'+(noTime===1?'':'r')+' mangler tidsanslag og telles ikke med.</div>';
+    }
+  }
+
   if(planTab==='senere'){
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Senere <span style="font-weight:400;color:var(--rose)">\u00b7 venter p\u00e5 riktig tidspunkt</span></div>';
   if(laters.length){
@@ -3132,7 +3241,7 @@ function render(){
     +'<button class="tab'+(view.kind==='hjem'||view.kind==='dagbok'?' on':'')+'" onclick="goHjem()">Dagbok</button>'
     +'<button class="tab'+(view.kind==='kalender'||view.kind==='rutiner'||view.kind==='uke'?' on':'')+'" onclick="goUke()">Kalender</button>'
     +'<button class="tab'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'?' on':'')+'" onclick="goOppsummering()">Rapporter</button>'
-    +'<button class="tab'+(view.kind==='planlegging'?' on':'')+'" onclick="goPlanlegging()">Planlegging</button>'
+    +'<button class="tab'+(view.kind==='planlegging'?' on':'')+'" onclick="goPlanlegging()">Legg inn m\u00e5l, rutiner og planer</button>'
     +'</div>'
     +'</div>';
 
@@ -3142,6 +3251,7 @@ function render(){
   else if(view.kind==='rutiner')content=rutinerViewHTML();
   else if(view.kind==='kalender')content=kalenderViewHTML();
   else if(view.kind==='uke')content=ukeViewHTML();
+  else if(view.kind==='om')content=omViewHTML();
   else if(view.kind==='oppsummering')content=oppsummeringViewHTML();
   else if(view.kind==='rapport')content=rapportViewHTML();
   else if(view.kind==='arsrapport')content=arsrapportViewHTML();
