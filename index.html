@@ -1795,6 +1795,7 @@ function modalHTML(){
       +'<button class="chip'+(f.freq==='weekly'?' on':'')+'" onclick="mf().freq=\'weekly\';render()">Ukentlig</button>'
       +'<button class="chip'+(f.freq==='odd'?' on':'')+'" onclick="mf().freq=\'odd\';render()">Oddetallsuker</button>'
       +'<button class="chip'+(f.freq==='even'?' on':'')+'" onclick="mf().freq=\'even\';render()">Partallsuker</button>'
+      +'<button class="chip'+(f.freq==='yearly'?' on':'')+'" onclick="mf().freq=\'yearly\';render()">\u00c5rlig</button>'
       +'</div>'
       +(f.freq?'<div class="hint">Rutinen får én knapp per aktuell uke, og krysses av per uke.</div>':'')
       +'<label class="field-lbl">Måneder (tom = hver måned)</label>'
@@ -1954,6 +1955,8 @@ function periodTodoItems(scope){
       // Daglige rutiner vises bare i dagbokboksene, aldri i kalenderen
       if(!scope.daily)return;
       pushR(r,'d'+scope.daily,'daglig');
+    } else if(r.freq==='yearly'){
+      pushR(r,'y'+scope.y,'\u00e5rlig');
     } else if(isWeekly(r)){
       if(r.freq==='odd'&&scope.wk%2===0)return;
       if(r.freq==='even'&&scope.wk%2===1)return;
@@ -3524,6 +3527,7 @@ function planleggingViewHTML(){
     routines.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(r){
       var months=(r.months||[]).length?(r.months||[]).map(function(m){return MND_FULL[m-1].slice(0,3);}).join(', '):'hver måned';
       if(r.freq==='daily')months+=' · daglig';
+      if(r.freq==='yearly')months+=' · én gang i året';
       if(r.freq==='weekly')months+=' · ukentlig';
       if(r.freq==='odd')months+=' · oddetallsuker';
       if(r.freq==='even')months+=' · partallsuker';
