@@ -685,21 +685,64 @@ function gaverViewHTML(){
     h+='<div class="card"><div class="empty">Ingen gaver logget enn\u00e5. Registrer en gave du har gitt, eller en id\u00e9 du vil huske \u2014 s\u00e5 f\u00e5r hver person sin egen gaveside.</div></div>';
     return h;
   }
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Personer</div><div class="card">';
-  people.forEach(function(pn){
-    var gs=giftsFor(pn).filter(function(g){return!g.greetMark;});
-    var ideas=gs.filter(function(g){return g.idea;}).length;
-    var given=gs.filter(function(g){return!g.idea;}).length;
-    var bd=bdayForPerson(pn);
-    var dd=bd?daysToNextBday(bd):null;
-    h+='<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(pn)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(pn)+'</div>'
-      +'<div class="entry-date">'+given+' gitt'+(ideas?' \u00b7 '+ideas+' id\u00e9'+(ideas>1?'er':''):'')
-      +(dd!==null&&dd<=21?' \u00b7 <span style="color:var(--rose)">bursdag om '+dd+' dager</span>':'')+'</div></div>'
-      +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
-      +'</div>';
-  });
-  h+='</div>';
+  // Årsmatrise: personer som rader, år som kolonner delt i Bursdag/Jul/Andre
+  var given=gifts.filter(function(g){return!g.greetMark&&!g.idea;});
+  var years=Array.from(new Set(given.map(function(g){return Number(g.year);}))).sort(function(a,b){return b-a;});
+  var cellText=function(pn,y,k){
+    var items=given.filter(function(g){return(g.person||'').trim()===pn&&Number(g.year)===y&&g.kind===k;});
+    if(!items.length)return'<span style="color:var(--line)">\u00b7</span>';
+    return items.map(function(g){return esc(g.what);}).join('<br>');
+  };
+  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Gaveoversikt</div>';
+  if(!years.length){
+    h+='<div class="card"><div class="empty">Ingen gitte gaver logget enn\u00e5 \u2014 bare id\u00e9er. N\u00e5r du registrerer en gitt gave, dukker den opp i oversikten.</div></div>';
+  } else {
+    var kinds=[['bursdag','\ud83c\udf82'],['jul','\ud83c\udf84'],['annet','\u2726']];
+    var th='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="border-collapse:collapse;font-size:11px;min-width:100%">';
+    // Rad 1: år
+    th+='<tr><th style="position:sticky;left:0;z-index:2;background:var(--card);border-bottom:1px solid var(--line);padding:4px 8px"></th>';
+    years.forEach(function(y,i){
+      th+='<th colspan="3" style="text-align:center;font-size:11px;font-weight:700;padding:4px 6px 2px;border-bottom:1px solid var(--line)'+(i>0?';border-left:1.5px solid var(--line)':'')+'">'+y+'</th>';
+    });
+    th+='</tr>';
+    // Rad 2: sub-kolonner
+    th+='<tr><th style="position:sticky;left:0;z-index:2;background:var(--card);border-bottom:1.5px solid var(--line)"></th>';
+    years.forEach(function(y,i){
+      kinds.forEach(function(kk,ki){
+        th+='<th style="font-size:11px;font-weight:400;color:var(--muted);padding:2px 6px;border-bottom:1.5px solid var(--line);min-width:56px'+(ki===0&&i>0?';border-left:1.5px solid var(--line)':'')+'">'+kk[1]+'</th>';
+      });
+    });
+    th+='</tr>';
+    // Rader: personer
+    people.forEach(function(pn){
+      var bd=bdayForPerson(pn);var dd=bd?daysToNextBday(bd):null;
+      var nameCol='<th style="position:sticky;left:0;z-index:1;background:var(--card);text-align:left;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap" onclick="goGavePerson(\''+q(pn)+'\')">'+esc(pn)
+        +(dd!==null&&dd<=21?'<br><span style="font-weight:400;color:var(--rose);font-size:10px">bursdag om '+dd+' d</span>':'')+'</th>';
+      var cells='';
+      years.forEach(function(y,i){
+        kinds.forEach(function(kk,ki){
+          cells+='<td style="text-align:center;vertical-align:top;padding:5px 6px;border-bottom:1px solid var(--line);color:var(--ink)'+(ki===0&&i>0?';border-left:1.5px solid var(--line)':'')+'">'+cellText(pn,y,kk[0])+'</td>';
+        });
+      });
+      th+='<tr>'+nameCol+cells+'</tr>';
+    });
+    th+='</table></div>';
+    h+='<div class="card" style="padding:8px 4px">'+th
+      +'<div style="font-size:10px;color:var(--muted);padding:6px 8px 2px">\ud83c\udf82 bursdag \u00b7 \ud83c\udf84 jul \u00b7 \u2726 andre \u00b7 trykk p\u00e5 navnet for detaljer og id\u00e9er</div></div>';
+  }
+  // Personer uten gitte gaver (bare idéer) — så de ikke forsvinner
+  var onlyIdeas=people.filter(function(pn){return!given.some(function(g){return(g.person||'').trim()===pn;});});
+  if(onlyIdeas.length){
+    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Bare id\u00e9er enn\u00e5</div><div class="card">';
+    onlyIdeas.forEach(function(pn){
+      var ideas=giftsFor(pn).filter(function(g){return g.idea;}).length;
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(pn)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(pn)+'</div>'
+        +'<div class="entry-date">'+ideas+' id\u00e9'+(ideas>1?'er':'')+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    h+='</div>';
+  }
   return h;
 }
 function gavePersonViewHTML(){
