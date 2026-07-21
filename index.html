@@ -755,7 +755,7 @@ function gavePersonViewHTML(){
     +'<button class="chip'+(greetDone(pn,curYear,'jul')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'jul\')">'+(greetDone(pn,curYear,'jul')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
     +'</div>';
   if(!gs.length){
-    h+='<div class="card"><div class="empty">Ingen gaver logget for '+esc(pn)+' enn\u00e5.</div></div>';
+    h+='<div class="card"><div class="empty">Ingen gaver logget for '+esc(pn)+' enn\u00e5. Trykk \u00ab+ Gave\u00bb for \u00e5 registrere en gave eller notere en id\u00e9.</div></div>';
   }
   return h;
 }
@@ -2064,7 +2064,7 @@ function sidebarHTML(){
   var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow">☀\ufe0e</span>Dagbok</div>';
   h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow">\u24d8</span>Om appen</div>';
   h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='kategorier'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow">⚙\ufe0e</span>Innstillinger</div>';
-  h+='<div class="side-month'+(view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goGaver()"><span class="s-arrow">\ud83c\udf81</span>Gaver</div>';
+  h+='<div class="side-month'+(view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goGaver()"><span class="s-arrow"></span>Gaver</div>';
   h+='<div class="side-month'+(view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goBudsjett(curYear)"><span class="s-arrow">\u00a4</span>Budsjett og regnskap</div>';
   return h;
 }
@@ -3756,7 +3756,7 @@ function planleggingViewHTML(){
       h+='<div class="'+(round?'confetti round-bday':'')+'" style="display:flex;align-items:center;gap:8px;padding:3px 14px;font-size:13px;position:relative">'
         +(round?confettiHTML():'')
         +'<span style="width:64px;flex-shrink:0;color:var(--muted);font-size:12px">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1].slice(0,3)+'</span>'
-        +'<span style="flex:1">'+esc(e.name)
+        +'<span style="flex:1"><span style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:2px" onclick="goGavePerson(\''+q(e.name)+'\')">'+esc(e.name)+'</span>'
         +(age!==null?' <span style="color:var(--muted);font-size:11px">'+age+' \u00e5r</span>':'')
         +' <span style="color:var(--rose);font-size:11px">\u00b7 '+(nAge!==null?'fyller '+nAge+' ':'bursdag ')+when+'</span>'
         +(round?' <span style="color:var(--red);font-weight:700;font-size:11px">\ud83c\udf89</span>':'')
