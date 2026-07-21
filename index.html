@@ -697,7 +697,7 @@ function gaverViewHTML(){
   if(!years.length){
     h+='<div class="card"><div class="empty">Ingen gitte gaver logget enn\u00e5 \u2014 bare id\u00e9er. N\u00e5r du registrerer en gitt gave, dukker den opp i oversikten.</div></div>';
   } else {
-    var kinds=[['bursdag','\ud83c\udf82'],['jul','\ud83c\udf84'],['annet','\u2726']];
+    var kinds=[['bursdag','Bursdag'],['jul','Jul'],['annet','Andre']];
     var th='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="border-collapse:collapse;font-size:11px;min-width:100%">';
     // Rad 1: år
     th+='<tr><th style="position:sticky;left:0;z-index:2;background:var(--card);border-bottom:1px solid var(--line);padding:4px 8px"></th>';
@@ -709,7 +709,7 @@ function gaverViewHTML(){
     th+='<tr><th style="position:sticky;left:0;z-index:2;background:var(--card);border-bottom:1.5px solid var(--line)"></th>';
     years.forEach(function(y,i){
       kinds.forEach(function(kk,ki){
-        th+='<th style="font-size:11px;font-weight:400;color:var(--muted);padding:2px 6px;border-bottom:1.5px solid var(--line);min-width:56px'+(ki===0&&i>0?';border-left:1.5px solid var(--line)':'')+'">'+kk[1]+'</th>';
+        th+='<th style="font-size:11px;font-weight:400;color:var(--muted);padding:2px 6px;border-bottom:1.5px solid var(--line);min-width:64px'+(ki===0&&i>0?';border-left:1.5px solid var(--line)':'')+'">'+kk[1]+'</th>';
       });
     });
     th+='</tr>';
@@ -728,7 +728,7 @@ function gaverViewHTML(){
     });
     th+='</table></div>';
     h+='<div class="card" style="padding:8px 4px">'+th
-      +'<div style="font-size:10px;color:var(--muted);padding:6px 8px 2px">\ud83c\udf82 bursdag \u00b7 \ud83c\udf84 jul \u00b7 \u2726 andre \u00b7 trykk p\u00e5 navnet for detaljer og id\u00e9er</div></div>';
+      +'<div style="font-size:10px;color:var(--muted);padding:6px 8px 2px">Trykk p\u00e5 navnet for detaljer og id\u00e9er.</div></div>';
   }
   // Personer uten gitte gaver (bare idéer) — så de ikke forsvinner
   var onlyIdeas=people.filter(function(pn){return!given.some(function(g){return(g.person||'').trim()===pn;});});
@@ -757,14 +757,14 @@ function gavePersonViewHTML(){
     +'</div>';
   if(bd){
     var dd=daysToNextBday(bd);var nAge=bdayNextAge(bd);
-    h+='<div class="view-sub" style="padding-top:2px">\ud83c\udf82 '+(bd.day?bd.day+'. ':'')+MND_FULL[bd.month-1]+(nAge!==null?' \u00b7 fyller '+nAge+' om '+dd+' dager':' \u00b7 om '+dd+' dager')+'</div>';
+    h+='<div class="view-sub" style="padding-top:2px">Bursdag '+(bd.day?bd.day+'. ':'')+MND_FULL[bd.month-1]+(nAge!==null?' \u00b7 fyller '+nAge+' om '+dd+' dager':' \u00b7 om '+dd+' dager')+'</div>';
   }
   // Idébank øverst
   var ideas=gs.filter(function(g){return g.idea;});
   if(ideas.length){
     h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Gaveidéer</div><div class="card">';
     ideas.forEach(function(g){
-      h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">\ud83d\udca1 '+esc(g.what)+'</div>'
+      h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(g.what)+'</div>'
         +'<div class="entry-date">'+giftKindLabel(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
         +'<button class="chip" style="font-size:11px;padding:3px 9px;align-self:center;flex-shrink:0" onclick="giftIdeaToGiven(\''+q(g.id)+'\')">\u2192 Gitt</button>'
         +'<button class="icon-btn" style="font-size:11px;padding:1px 7px;align-self:center" onclick="openEditGift(\''+q(g.id)+'\')">\u270e</button></div>';
@@ -791,10 +791,10 @@ function gavePersonViewHTML(){
   // Bursdagshilsen og julekort — per år
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Hilsener i \u00e5r</div><div class="card" style="padding:8px 0">'
     +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
-    +'<span style="flex:1;font-size:13px">\ud83c\udf82 Bursdagshilsen '+curYear+'</span>'
+    +'<span style="flex:1;font-size:13px">Bursdagshilsen '+curYear+'</span>'
     +'<button class="chip'+(greetDone(pn,curYear,'bursdag')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'bursdag\')">'+(greetDone(pn,curYear,'bursdag')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
     +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
-    +'<span style="flex:1;font-size:13px">\ud83c\udf84 Julekort '+curYear+'</span>'
+    +'<span style="flex:1;font-size:13px">Julekort '+curYear+'</span>'
     +'<button class="chip'+(greetDone(pn,curYear,'jul')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'jul\')">'+(greetDone(pn,curYear,'jul')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
     +'</div>';
   if(!gs.length){
