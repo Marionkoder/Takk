@@ -2104,11 +2104,11 @@ function entryRowHTML(e){
 
 /* ── Sidemeny ── */
 function sidebarHTML(){
-  var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow">☀\ufe0e</span>Dagbok</div>';
-  h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow">\u24d8</span>Om appen</div>';
-  h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='kategorier'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow">⚙\ufe0e</span>Innstillinger</div>';
+  var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow"></span>Dagbok</div>';
+  h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
+  h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='kategorier'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
   h+='<div class="side-month'+(view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goGaver()"><span class="s-arrow"></span>Gaver</div>';
-  h+='<div class="side-month'+(view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goBudsjett(curYear)"><span class="s-arrow">\u00a4</span>Budsjett og regnskap</div>';
+  h+='<div class="side-month'+(view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goBudsjett(curYear)"><span class="s-arrow"></span>Budsjett og regnskap</div>';
   return h;
 }
 
