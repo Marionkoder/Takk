@@ -1509,7 +1509,7 @@ function modalHTML(){
          +((f.goalIds||[]).length?'':'<div class="hint" style="color:var(--amber)">En prosjektplan m\u00e5 kobles til minst \u00e9n verdi \u2014 den skal vise hvordan du vil leve.</div>')
         :f.type==='pakke'
         ?'<label class="field-lbl">Hendelse <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 minst \u00e9n</span></label>'
-         +'<div class="chips">'+(events.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
+         +'<div class="chips">'+(events.filter(function(e){return!e.bday;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
             var on=(f.eventIds||[]).includes(e.id);
             return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormEventId(\''+q(e.id)+'\')">'+esc(e.name)+'</button>';
           }).join('')||'<div class="hint">Ingen hendelser enn\u00e5 \u2014 legg inn turen eller anledningen under Hendelser f\u00f8rst.</div>')+'</div>'
