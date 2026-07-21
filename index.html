@@ -68,6 +68,7 @@ body{background:var(--bg);color:var(--ink);font-family:"Nunito","Helvetica Neue"
 .topbar{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--line);padding:0}
 .topbar-row{display:flex;align-items:center;gap:10px;margin-bottom:0;padding:14px 16px 10px;background:var(--bg)}
 .stripe-ribbon{height:7px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
+.stripe-thin{height:3.5px;border-radius:2px;margin:8px 12px 2px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
 .menu-btn{background:none;border:1px solid var(--line);border-radius:8px;font-size:16px;padding:4px 10px;cursor:pointer;color:var(--ink)}
 h1{font-size:24px;font-weight:400;letter-spacing:0;flex:1;color:var(--ink)}
 .edit-btn{font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit}
@@ -750,14 +751,19 @@ function gavePersonViewHTML(){
   var all=giftsFor(pn);
   var gs=all.filter(function(g){return!g.greetMark;});
   var bd=bdayForPerson(pn);
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
+  var titleName=esc(pn);
+  if(bd&&bd.day){
+    titleName+=', '+bd.day+'. '+MND_FULL[bd.month-1]+(Number(bd.sinceYear)>0?' '+bd.sinceYear:'');
+  }
+  var h='<div style="display:flex;align-items:flex-start;gap:8px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goGaver()">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">'+esc(pn)+'</div>'
-    +'<button class="icon-btn" style="font-size:11px" onclick="openGiftModal(\''+q(pn)+'\')">+ Gave</button>'
+    +'<div class="view-title" style="padding:0;flex:1">'+titleName+'</div>'
+    +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="openGiftModal(\''+q(pn)+'\')">+ Gave</button>'
     +'</div>';
   if(bd){
     var dd=daysToNextBday(bd);var nAge=bdayNextAge(bd);
-    h+='<div class="view-sub" style="padding-top:2px">Bursdag '+(bd.day?bd.day+'. ':'')+MND_FULL[bd.month-1]+(nAge!==null?' \u00b7 fyller '+nAge+' om '+dd+' dager':' \u00b7 om '+dd+' dager')+'</div>';
+    h+='<div class="view-sub" style="padding-top:2px">'+(nAge!==null?'Fyller '+nAge+' om '+dd+' dager':(dd===0?'Bursdag i dag':dd===1?'Bursdag i morgen':'Bursdag om '+dd+' dager'))+'</div>';
+    h+='<div class="stripe-thin"></div>';
   }
   // Idébank øverst
   var ideas=gs.filter(function(g){return g.idea;});
@@ -804,6 +810,24 @@ function gavePersonViewHTML(){
 }
 function goInnstillinger(){view={kind:'innstillinger'};drawerOpen=false;render();}
 function goKategorier(){view={kind:'kategorier'};drawerOpen=false;render();}
+function openPinSetup(){
+  var pd=pinData();
+  modal={step:'pinsetup',form:{has:!!pd,pin:'',pin2:'',q:pd?pd.q:'',a:'',cur:'',showOff:false}};render();
+}
+function submitPinSetup(){
+  var f=mf();
+  if(!/^[0-9]{4}$/.test(f.pin)){f._err='PIN-en m\u00e5 v\u00e6re fire siffer.';render();return;}
+  if(f.pin!==f.pin2){f._err='De to PIN-kodene er ikke like.';render();return;}
+  if(!(f.q||'').trim()||!(f.a||'').trim()){f._err='Fyll inn b\u00e5de sp\u00f8rsm\u00e5l og svar.';render();return;}
+  pinSet(f.pin,f.q.trim(),f.a);
+  closeModal();
+}
+function turnPinOff(){
+  var f=mf();var pd=pinData();
+  if(!pd)return;
+  if(f.cur!==pd.pin){f._err2='Feil PIN.';render();return;}
+  pinClear();closeModal();
+}
 function goBudsjett(y,q){view={kind:'budsjett',year:y,q:q||'\u00e5r'};drawerOpen=false;render();}
 function addBudgetLine(catId){
   var row=budgetRowFor(catId,view.year,true);
@@ -1470,7 +1494,27 @@ function modalHTML(){
   if(!modal)return'';
   var f=mf(),step=modal.step,body='';
 
-  if(step==='gift'){
+  if(step==='pinsetup'){
+    body='<div class="modal-title">'+(f.has?'Endre PIN-l\u00e5s':'Sett opp PIN-l\u00e5s')+'</div>'
+      +'<div class="hint" style="line-height:1.6">PIN-koden er en sperre mot at andre \u00e5pner dagboka di \u2014 familie, gjester, noen som l\u00e5ner telefonen. Den er <b>ikke</b> kryptering: teksten ligger fortsatt p\u00e5 telefonen, og en teknisk kyndig person kan i prinsippet lese den. Vil du verne mot at telefonen mistes eller stjeles, er telefonens egen skjerml\u00e5s det som faktisk hjelper.</div>'
+      +'<label class="field-lbl">'+(f.has?'Ny PIN':'PIN')+' <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 fire siffer</span></label>'
+      +'<input class="inp" type="password" inputmode="numeric" maxlength="4" style="width:120px;letter-spacing:6px;text-align:center" value="'+esc(f.pin)+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').slice(0,4);mf().pin=this.value">'
+      +'<label class="field-lbl">Gjenta PIN</label>'
+      +'<input class="inp" type="password" inputmode="numeric" maxlength="4" style="width:120px;letter-spacing:6px;text-align:center" value="'+esc(f.pin2)+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').slice(0,4);mf().pin2=this.value">'
+      +'<label class="field-lbl">Sikkerhetssp\u00f8rsm\u00e5l <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 for \u00e5 komme inn igjen ved glemt PIN</span></label>'
+      +'<input class="inp" type="text" value="'+esc(f.q)+'" placeholder="F.eks. Navnet p\u00e5 min f\u00f8rste katt?" oninput="mf().q=this.value">'
+      +'<label class="field-lbl">Svar</label>'
+      +'<input class="inp" type="text" value="'+esc(f.a)+'" placeholder="Svaret bare du kjenner" oninput="mf().a=this.value">'
+      +'<div class="hint">Svaret sammenlignes uten forskjell p\u00e5 store og sm\u00e5 bokstaver.</div>'
+      +(f._err?'<div class="hint" style="color:var(--amber)">'+esc(f._err)+'</div>':'')
+      +'<button class="save-btn" onclick="submitPinSetup()">'+(f.has?'Lagre ny PIN':'Sl\u00e5 p\u00e5 PIN-l\u00e5s')+'</button>'
+      +(f.has?'<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">'
+        +'<label class="field-lbl">Sl\u00e5 av l\u00e5sen <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 skriv n\u00e5v\u00e6rende PIN</span></label>'
+        +'<input class="inp" type="password" inputmode="numeric" maxlength="4" style="width:120px;letter-spacing:6px;text-align:center" value="'+esc(f.cur)+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').slice(0,4);mf().cur=this.value">'
+        +(f._err2?'<div class="hint" style="color:var(--amber)">'+esc(f._err2)+'</div>':'')
+        +'<button class="save-btn" style="background:transparent;border:1.5px solid var(--red);color:var(--red);margin-top:8px" onclick="turnPinOff()">Sl\u00e5 av PIN-l\u00e5sen</button></div>':'');
+
+  } else if(step==='gift'){
     var isEditG=!!f.id;
     var pplist=giftPeople().filter(function(n){return n!==f.person;});
     var bdayNames=events.filter(function(e){return e.bday;}).map(function(e){return(e.name||'').trim();});
@@ -3444,6 +3488,11 @@ function innstillingerViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Administrer kategorier</div>'
     +'<div class="entry-date">se hva hver kategori er knyttet til, og finn ubrukte</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  var hasPin=!!pinData();
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="openPinSetup()">'
+    +'<div class="entry-body"><div class="entry-text">PIN-l\u00e5s</div>'
+    +'<div class="entry-date">'+(hasPin?'p\u00e5 \u2014 endre eller sl\u00e5 av':'av \u2014 lås appen med en PIN-kode')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   return h;
 }
 
@@ -3899,6 +3948,7 @@ function planleggingViewHTML(){
 
 /* ── Hovedrender ── */
 function render(){
+  if(pinLocked){renderPinScreen();return;}
   var wasSearch=false,wasQuick=false;
   var wasQTags=false;
   try{wasSearch=document.activeElement&&document.activeElement.id==='search-inp';wasQuick=document.activeElement&&document.activeElement.id==='quick-inp';wasQTags=document.activeElement&&document.activeElement.id==='quick-tags';}catch(e){}
@@ -3960,7 +4010,95 @@ function render(){
   if(ta&&!ta.value)ta.focus();
 }
 
-load();
+
+// ── PIN-lås ──
+var pinLocked=false;
+function pinData(){
+  try{return JSON.parse(localStorage.getItem(SK+'_pin')||'null');}catch(e){return null;}
+}
+function pinSet(pin,question,answer){
+  localStorage.setItem(SK+'_pin',JSON.stringify({pin:String(pin),q:question||'',a:normAnswer(answer||'')}));
+}
+function pinClear(){localStorage.removeItem(SK+'_pin');}
+function normAnswer(x){return String(x||'').trim().toLowerCase().replace(/\s+/g,' ');}
+function pinRender(){
+  var pd=pinData();
+  var st=window._pinState||(window._pinState={mode:'enter',buf:'',err:'',recovering:false,ansBuf:'',newBuf:''});
+  var box=function(inner){return'<div style="max-width:340px;margin:0 auto;padding:60px 24px 24px;text-align:center">'+inner+'</div>';};
+  var dots=function(n){var h='';for(var i=0;i<4;i++)h+='<span style="display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 6px;border:1.5px solid var(--sel-line);background:'+(i<n?'var(--ink)':'transparent')+'"></span>';return h;};
+  var pad=function(handler){
+    var h='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:240px;margin:22px auto 0">';
+    ['1','2','3','4','5','6','7','8','9','','0','\u232b'].forEach(function(k){
+      if(k==='')h+='<div></div>';
+      else h+='<button onclick="'+handler+'(\''+k+'\')" style="font-size:22px;padding:14px 0;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-family:inherit">'+k+'</button>';
+    });
+    return h+'</div>';
+  };
+  var h;
+  if(st.recovering){
+    h=box('<div style="font-size:17px;font-weight:700;margin-bottom:6px">Glemt PIN</div>'
+      +'<div style="font-size:14px;color:var(--muted);margin-bottom:16px">'+esc(pd.q||'Sikkerhetssp\u00f8rsm\u00e5l')+'</div>'
+      +'<input id="pin-ans" class="inp" type="text" value="'+esc(st.ansBuf)+'" placeholder="Svar" oninput="_pinState.ansBuf=this.value" style="text-align:center">'
+      +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:8px">'+esc(st.err)+'</div>':'')
+      +'<button class="save-btn" style="margin-top:14px" onclick="pinCheckAnswer()">Bekreft svar</button>'
+      +'<button class="icon-btn" style="margin-top:10px" onclick="_pinState.recovering=false;_pinState.err=\'\';renderPinScreen()">Tilbake</button>');
+  } else if(st.mode==='setnew'){
+    h=box('<div style="font-size:17px;font-weight:700;margin-bottom:6px">Velg ny PIN</div>'
+      +'<div style="font-size:13px;color:var(--muted);margin-bottom:20px">Fire siffer</div>'
+      +dots(st.newBuf.length)
+      +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
+      +pad('pinNewDigit'));
+  } else {
+    h=box('<div style="font-size:17px;font-weight:700;margin-bottom:6px">Gode dager</div>'
+      +'<div style="font-size:13px;color:var(--muted);margin-bottom:20px">Skriv PIN-koden</div>'
+      +dots(st.buf.length)
+      +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
+      +pad('pinDigit')
+      +'<button class="icon-btn" style="margin-top:16px;color:var(--rose)" onclick="_pinState.recovering=true;_pinState.err=\'\';renderPinScreen()">Glemt PIN?</button>');
+  }
+  document.getElementById('app').innerHTML=h;
+  var ai=document.getElementById('pin-ans');if(ai){ai.focus();}
+}
+function renderPinScreen(){pinRender();}
+function pinDigit(k){
+  var st=window._pinState;
+  if(k==='\u232b'){st.buf=st.buf.slice(0,-1);st.err='';renderPinScreen();return;}
+  if(st.buf.length>=4)return;
+  st.buf+=k;
+  if(st.buf.length===4){
+    var pd=pinData();
+    if(pd&&st.buf===pd.pin){pinLocked=false;window._pinState=null;render();}
+    else{
+      st._fails=(st._fails||0)+1;
+      var delay=st._fails>=3?Math.min(4000,(st._fails-2)*1000):0;
+      st.buf='';st.err='Feil PIN'+(delay?' \u2014 vent litt \u2026':'');renderPinScreen();
+      if(delay){var btns=document.querySelectorAll('#app button');btns.forEach(function(b){b.disabled=true;});
+        setTimeout(function(){st.err='';renderPinScreen();},delay);}
+    }
+  } else renderPinScreen();
+}
+function pinCheckAnswer(){
+  var st=window._pinState;var pd=pinData();
+  if(pd&&normAnswer(st.ansBuf)===pd.a){st.recovering=false;st.mode='setnew';st.newBuf='';st.err='';renderPinScreen();}
+  else{st.err='Svaret stemmer ikke.';renderPinScreen();}
+}
+function pinNewDigit(k){
+  var st=window._pinState;
+  if(k==='\u232b'){st.newBuf=st.newBuf.slice(0,-1);renderPinScreen();return;}
+  if(st.newBuf.length>=4)return;
+  st.newBuf+=k;
+  if(st.newBuf.length===4){
+    var pd=pinData();
+    pinSet(st.newBuf,pd.q,pd.a);
+    pinLocked=false;window._pinState=null;render();
+  } else renderPinScreen();
+}
+function bootPin(){
+  if(pinData())pinLocked=true;
+  load();
+  if(pinLocked)renderPinScreen();
+}
+bootPin();
 </script>
 </body>
 </html>
