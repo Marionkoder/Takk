@@ -325,6 +325,13 @@ function load(){
   } else if(!seeded){
     try{localStorage.setItem(SK+'_seeded','1');}catch(e){}
   }
+  // Punktkoblinger til verdier/resultater/rutiner/hendelser ble flyttet til listenivå — rens gamle rester
+  inventories.forEach(function(iv){
+    (iv.items||[]).forEach(function(it){
+      delete it.goalIds;delete it.resultIds;delete it.routineIds;delete it.eventIds;
+    });
+  });
+
   // Andre runde med standardkategorier — også hos eksisterende brukere, fritt slettbare
   var seeded2=false;try{seeded2=!!localStorage.getItem(SK+'_seeded2');}catch(e){}
   if(!seeded2){
@@ -714,9 +721,7 @@ function toggleItemOnList(invId,itemId,targetInvId){
     target.items=(target.items||[]).concat([{
       id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),
       sectionId:null,name:it.name,note:it.note||'',values:values,have:(target.type||'inventar')==='pakke'?false:!!it.have,
-      syncId:it.syncId,
-      goalIds:[].concat(it.goalIds||[]),resultIds:[].concat(it.resultIds||[]),
-      routineIds:[].concat(it.routineIds||[]),eventIds:[].concat(it.eventIds||[])
+      syncId:it.syncId
     }]);
   }
   save();render();
@@ -833,11 +838,11 @@ function deleteInvSec(){
   save();closeModal();
 }
 function openInvItemModal(invId,secId){
-  modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:{},have:false,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
+  modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:{},have:false,_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
 }
 function openEditInvItem(invId,itemId){
   var inv=invById(invId);var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
-  modal={step:'invitem_edit',form:{invId:invId,id:itemId,sectionId:it.sectionId,name:it.name,note:it.note||'',mdate:it.date||'',inCal:it.inCal!==false,values:JSON.parse(JSON.stringify(it.values||{})),have:!!it.have,goalIds:[].concat(it.goalIds||[]),resultIds:[].concat(it.resultIds||[]),routineIds:[].concat(it.routineIds||[]),eventIds:[].concat(it.eventIds||[])}};render();
+  modal={step:'invitem_edit',form:{invId:invId,id:itemId,sectionId:it.sectionId,name:it.name,note:it.note||'',mdate:it.date||'',inCal:it.inCal!==false,values:JSON.parse(JSON.stringify(it.values||{})),have:!!it.have}};render();
 }
 function submitInvItem(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
@@ -849,7 +854,6 @@ function saveEditInvItem(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
   var inv=invById(f.invId);var it=(inv.items||[]).find(function(x){return x.id===f.id;});if(!it)return;
   it.name=n;it.sectionId=f.sectionId||null;it.note=(f.note||'').trim();it.date=f.mdate||'';it.inCal=!!f.inCal;it.values=f.values||{};it.have=!!f.have;
-  it.goalIds=f.goalIds||[];it.resultIds=f.resultIds||[];it.routineIds=f.routineIds||[];it.eventIds=f.eventIds||[];
   save();closeModal();
 }
 function deleteInvItem(){
@@ -867,19 +871,11 @@ function toggleFormEventId(id){
   mf().eventIds=a.includes(id)?a.filter(function(x){return x!==id;}):[].concat(a,[id]);
   render();
 }
-function invItemLinkNames(it){
-  return[].concat(
-    (it.goalIds||[]).map(function(id){var g=goalById(id);return g?g.name:null;}),
-    (it.resultIds||[]).map(function(id){var r=resultById(id);return r?r.name:null;}),
-    (it.routineIds||[]).map(function(id){var r=routines.find(function(x){return x.id===id;});return r?r.name:null;}),
-    (it.eventIds||[]).map(function(id){var e=events.find(function(x){return x.id===id;});return e?e.name:null;})
-  ).filter(Boolean);
-}
 function invRowToLater(invId,itemId){
   var inv=invById(invId);if(!inv)return;
   var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
-  var gids=[].concat(inv.goalIds||[],it.goalIds||[]);
-  [].concat(inv.resultIds||[],it.resultIds||[]).forEach(function(rid){var r=resultById(rid);if(r&&r.valueId&&!gids.includes(r.valueId))gids.push(r.valueId);});
+  var gids=[].concat(inv.goalIds||[]);
+  (inv.resultIds||[]).forEach(function(rid){var r=resultById(rid);if(r&&r.valueId&&!gids.includes(r.valueId))gids.push(r.valueId);});
   gids=gids.filter(function(x,i){return gids.indexOf(x)===i;});
   laters.push({id:'l'+Date.now()+Math.random().toString(36).slice(2,6),name:it.name,note:'Fra '+inv.name+(it.note?' \u00b7 '+it.note:''),goalIds:gids});
   save();render();
@@ -1820,7 +1816,7 @@ function modalHTML(){
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="Beskriv hendelsen …" oninput="mf().name=this.value;updateSaveBtn()">'
       +'<label class="field-lbl">Når</label>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-      +'<select class="inp" style="width:auto" oninput="mf().day=this.value"><optgroup label="Dag (valgfritt)">'+dOpts+'</optgroup></select>'
+      +'<select class="inp" style="width:auto" oninput="mf().day=this.value;if(!this.value){mf().toDay=\'\';mf().toMonth=\'\';}render()"><optgroup label="Dag (valgfritt)">'+dOpts+'</optgroup></select>'
       +'<select class="inp" style="width:auto" oninput="mf().month=this.value">'+mOpts+'</select>'
       +'<select class="inp" style="width:auto" oninput="mf().year=this.value">'+yOpts+'</select>'
       +'</div>'
@@ -3176,7 +3172,7 @@ function inventarViewHTML(){
       +'</div>'
       +(vals?'<div class="entry-date">'+vals+'</div>':'')
       +(it.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(it.note)+'</div>':'')
-      +(function(){var ln=invItemLinkNames(it);return ln.length?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(ln.join(' \u00b7 '))+'</div>':'';})()
+
       +(function(){
         if(!it.syncId)return'';
         var others=inventories.filter(function(iv){return iv.id!==inv.id&&(iv.items||[]).some(function(x){return x.syncId===it.syncId;});}).map(function(iv){return iv.name;});
@@ -3537,11 +3533,7 @@ function planleggingViewHTML(){
         ?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(gNames.join(' · '))+'</div>'
         :'<div class="entry-date" style="color:var(--amber)">\u26a0\ufe0e mangler kobling</div>';
       if(r.ease)gLine+='<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(r.ease)+'</div>';
-      var gear=[];
-      inventories.forEach(function(iv){(iv.items||[]).forEach(function(it){
-        if((it.routineIds||[]).includes(r.id))gear.push(it.name+(it.have?'':' (mangler)'));
-      });});
-      if(gear.length)gLine+='<div style="font-size:12px;color:var(--muted)">Utstyr: '+esc(gear.join(' \u00b7 '))+'</div>';
+
       h+='<div class="entry-row"><div class="entry-body">'
         +'<div class="entry-text">'+esc(r.name)+'</div>'
         +'<div class="entry-date">'+esc(months)+'</div>'
