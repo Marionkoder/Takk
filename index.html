@@ -294,6 +294,48 @@ var openGoals={};
 var editMode=false;
 var modal=null;
 var drawerOpen=false;
+var gifts=[];
+// gift: {id, person, bdayId(valgfri), kind:'bursdag'|'jul'|'annet', year, what, idea:bool, greeting:bool(bursdagshilsen), card:bool(julekort), note}
+function giftPeople(){
+  var names={};
+  gifts.forEach(function(g){var k=(g.person||'').trim();if(k)names[k]=(names[k]||0)+1;});
+  events.forEach(function(e){if(e.bday&&e.giftPerson)names[(e.name||'').trim()]=names[(e.name||'').trim()]||0;});
+  return Object.keys(names).sort(function(a,b){return nbSort(a,b);});
+}
+function giftsFor(person){return gifts.filter(function(g){return(g.person||'').trim()===(person||'').trim();});}
+function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.name||'').trim()===(person||'').trim();});}
+function goGaver(){view={kind:'gaver'};drawerOpen=false;render();}
+function openGiftModal(person){
+  modal={step:'gift',form:{id:'',person:person||'',kind:'bursdag',year:curYear,what:'',idea:false,note:''}};render();
+}
+function openEditGift(id){
+  var g=gifts.find(function(x){return x.id===id;});if(!g)return;
+  modal={step:'gift',form:{id:g.id,person:g.person||'',kind:g.kind||'bursdag',year:g.year||curYear,what:g.what||'',idea:!!g.idea,note:g.note||''}};render();
+}
+function submitGift(){
+  var f=mf();var person=(f.person||'').trim();var what=(f.what||'').trim();
+  if(!person||!what)return;
+  if(f.id){
+    var g=gifts.find(function(x){return x.id===f.id;});if(!g)return;
+    g.person=person;g.kind=f.kind;g.year=Number(f.year)||curYear;g.what=what;g.idea=!!f.idea;g.note=(f.note||'').trim();
+  } else {
+    gifts.push({id:'gf'+Date.now()+Math.random().toString(36).slice(2,6),person:person,kind:f.kind,year:Number(f.year)||curYear,what:what,idea:!!f.idea,note:(f.note||'').trim()});
+  }
+  save();closeModal();
+}
+function giftIdeaToGiven(id){var g=gifts.find(function(x){return x.id===id;});if(g){g.idea=false;save();render();}}
+function deleteGift(id){gifts=gifts.filter(function(x){return x.id!==id;});save();closeModal();}
+// Bursdagshilsen og julekort logges per person per år
+function greetKey(person,year,kind){return 'gr_'+kind+'_'+year+'_'+(person||'').trim();}
+function greetDone(person,year,kind){return gifts.some(function(g){return g.greetMark&&g.person===(person||'').trim()&&g.year===year&&g.kind===kind;});}
+function toggleGreet(person,year,kind){
+  var existing=gifts.find(function(g){return g.greetMark&&g.person===(person||'').trim()&&g.year===year&&g.kind===kind;});
+  if(existing)gifts=gifts.filter(function(g){return g!==existing;});
+  else gifts.push({id:'gr'+Date.now()+Math.random().toString(36).slice(2,6),greetMark:true,person:(person||'').trim(),kind:kind,year:year,what:'',idea:false});
+  save();render();
+}
+function goGavePerson(person){view={kind:'gaveperson',person:person};drawerOpen=false;render();}
+function giftKindLabel(k){return k==='jul'?'Julegave':k==='annet'?'Annen gave':'Bursdagsgave';}
 var dOpenMonth={},dOpenSec={};
 var view={kind:'hjem',month:curMonth,year:curYear};
 var selectedTag=null;
@@ -311,6 +353,7 @@ function load(){
   try{inventories=JSON.parse(localStorage.getItem(SK+'_inv')||'[]');}catch(e){inventories=[];}
   try{budgetRows=JSON.parse(localStorage.getItem(SK+'_budget')||'[]');}catch(e){budgetRows=[];}
   try{deposits=JSON.parse(localStorage.getItem(SK+'_deposits')||'[]');}catch(e){deposits=[];}
+  try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tb=JSON.parse(localStorage.getItem(SK+'_tb')||'null')||tb;}catch(e){}
   // Defaultkategorier ved første oppstart — kan slettes fritt av brukeren
   var seeded=false;try{seeded=!!localStorage.getItem(SK+'_seeded');}catch(e){}
@@ -355,6 +398,7 @@ function save(){
   try{localStorage.setItem(SK+'_inv',JSON.stringify(inventories));}catch(e){}
   try{localStorage.setItem(SK+'_budget',JSON.stringify(budgetRows));}catch(e){}
   try{localStorage.setItem(SK+'_deposits',JSON.stringify(deposits));}catch(e){}
+  try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tb',JSON.stringify(tb));}catch(e){}
 }
 
@@ -629,6 +673,91 @@ function omViewHTML(){
     +'<div class="card" style="padding:16px 18px;font-size:14px;line-height:1.7">'
     +'Dette er en betaversjon. Alle immaterielle rettigheter tilh\u00f8rer M. All bruk av appen skjer p\u00e5 eget ansvar.'
     +'</div>';
+}
+function gaverViewHTML(){
+  var people=giftPeople();
+  var h='<div class="view-title">Gaver</div>';
+  h+='<button class="add-btn" onclick="openGiftModal(\'\')">+ Ny gave eller idé</button>';
+  // Kommende bursdager blant gavefolk — hint om ideer
+  var soon=events.filter(function(e){return e.bday&&daysToNextBday(e)<=21&&giftsFor(e.name).length;})
+    .sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b);});
+  if(!people.length){
+    h+='<div class="card"><div class="empty">Ingen gaver logget enn\u00e5. Registrer en gave du har gitt, eller en id\u00e9 du vil huske \u2014 s\u00e5 f\u00e5r hver person sin egen gaveside.</div></div>';
+    return h;
+  }
+  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Personer</div><div class="card">';
+  people.forEach(function(pn){
+    var gs=giftsFor(pn).filter(function(g){return!g.greetMark;});
+    var ideas=gs.filter(function(g){return g.idea;}).length;
+    var given=gs.filter(function(g){return!g.idea;}).length;
+    var bd=bdayForPerson(pn);
+    var dd=bd?daysToNextBday(bd):null;
+    h+='<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(pn)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(pn)+'</div>'
+      +'<div class="entry-date">'+given+' gitt'+(ideas?' \u00b7 '+ideas+' id\u00e9'+(ideas>1?'er':''):'')
+      +(dd!==null&&dd<=21?' \u00b7 <span style="color:var(--rose)">bursdag om '+dd+' dager</span>':'')+'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
+      +'</div>';
+  });
+  h+='</div>';
+  return h;
+}
+function gavePersonViewHTML(){
+  var pn=view.person;
+  var all=giftsFor(pn);
+  var gs=all.filter(function(g){return!g.greetMark;});
+  var bd=bdayForPerson(pn);
+  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
+    +'<button class="icon-btn" onclick="goGaver()">\u2039</button>'
+    +'<div class="view-title" style="padding:0;flex:1">'+esc(pn)+'</div>'
+    +'<button class="icon-btn" style="font-size:11px" onclick="openGiftModal(\''+q(pn)+'\')">+ Gave</button>'
+    +'</div>';
+  if(bd){
+    var dd=daysToNextBday(bd);var nAge=bdayNextAge(bd);
+    h+='<div class="view-sub" style="padding-top:2px">\ud83c\udf82 '+(bd.day?bd.day+'. ':'')+MND_FULL[bd.month-1]+(nAge!==null?' \u00b7 fyller '+nAge+' om '+dd+' dager':' \u00b7 om '+dd+' dager')+'</div>';
+  }
+  // Idébank øverst
+  var ideas=gs.filter(function(g){return g.idea;});
+  if(ideas.length){
+    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Gaveidéer</div><div class="card">';
+    ideas.forEach(function(g){
+      h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">\ud83d\udca1 '+esc(g.what)+'</div>'
+        +'<div class="entry-date">'+giftKindLabel(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
+        +'<button class="chip" style="font-size:11px;padding:3px 9px;align-self:center;flex-shrink:0" onclick="giftIdeaToGiven(\''+q(g.id)+'\')">\u2192 Gitt</button>'
+        +'<button class="icon-btn" style="font-size:11px;padding:1px 7px;align-self:center" onclick="openEditGift(\''+q(g.id)+'\')">\u270e</button></div>';
+    });
+    h+='</div>';
+  }
+  // Gitte gaver gruppert per år
+  var given=gs.filter(function(g){return!g.idea;});
+  var years=Array.from(new Set(given.map(function(g){return g.year;}))).sort(function(a,b){return b-a;});
+  if(years.length){
+    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Gitt</div>';
+    years.forEach(function(y){
+      h+='<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+y+'</div><div class="card">';
+      ['bursdag','jul','annet'].forEach(function(k){
+        given.filter(function(g){return g.year===y&&g.kind===k;}).forEach(function(g){
+          h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(g.what)+'</div>'
+            +'<div class="entry-date">'+giftKindLabel(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
+            +'<button class="icon-btn" style="font-size:11px;padding:1px 7px;align-self:center" onclick="openEditGift(\''+q(g.id)+'\')">\u270e</button></div>';
+        });
+      });
+      h+='</div>';
+    });
+  }
+  // Bursdagshilsen og julekort — per år
+  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Hilsener i \u00e5r</div><div class="card" style="padding:8px 0">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
+    +'<span style="flex:1;font-size:13px">\ud83c\udf82 Bursdagshilsen '+curYear+'</span>'
+    +'<button class="chip'+(greetDone(pn,curYear,'bursdag')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'bursdag\')">'+(greetDone(pn,curYear,'bursdag')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
+    +'<span style="flex:1;font-size:13px">\ud83c\udf84 Julekort '+curYear+'</span>'
+    +'<button class="chip'+(greetDone(pn,curYear,'jul')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'jul\')">'+(greetDone(pn,curYear,'jul')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
+    +'</div>';
+  if(!gs.length){
+    h+='<div class="card"><div class="empty">Ingen gaver logget for '+esc(pn)+' enn\u00e5.</div></div>';
+  }
+  return h;
 }
 function goInnstillinger(){view={kind:'innstillinger'};drawerOpen=false;render();}
 function goKategorier(){view={kind:'kategorier'};drawerOpen=false;render();}
@@ -1235,6 +1364,7 @@ function updateSaveBtn(){
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId;
   if(step==='invsec'||step==='invsec_edit'||step==='invitem'||step==='invitem_edit')enabled=(mf().name||'').trim().length>0;
+  if(step==='gift')enabled=(mf().person||'').trim().length>0&&(mf().what||'').trim().length>0;
   if(step==='inv'||step==='inv_edit')enabled=invValid(mf());
   if(step==='deposit')enabled=!!parseKr(mf().amount);
   if(step==='posting')enabled=!!parseKr(mf().amount)&&!!mf().rowId;
@@ -1297,7 +1427,33 @@ function modalHTML(){
   if(!modal)return'';
   var f=mf(),step=modal.step,body='';
 
-  if(step==='restgarn'){
+  if(step==='gift'){
+    var isEditG=!!f.id;
+    var pplist=giftPeople().filter(function(n){return n!==f.person;});
+    var bdayNames=events.filter(function(e){return e.bday;}).map(function(e){return(e.name||'').trim();});
+    var sugg=bdayNames.filter(function(n){return n&&giftPeople().indexOf(n)<0;}).sort(function(a,b){return nbSort(a,b);});
+    body='<div class="modal-title">'+(isEditG?'Rediger':(f.idea?'Ny gaveid\u00e9':'Ny gave'))+'</div>'
+      +'<label class="field-lbl">Til hvem</label>'
+      +'<input class="inp" type="text" list="giftppl" value="'+esc(f.person||'')+'" placeholder="Navn" oninput="mf().person=this.value;updateSaveBtn()">'
+      +'<datalist id="giftppl">'+pplist.concat(sugg).map(function(n){return'<option value="'+esc(n)+'">';}).join('')+'</datalist>'
+      +(sugg.length&&!(f.person||'').trim()?'<div class="chips" style="margin-top:4px">'+sugg.slice(0,6).map(function(n){return'<button class="chip" onclick="mf().person=\''+q(n)+'\';render()">'+esc(n)+'</button>';}).join('')+'</div>':'')
+      +'<label class="field-lbl">Hva</label>'
+      +'<input class="inp" type="text" value="'+esc(f.what||'')+'" placeholder="'+(f.idea?'Gaveidé \u2026':'Hva ga du?')+'" oninput="mf().what=this.value;updateSaveBtn()">'
+      +'<label class="field-lbl">Anledning</label>'
+      +'<div class="chips">'
+      +'<button class="chip'+(f.kind==='bursdag'?' on':'')+'" onclick="mf().kind=\'bursdag\';render()">Bursdagsgave</button>'
+      +'<button class="chip'+(f.kind==='jul'?' on':'')+'" onclick="mf().kind=\'jul\';render()">Julegave</button>'
+      +'<button class="chip'+(f.kind==='annet'?' on':'')+'" onclick="mf().kind=\'annet\';render()">Annen gave</button>'
+      +'</div>'
+      +'<label class="field-lbl">\u00c5r</label>'
+      +'<input class="inp" type="text" inputmode="numeric" style="width:100px" value="'+esc(String(f.year||curYear))+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').slice(0,4);mf().year=this.value">'
+      +'<div class="chips" style="margin-top:8px"><button class="chip'+(f.idea?' on':'')+'" onclick="mf().idea=!mf().idea;render()">'+(f.idea?'\u2713 Dette er en id\u00e9':'Merk som id\u00e9 (ikke gitt enn\u00e5)')+'</button></div>'
+      +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. hvor kj\u00f8pt, st\u00f8rrelse \u2026" oninput="mf().note=this.value">'
+      +(isEditG?confirmBtn('gift','Slett','deleteGift(\''+q(f.id)+'\')'):'')
+      +'<button class="save-btn" onclick="submitGift()" '+(((f.person||'').trim()&&(f.what||'').trim())?'':'disabled')+'>'+(isEditG?'Lagre':'Legg til')+'</button>';
+
+  } else if(step==='restgarn'){
     var rgInv=invById(f.invId);
     body='<div class="modal-title">Gratulerer med ferdig prosjekt! \ud83c\udf89</div>'
       +'<div class="hint">Vil du sende restgarnet til garnlageret? Fyll inn omtrent hvor mye som er igjen \u2014 det legges inn som punkter p\u00e5 inventarlista \u00abGarnlager\u00bb'+(inventories.some(function(iv){return iv.name.toLowerCase()==='garnlager';})?'':' (opprettes automatisk)')+'.</div>'
@@ -1908,6 +2064,7 @@ function sidebarHTML(){
   var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow">☀\ufe0e</span>Dagbok</div>';
   h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow">\u24d8</span>Om appen</div>';
   h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='kategorier'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow">⚙\ufe0e</span>Innstillinger</div>';
+  h+='<div class="side-month'+(view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goGaver()"><span class="s-arrow">\ud83c\udf81</span>Gaver</div>';
   h+='<div class="side-month'+(view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goBudsjett(curYear)"><span class="s-arrow">\u00a4</span>Budsjett og regnskap</div>';
   return h;
 }
@@ -2098,6 +2255,7 @@ function hjemViewHTML(){
         +(round?confettiHTML():'')
         +'<div class="entry-body"><div class="entry-text">\ud83c\udf82 '+esc(e.name)
         +(nAge?' fyller '+nAge:'')
+        +(function(){var gi=giftsFor(e.name).filter(function(g){return g.idea&&g.kind==='bursdag';});return gi.length?' <span style="color:var(--rose);font-size:11px">\u00b7 '+gi.length+' gaveid\u00e9'+(gi.length>1?'er':'')+'</span>':'';})()
         +(round?' \ud83c\udf89':'')+'</div>'
         +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+' \u00b7 om '+d+' dager')+'</div></div>'
         +'</div>';
@@ -3729,6 +3887,8 @@ function render(){
   else if(view.kind==='kalender')content=kalenderViewHTML();
   else if(view.kind==='uke')content=ukeViewHTML();
   else if(view.kind==='om')content=omViewHTML();
+  else if(view.kind==='gaver')content=gaverViewHTML();
+  else if(view.kind==='gaveperson')content=gavePersonViewHTML();
   else if(view.kind==='oppsummering')content=oppsummeringViewHTML();
   else if(view.kind==='rapport')content=rapportViewHTML();
   else if(view.kind==='arsrapport')content=arsrapportViewHTML();
