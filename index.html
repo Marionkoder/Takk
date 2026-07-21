@@ -198,10 +198,23 @@ textarea.inp{min-height:80px;resize:vertical}
   .card{margin:8px 8px 4px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+#print-area{display:none}
+@media print{
+  body>*{display:none!important}
+  #print-area{display:block!important;color:#000;background:#fff;font-family:Georgia,'Times New Roman',serif;font-size:12pt;line-height:1.5}
+  #print-area h1{font-size:17pt;margin:0 0 2pt}
+  #print-area .p-sub{font-size:10pt;color:#444;margin:0 0 12pt}
+  #print-area h2{font-size:12pt;margin:12pt 0 3pt;border-bottom:.75pt solid #000;padding-bottom:2pt}
+  #print-area .p-item{margin:0 0 3pt;page-break-inside:avoid}
+  #print-area .p-note{font-size:9.5pt;color:#444;margin-left:16pt}
+  #print-area .p-meta{font-size:10pt;margin:1pt 0}
+  #print-area .p-foot{margin-top:16pt;font-size:9pt;color:#666}
+}
 </style>
 </head>
 <body>
 <div id="app"><div class="empty" style="padding:40px 18px">Laster …</div></div>
+<div id="print-area" aria-hidden="true"></div>
 
 <script>
 'use strict';
@@ -2995,6 +3008,72 @@ function ganttHTML(){
   h+='</div>';
   return h;
 }
+function printListHTML(inv){
+  var typeTxt=(inv.type||'inventar')==='pakke'?'Pakkeliste':(inv.type||'inventar')==='prosjekt'?(inv.subtype==='strikk'?'Strikkeprosjekt':'Prosjektplan'):'Inventarliste';
+  var isProjP=(inv.type||'inventar')==='prosjekt';
+  var h='<h1>'+esc(dispName(inv))+'</h1><div class="p-sub">'+typeTxt
+    +(isProjP&&(inv.startDate||inv.endDate)?' \u00b7 '+(inv.startDate?fmtDate(inv.startDate):'?')+' \u2013 '+(inv.endDate?fmtDate(inv.endDate):'?'):'')
+    +'</div>';
+  if(isProjP){
+    var cat0=inv.catId?catById(inv.catId):null;
+    if(cat0)h+='<div class="p-meta">Kategori: '+esc(cat0.name)+'</div>';
+    if(inv.hoursTotal)h+='<div class="p-meta">Forventet tidsbruk: '+String(inv.hoursTotal).replace('.',',')+' t</div>';
+    if(inv.subtype==='strikk'&&inv.knit){
+      var K3=inv.knit;
+      if(K3.toWhom)h+='<div class="p-meta">Til: '+esc(K3.toWhom)+'</div>';
+      (K3.yarns||[]).forEach(function(y){
+        var parts=[y.name,y.color,y.mat,y.prod].filter(Boolean).join(' \u00b7 ');
+        var amt=[y.gram?y.gram+' g':'',y.skeins?y.skeins+' n\u00f8ster':''].filter(Boolean).join(' / ');
+        if(parts||amt)h+='<div class="p-meta">Garn: '+esc(parts)+(amt?' \u00b7 '+amt:'')+'</div>';
+      });
+      if(K3.pattern)h+='<div class="p-meta">Oppskrift: '+esc(K3.pattern)+'</div>';
+      var pins3=(K3.needles||[]).filter(function(n){return n.th||n.len;}).map(function(n){return(n.th?n.th+' mm':'?')+(n.len?' \u00d7 '+n.len+' cm':'');}).join(', ');
+      if(pins3)h+='<div class="p-meta">Pinner: '+esc(pins3)+'</div>';
+    }
+    (inv.fields||[]).forEach(function(fd){
+      var v=(inv.varValues||{})[fd.id];
+      if(v)h+='<div class="p-meta">'+esc(fd.name)+': '+esc(v)+'</div>';
+    });
+  }
+  var itemLine=function(it){
+    var vals=isProjP?'':(inv.fields||[]).map(function(fd){
+      var v=(it.values||{})[fd.id];
+      return v?esc(fd.name)+': '+esc(v):null;
+    }).filter(Boolean).join(' \u00b7 ');
+    return'<div class="p-item">'+(it.have?'\u2611':'\u2610')+' '+esc(it.name)
+      +(isProjP&&it.date?' \u2014 '+fmtDate(it.date):'')
+      +(vals?'<div class="p-note">'+vals+'</div>':'')
+      +(it.note?'<div class="p-note">'+esc(it.note)+'</div>':'')
+      +'</div>';
+  };
+  var secs=[].concat(inv.sections||[]);
+  if(isProjP)secs.sort(function(a,b){return(a.startDate||'9999')<(b.startDate||'9999')?-1:1;});
+  var sortItems=function(arr){
+    return arr.sort(function(a,b){
+      if(isProjP)return(a.date||'9999')<(b.date||'9999')?-1:(a.date||'9999')>(b.date||'9999')?1:nbSort(a.name,b.name);
+      return nbSort(a.name,b.name);});
+  };
+  secs.forEach(function(sc){
+    h+='<h2>'+esc(sc.name)
+      +(isProjP&&(sc.startDate||sc.endDate)?' <span style="font-weight:normal;font-size:10pt">'+(sc.startDate?fmtDate(sc.startDate):'?')+' \u2013 '+(sc.endDate?fmtDate(sc.endDate):'?')+(sc.hours?' \u00b7 '+String(sc.hours).replace('.',',')+' t':'')+'</span>':'')+'</h2>';
+    h+=sortItems((inv.items||[]).filter(function(it){return it.sectionId===sc.id;})).map(itemLine).join('');
+  });
+  var lone=(inv.items||[]).filter(function(it){return!it.sectionId||!secs.some(function(sc){return sc.id===it.sectionId;});});
+  if(lone.length){
+    if(secs.length)h+='<h2>'+(isProjP?'Uten fase':'Uten overskrift')+'</h2>';
+    h+=sortItems(lone).map(itemLine).join('');
+  }
+  h+='<div class="p-foot">Gode dager \u00b7 skrevet ut '+fmtDate(isoDate(today))+'</div>';
+  return h;
+}
+function printList(invId){
+  var inv=invById(invId);if(!inv)return;
+  var area=document.getElementById('print-area');
+  if(!area)return;
+  area.innerHTML=printListHTML(inv);
+  try{window.print();}
+  catch(e){alert('Utskrift st\u00f8ttes ikke her \u2014 \u00e5pne appen i nettleseren og pr\u00f8v derfra.');}
+}
 function inventarViewHTML(){
   var inv=invById(view.invId);
   if(!inv)return'<div class="card"><div class="empty">Fant ikke listen.</div></div>';
@@ -3006,6 +3085,7 @@ function inventarViewHTML(){
   var isProj=(inv.type||'inventar')==='prosjekt';
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goPlanlegging()">\u2039</button>'
+    +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
     +(isPack?' <span style="font-size:11px;font-weight:400;color:var(--rose)">pakkeliste</span>':isProj?' <span style="font-size:11px;font-weight:400;color:var(--rose)">'+(inv.subtype==='strikk'?'strikkeprosjekt':'prosjektplan')+'</span>':'')+'</div>'
     +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="openEditInv(\''+q(inv.id)+'\')">\u270e</button>'
