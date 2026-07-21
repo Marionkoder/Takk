@@ -761,10 +761,10 @@ function sendRestgarn(){
 function invValid(f){
   if(!(f.name||'').trim())return false;
   if(f.type==='prosjekt')return!!f.catId&&(f.goalIds||[]).length>0;
-  if(f.type==='pakke')return(f.eventIds||[]).length>0;
+  if(f.type==='pakke')return f.pakkeFast||(f.eventIds||[]).length>0;
   return!!f.catId; // inventarliste
 }
-function openInvModal(){modal={step:'inv',form:{name:'',type:'inventar',startDate:'',endDate:'',catId:'',hoursTotal:'',varValues:{},goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
+function openInvModal(){modal={step:'inv',form:{name:'',type:'inventar',startDate:'',endDate:'',catId:'',hoursTotal:'',varValues:{},pakkeFast:false,goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
 function blankKnit(){return{shortTitle:'',toWhom:'',pattern:'',needles:[{th:'',len:''}],yarns:[{name:'',mat:'',prod:'',color:'',gram:'',skeins:''}]};}
 function openProjModal(){modal={step:'inv',form:{name:'',type:'prosjekt',subtype:'',_lockType:true,startDate:'',endDate:'',catId:'',hoursTotal:'',varValues:{},knit:blankKnit(),goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
 function addKnitYarn(){mf().knit.yarns.push({name:'',mat:'',prod:'',color:'',gram:'',skeins:''});render();}
@@ -774,7 +774,7 @@ function rmKnitNeedle(i){var k=mf().knit;if(k.needles.length>1)k.needles.splice(
 function dispName(iv){return(iv.subtype==='strikk'&&iv.knit&&(iv.knit.shortTitle||'').trim())?iv.knit.shortTitle.trim():iv.name;}
 function openEditInv(id){
   var inv=invById(id);if(!inv)return;
-  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',hoursTotal:inv.hoursTotal||'',varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
+  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',hoursTotal:inv.hoursTotal||'',varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
 }
 function fieldNumKind(fd){
   var n=(fd.name||'').trim().toLowerCase();
@@ -802,13 +802,13 @@ function addInvField(){
 function removeInvField(fid){mf().fields=(mf().fields||[]).filter(function(x){return x.id!==fid;});render();}
 function submitInv(){
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
-  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',subtype:f.subtype||'',knit:f.subtype==='strikk'?f.knit:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.catId||'',hoursTotal:numVal(f.hoursTotal)||'',varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:[],items:[]};
+  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.catId||'',hoursTotal:numVal(f.hoursTotal)||'',varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:[],items:[]};
   inventories.push(inv);save();closeModal();goInventar(inv.id);
 }
 function saveEditInv(){
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var inv=invById(f.id);if(!inv)return;
-  inv.name=name;inv.type=f.type||'inventar';inv.subtype=f.subtype||'';if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=f.catId||'';inv.hoursTotal=numVal(f.hoursTotal)||'';inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
+  inv.name=name;inv.type=f.type||'inventar';inv.subtype=f.subtype||'';inv.pakkeFast=f.type==='pakke'?!!f.pakkeFast:undefined;if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=f.catId||'';inv.hoursTotal=numVal(f.hoursTotal)||'';inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
   save();closeModal();
 }
 function deleteInv(id){
@@ -1470,7 +1470,15 @@ function modalHTML(){
       +'</div>'
       +'<div class="hint">'+(f.type==='pakke'
         ?'En pakkeliste kan hente punkter fra inventarlistene, og avhakingen (\u00abpakket\u00bb) kan nullstilles f\u00f8r neste tur \u2014 punktene best\u00e5r.'
-        :'En inventarliste holder oversikt over det du har og mangler.')+'</div>')
+        :'En inventarliste holder oversikt over det du har og mangler.')+'</div>'
+      +(f.type==='pakke'
+        ?'<label class="field-lbl">Pakkeliste for</label>'
+         +'<div class="chips">'
+         +'<button class="chip'+(f.pakkeFast?' on':'')+'" onclick="mf().pakkeFast=true;render()">Fast pakkeliste</button>'
+         +'<button class="chip'+(!f.pakkeFast?' on':'')+'" onclick="mf().pakkeFast=false;render()">For en hendelse</button>'
+         +'</div>'
+         +'<div class="hint">'+(f.pakkeFast?'En fast pakkeliste brukes om igjen \u2014 til sv\u00f8mmehallen, treningsbagen, hva det skal v\u00e6re \u2014 og trenger ingen hendelse.':'Knyttes til turen eller anledningen den pakkes for.')+'</div>'
+        :''))
       +(isProjM&&!isEditI
         ?'<label class="field-lbl">Prosjekttype</label>'
          +'<div class="chips">'
@@ -1517,12 +1525,13 @@ function modalHTML(){
          +'<div class="chips">'+linkChipSection(f)+'</div>'
          +((f.goalIds||[]).length?'':'<div class="hint" style="color:var(--amber)">En prosjektplan m\u00e5 kobles til minst \u00e9n verdi \u2014 den skal vise hvordan du vil leve.</div>')
         :f.type==='pakke'
-        ?'<label class="field-lbl">Hendelse <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 minst \u00e9n</span></label>'
-         +'<div class="chips">'+(events.filter(function(e){return!e.bday;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
-            var on=(f.eventIds||[]).includes(e.id);
-            return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormEventId(\''+q(e.id)+'\')">'+esc(e.name)+'</button>';
-          }).join('')||'<div class="hint">Ingen hendelser enn\u00e5 \u2014 legg inn turen eller anledningen under Hendelser f\u00f8rst.</div>')+'</div>'
-         +((f.eventIds||[]).length?'':'<div class="hint" style="color:var(--amber)">En pakkeliste m\u00e5 knyttes til hendelsen den pakkes for.</div>')
+        ?(f.pakkeFast?''
+          :'<label class="field-lbl">Hendelse <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 minst \u00e9n</span></label>'
+           +'<div class="chips">'+(events.filter(function(e){return!e.bday;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
+              var on=(f.eventIds||[]).includes(e.id);
+              return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormEventId(\''+q(e.id)+'\')">'+esc(e.name)+'</button>';
+            }).join('')||'<div class="hint">Ingen hendelser enn\u00e5 \u2014 legg inn turen eller anledningen under Hendelser f\u00f8rst.</div>')+'</div>'
+           +((f.eventIds||[]).length?'':'<div class="hint" style="color:var(--amber)">En pakkeliste m\u00e5 knyttes til hendelsen den pakkes for.</div>'))
         :'<label class="field-lbl">Hovedkategori</label>'
          +'<div class="chips">'+cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(c){
             return'<button class="chip'+(f.catId===c.id?' on':'')+'" onclick="mf().catId=\''+q(c.id)+'\';render()">'+esc(c.name)+'</button>';
@@ -3420,7 +3429,7 @@ function budsjettViewHTML(){
 }
 
 function planleggingViewHTML(){
-  var h='<div class="view-title">Legg inn m\u00e5l, rutiner og planer</div>'
+  var h='<div class="view-title">M\u00e5l, rutiner og planer</div>'
     +'<div class="view-sub">Verdier er slik du vil leve («Jeg tar vare på helsa»). Resultater er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
   var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['prosjekt','Prosjektplaner'],['inventar','Lister'],['senere','Satt p\u00e5 vent']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
@@ -3429,6 +3438,7 @@ function planleggingViewHTML(){
 
   if(planTab==='verdier'){
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Verdier</div>';
+  h+='<button class="add-btn" onclick="openGoalModal()">+ Ny verdi</button>';
   if(!goals.length){
     h+='<div class="card"><div class="empty">Ingen verdier ennå. En verdi er identitetsmålet — hvem du vil være — og eier en hovedkategori.</div></div>';
   } else {
@@ -3489,11 +3499,11 @@ function planleggingViewHTML(){
     });
     h+='</div>';
   }
-  h+='<button class="add-btn" onclick="openGoalModal()">+ Ny verdi</button>';
 
   }
   if(planTab==='resultater'){
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Resultater <span style="font-weight:400;color:var(--rose)">\u00b7 m\u00e5lbare, med frist</span></div>';
+  h+='<button class="add-btn" onclick="openResultModal()">+ Nytt resultat</button>';
   if(results.length){
     h+='<div class="card">';
     results.slice().sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);}).forEach(function(r){
@@ -3515,11 +3525,11 @@ function planleggingViewHTML(){
     });
     h+='</div>';
   }
-  h+='<button class="add-btn" onclick="openResultModal()">+ Nytt resultat</button>';
 
   }
   if(planTab==='rutiner'){
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Rutiner</div>';
+  h+='<button class="add-btn" onclick="openRoutineModal()">+ Ny rutine</button>';
   if(!routines.length){
     h+='<div class="card"><div class="empty">Ingen rutiner ennå.</div></div>';
   } else {
@@ -3548,11 +3558,11 @@ function planleggingViewHTML(){
     });
     h+='</div>';
   }
-  h+='<button class="add-btn" onclick="openRoutineModal()">+ Ny rutine</button>';
 
   }
   if(planTab==='hendelser'){
   h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Hendelser</div>';
+  h+='<button class="add-btn" onclick="openEventModal()">+ Ny hendelse</button>';
   if(!events.length){
     h+='<div class="card"><div class="empty">Ingen hendelser ennå.</div></div>';
   } else {
@@ -3571,7 +3581,6 @@ function planleggingViewHTML(){
     });
     h+='</div>';
   }
-  h+='<button class="add-btn" onclick="openEventModal()">+ Ny hendelse</button>';
   }
   var bdays=events.filter(function(e){return e.bday;}).sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
   if(planTab==='bursdager'){
@@ -3609,35 +3618,38 @@ function planleggingViewHTML(){
   }
   if(planTab==='prosjekt'){
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Prosjektplaner</div>';
-  h+=ganttHTML();
-  var projRows=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';})
-    .sort(function(a,b){
-      var ca=a.completedDate?1:0,cb=b.completedDate?1:0;
-      return ca-cb||((a.startDate||a.endDate||'9999')<(b.startDate||b.endDate||'9999')?-1:1);
-    });
-  if(projRows.length){
-    h+='<div class="card">';
-    projRows.forEach(function(inv){
-      var c=invCounts(inv);
-      var pCat=inv.catId?catById(inv.catId):null;
-      h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text"'+(inv.completedDate?' style="color:var(--muted)"':'')+'>'+(inv.completedDate?'\u2713 ':'')+esc(dispName(inv))+'</div>'
-        +'<div class="entry-date">'+(pCat?esc(pCat.name)+' \u00b7 ':'')+c.have+' av '+c.total+' milep\u00e6ler'
-        +(inv.completedDate?' \u00b7 <span style="color:var(--red)">ferdigstilt '+fmtDate(inv.completedDate)+'</span>'
-          :(inv.endDate?' \u00b7 frist '+fmtDate(inv.endDate):''))
-        +'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
-        +'</div>';
-    });
-    h+='</div>';
-  } else {
-    h+='<div class="card"><div class="empty">Ingen prosjektplaner enn\u00e5. En prosjektplan har ramme (datoer, tidsbruk, kategori), faser og milep\u00e6ler.</div></div>';
-  }
   h+='<button class="add-btn" onclick="openProjModal()">+ Ny prosjektplan</button>';
+  h+=ganttHTML();
+  var allProj=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});
+  var byStart=function(a,b){return(a.startDate||a.endDate||'9999')<(b.startDate||b.endDate||'9999')?-1:1;};
+  var activeProj=allProj.filter(function(iv){return!iv.completedDate;}).sort(byStart);
+  var doneProj=allProj.filter(function(iv){return iv.completedDate;}).sort(function(a,b){return(a.completedDate<b.completedDate)?1:-1;});
+  var projRow=function(inv){
+    var c=invCounts(inv);
+    var pCat=inv.catId?catById(inv.catId):null;
+    return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text"'+(inv.completedDate?' style="color:var(--muted)"':'')+'>'+(inv.completedDate?'\u2713 ':'')+esc(dispName(inv))+'</div>'
+      +'<div class="entry-date">'+(pCat?esc(pCat.name)+' \u00b7 ':'')+c.have+' av '+c.total+' milep\u00e6ler'
+      +(inv.completedDate?' \u00b7 <span style="color:var(--red)">ferdigstilt '+fmtDate(inv.completedDate)+'</span>'
+        :(inv.endDate?' \u00b7 frist '+fmtDate(inv.endDate):''))
+      +'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
+      +'</div>';
+  };
+  if(!allProj.length){
+    h+='<div class="card"><div class="empty">Ingen prosjektplaner enn\u00e5. En prosjektplan har ramme (datoer, tidsbruk, kategori), faser og milep\u00e6ler.</div></div>';
+  } else {
+    if(activeProj.length)h+='<div class="card">'+activeProj.map(projRow).join('')+'</div>';
+    if(doneProj.length){
+      h+='<div class="view-sub" style="padding-top:16px;font-weight:600">Ferdigstilte prosjekter</div>'
+        +'<div class="card">'+doneProj.map(projRow).join('')+'</div>';
+    }
+  }
   }
 
   if(planTab==='inventar'){
   h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Lister</div>';
+  h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
   h+='<div class="chips" style="padding:4px 12px 0">'
     +[['alle','Alle'],['pakke','Pakkelister'],['inventar','Inventarlister']].map(function(t){
       return'<button class="chip'+(listFilter===t[0]?' on':'')+'" onclick="listFilter=\''+t[0]+'\';render()">'+t[1]+'</button>';
@@ -3653,14 +3665,13 @@ function planleggingViewHTML(){
     }).forEach(function(inv){
       var c=invCounts(inv);
       h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+((inv.type||'inventar')==='pakke'?' <span style="font-size:10px;color:var(--rose)">\u00b7 pakkeliste</span>':(inv.type||'inventar')==='prosjekt'?' <span style="font-size:10px;color:var(--rose)">\u00b7 prosjekt</span>':'')+'</div>'
+        +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+((inv.type||'inventar')==='pakke'?' <span style="font-size:10px;color:var(--rose)">\u00b7 '+(inv.pakkeFast?'fast pakkeliste':'pakkeliste')+'</span>':(inv.type||'inventar')==='prosjekt'?' <span style="font-size:10px;color:var(--rose)">\u00b7 prosjekt</span>':'')+'</div>'
         +'<div class="entry-date">'+c.have+' av '+c.total+((inv.type||'inventar')==='pakke'?' pakket':(inv.type||'inventar')==='prosjekt'?' milep\u00e6ler':'')+((inv.type||'inventar')==='prosjekt'?(inv.completedDate?' \u00b7 <span style="color:var(--red)">\u2713 ferdigstilt '+fmtDate(inv.completedDate)+'</span>':(inv.endDate?' \u00b7 frist '+fmtDate(inv.endDate):'')):'')+(c.missing?' <span style="color:var(--amber)">\u00b7 '+((inv.type||'inventar')!=='inventar'?'gjenst\u00e5r':'mangler')+' '+c.missing+'</span>':'')+'</div></div>'
         +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
         +'</div>';
     });
     h+='</div>';
   }
-  h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
 
   }
   if(planTab==='senere'){
@@ -3707,7 +3718,7 @@ function render(){
     +'<button class="tab'+(view.kind==='hjem'||view.kind==='dagbok'?' on':'')+'" onclick="goHjem()">Dagbok</button>'
     +'<button class="tab'+(view.kind==='kalender'||view.kind==='rutiner'||view.kind==='uke'?' on':'')+'" onclick="goUke()">Kalender</button>'
     +'<button class="tab'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'?' on':'')+'" onclick="goOppsummering()">Rapporter</button>'
-    +'<button class="tab'+(view.kind==='planlegging'?' on':'')+'" onclick="goPlanlegging()">Legg inn m\u00e5l, rutiner og planer</button>'
+    +'<button class="tab'+(view.kind==='planlegging'?' on':'')+'" onclick="goPlanlegging()">M\u00e5l, rutiner og planer</button>'
     +'</div>'
     +'</div>';
 
