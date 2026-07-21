@@ -365,16 +365,16 @@ function dToggleMonth(m){dOpenMonth[m]=!dOpenMonth[m];render();}
 function dToggleSec(key){dOpenSec[key]=!dOpenSec[key];render();}
 function goArsrapport(y){view={kind:'arsrapport',year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
 function goRapport(m,y){view={kind:'rapport',month:m,year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
-function goHjem(){view={kind:'hjem',month:curMonth,year:curYear};selectedTag=null;searchQuery='';drawerOpen=false;render();}
+function goHjem(){recentDone={};view={kind:'hjem',month:curMonth,year:curYear};selectedTag=null;searchQuery='';drawerOpen=false;render();}
 function goDagbok(m,y){view={kind:'dagbok',month:m,year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
 function goRutiner(m,catId,y){view={kind:'rutiner',month:m,cat:catId||null,year:y||null};drawerOpen=false;render();}
 function goKalender(y){view={kind:'kalender',year:y||curYear};drawerOpen=false;render();}
 function mondayOf(d){var x=new Date(d);var wd=(x.getDay()+6)%7;x.setDate(x.getDate()-wd);return x;}
-function goUke(iso){
+function goUke(iso){recentDone={};
   var d=iso?new Date(iso):mondayOf(today);
   view={kind:'uke',ws:isoDate(mondayOf(d))};drawerOpen=false;render();
 }
-function ukeShift(days){
+function ukeShift(days){recentDone={};
   var d=new Date(view.ws);d.setDate(d.getDate()+days);
   view.ws=isoDate(d);render();
 }
@@ -1781,6 +1781,7 @@ function modalHTML(){
       +'<input class="inp" type="text" value="'+esc(f.ease||'')+'" placeholder="F.eks. joggeskoene står ved døra …" oninput="mf().ease=this.value">'
       +'<label class="field-lbl">Frekvens</label>'
       +'<div class="chips">'
+      +'<button class="chip'+(f.freq==='daily'?' on':'')+'" onclick="mf().freq=\'daily\';render()">Daglig</button>'
       +'<button class="chip'+(!f.freq?' on':'')+'" onclick="mf().freq=\'\';render()">Månedlig</button>'
       +'<button class="chip'+(f.freq==='weekly'?' on':'')+'" onclick="mf().freq=\'weekly\';render()">Ukentlig</button>'
       +'<button class="chip'+(f.freq==='odd'?' on':'')+'" onclick="mf().freq=\'odd\';render()">Oddetallsuker</button>'
@@ -1917,6 +1918,10 @@ function catBoxesHTML(items){
     return'<div class="cat-box"'+(col?' style="border-left-color:'+col+'"':'')+'>'
       +'<div class="cb-hd">'+esc(g.cat?g.cat.name:'Annet')+'</div>'
       +g.items.map(function(it){
+        if(it.done){
+          return'<button class="cb-item" style="opacity:.5" onclick="'+it.click+'"><span style="color:var(--red)">\u2713</span> <span style="text-decoration:line-through">'+esc(it.label)+'</span>'
+            +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')+'</button>';
+        }
         return'<button class="cb-item" onclick="'+it.click+'"><span class="o">\u25cb</span> '+esc(it.label)
           +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')+'</button>';
       }).join('')
@@ -1926,19 +1931,26 @@ function catBoxesHTML(items){
 function periodTodoItems(scope){
   // scope: {wk, wKey, ym, m, y, includeDatedWeek (kun dagbok), includeUndated (kun uke)}
   var out=[];var total=0;
+  var pushR=function(r,key,sub){
+    total++;
+    var done=(r.log||[]).includes(key);
+    var rk='r_'+r.id+'_'+key;
+    if(done&&!recentDone[rk])return;
+    out.push({label:r.name,sub:sub,done:done,cat:mainCatOf(r.cats),click:"boxToggleRoutine('"+q(r.id)+"','"+q(key)+"')"});
+  };
   routines.forEach(function(r){
     var months=r.months||[];
     if(months.length&&!months.includes(scope.m))return;
-    if(isWeekly(r)){
+    if(r.freq==='daily'){
+      // Daglige rutiner vises bare i dagbokboksene, aldri i kalenderen
+      if(!scope.daily)return;
+      pushR(r,'d'+scope.daily,'daglig');
+    } else if(isWeekly(r)){
       if(r.freq==='odd'&&scope.wk%2===0)return;
       if(r.freq==='even'&&scope.wk%2===1)return;
-      total++;
-      if((r.log||[]).includes(scope.wKey))return;
-      out.push({label:r.name,sub:'',cat:mainCatOf(r.cats),click:"toggleRoutine('"+q(r.id)+"','"+q(scope.wKey)+"')"});
+      pushR(r,scope.wKey,'');
     } else {
-      total++;
-      if((r.log||[]).includes(scope.ym))return;
-      out.push({label:r.name,sub:'hver m\u00e5ned',cat:mainCatOf(r.cats),click:"toggleRoutine('"+q(r.id)+"','"+q(scope.ym)+"')"});
+      pushR(r,scope.ym,'hver m\u00e5ned');
     }
   });
   if(scope.includeDatedWeek){
@@ -1953,10 +1965,11 @@ function periodTodoItems(scope){
           if(scope._seen[k])return;
           scope._seen[k]=1;
           total++;
-          if(evDone(o.e,o.occYear))return;
+          var done=evDone(o.e,o.occYear);
+          if(done&&!recentDone['e_'+k])return;
           var isTod=isoDate(d)===isoDate(today);
           var sub=o.e.toDay?evSpanTxt(o.e):(isTod?'i dag':UKEDAGER_FULL[dow(d)]+' '+dd+'.');
-          out.push({label:o.e.name,sub:sub,cat:mainCatOf(o.e.cats),click:"toggleEvent('"+q(o.e.id)+"',"+o.occYear+")"});
+          out.push({label:o.e.name,sub:sub,done:done,cat:mainCatOf(o.e.cats),click:"boxToggleEvent('"+q(o.e.id)+"',"+o.occYear+")"});
         });
       })(d);
     }
@@ -1965,8 +1978,9 @@ function periodTodoItems(scope){
     monthEventsFor(scope.m,scope.y).forEach(function(e){
       if(e.day)return;
       total++;
-      if(evDone(e,scope.y))return;
-      out.push({label:e.name,sub:'i l\u00f8pet av m\u00e5neden',cat:mainCatOf(e.cats),click:"toggleEvent('"+q(e.id)+"',"+scope.y+")"});
+      var done=evDone(e,scope.y);
+      if(done&&!recentDone['e_'+e.id+'_'+scope.y])return;
+      out.push({label:e.name,sub:'i l\u00f8pet av m\u00e5neden',done:done,cat:mainCatOf(e.cats),click:"boxToggleEvent('"+q(e.id)+"',"+scope.y+")"});
     });
   }
   return{items:out,total:total};
@@ -1974,6 +1988,17 @@ function periodTodoItems(scope){
 
 /* ── Visninger ── */
 var quickForm={text:'',cats:[],tags:'',step:1};
+var recentDone={};
+function boxToggleRoutine(rid,key){
+  var k='r_'+rid+'_'+key;
+  if(recentDone[k])delete recentDone[k];else recentDone[k]=1;
+  toggleRoutine(rid,key);
+}
+function boxToggleEvent(id,occYear){
+  var k='e_'+id+'_'+occYear;
+  if(recentDone[k])delete recentDone[k];else recentDone[k]=1;
+  toggleEvent(id,occYear);
+}
 var planTab='verdier';
 function toggleQuickCat(id){
   var a=quickForm.cats;
@@ -2090,7 +2115,7 @@ function hjemViewHTML(){
   }
 
   // Denne dagen og denne uka — kompakte bokser per hovedkategori
-  var todo=periodTodoItems({wk:weekNum(today),wKey:'w'+weekYear(today)+'-'+pad(weekNum(today)),ym:curYear+'-'+pad(curMonth),m:curMonth,y:curYear,includeDatedWeek:true});
+  var todo=periodTodoItems({wk:weekNum(today),wKey:'w'+weekYear(today)+'-'+pad(weekNum(today)),ym:curYear+'-'+pad(curMonth),m:curMonth,y:curYear,includeDatedWeek:true,daily:isoDate(today)});
   if(todo.items.length){
     h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Denne dagen og denne uka <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>'
       +catBoxesHTML(todo.items);
@@ -3403,6 +3428,7 @@ function planleggingViewHTML(){
           var ic=invCounts(iv);
           return'<div class="entry-date"><button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(iv.name)+' \u00b7 '+ic.have+'/'+ic.total+(ic.missing?' \u00b7 <span style="color:var(--amber)">mangler '+ic.missing+'</span>':'')+' \u203a</button></div>';
         }).join('')
+        +catPillsHTML((r.subCats&&r.subCats.length)?r.subCats:(v?(v.cats||[]):[]))
         +'</div>'
         +(r.targetAmount?'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="openDepositModal(\''+q(r.id)+'\')">+ kr</button>':'')
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditResult(\''+q(r.id)+'\')">\u270e</button>'
@@ -3421,6 +3447,7 @@ function planleggingViewHTML(){
     h+='<div class="card">';
     routines.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(r){
       var months=(r.months||[]).length?(r.months||[]).map(function(m){return MND_FULL[m-1].slice(0,3);}).join(', '):'hver måned';
+      if(r.freq==='daily')months+=' · daglig';
       if(r.freq==='weekly')months+=' · ukentlig';
       if(r.freq==='odd')months+=' · oddetallsuker';
       if(r.freq==='even')months+=' · partallsuker';
