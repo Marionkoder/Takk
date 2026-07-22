@@ -309,6 +309,8 @@ function giftPeople(){
 }
 function giftsFor(person){return gifts.filter(function(g){return(g.person||'').trim()===(person||'').trim();});}
 function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.name||'').trim()===(person||'').trim();});}
+var LIST_UNITS=['n\u00f8ster','stk','g','kg','ml','dl'];
+function goLister(){view={kind:'lister'};drawerOpen=false;render();}
 function goGaver(){view={kind:'gaver'};drawerOpen=false;render();}
 function openGiftModal(person){
   modal={step:'gift',form:{id:'',person:person||'',kind:'bursdag',year:curYear,what:'',idea:false,note:''}};render();
@@ -389,6 +391,23 @@ function load(){
       if(!exists)cats.push({id:t[0],name:t[1],color:t[2]});
     });
     try{localStorage.setItem(SK+'_seeded2','1');}catch(e){}
+    save();
+  }
+
+  // Faste lister: Planlagte anskaffelser + Beredskapslager (Gaveloggen er egen datastruktur)
+  var seededLists=false;try{seededLists=!!localStorage.getItem(SK+'_seededlists');}catch(e){}
+  if(!seededLists){
+    if(!inventories.some(function(iv){return iv.fixed==='anskaffelser';})){
+      inventories.push({id:'fixed_anskaffelser',name:'Planlagte anskaffelser',type:'inventar',fixed:'anskaffelser',qty:true,
+        catId:'',fields:[],sections:[],items:[]});
+    }
+    if(!inventories.some(function(iv){return iv.fixed==='beredskap';})){
+      inventories.push({id:'fixed_beredskap',name:'Beredskapslager',type:'inventar',fixed:'beredskap',qty:true,
+        catId:'',fields:[],
+        sections:[{id:'ber_mat',name:'Mat og drikke'},{id:'ber_varme',name:'Varme og kulde'},{id:'ber_strom',name:'Str\u00f8m og lys'},{id:'ber_kom',name:'Kommunikasjon'}],
+        items:[]});
+    }
+    try{localStorage.setItem(SK+'_seededlists','1');}catch(e){}
     save();
   }
   render();
@@ -683,6 +702,35 @@ function omViewHTML(){
     +'Dette er en betaversjon. Alle immaterielle rettigheter tilh\u00f8rer M. All bruk av appen skjer p\u00e5 eget ansvar.'
     +'</div>';
 }
+function listerViewHTML(){
+  var h='<div class="view-title">Lister</div>';
+  h+='<div class="view-sub">Faste lister og dine egne. Gaveloggen kan ikke slettes; enkeltoppf\u00f8ringer kan.</div>';
+  // Gaveloggen (egen datastruktur)
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goGaver()">'
+    +'<div class="entry-body"><div class="entry-text">Gavelogg</div>'
+    +'<div class="entry-date">'+giftPeople().length+' personer</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  // Faste lister
+  var fixed=inventories.filter(function(iv){return iv.fixed;}).sort(function(a,b){return a.fixed<b.fixed?-1:1;});
+  var userLists=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')!=='prosjekt';});
+  var rowFor=function(inv){
+    var c=invCounts(inv);
+    var typeTxt=inv.fixed==='anskaffelser'?'planlagte anskaffelser':inv.fixed==='beredskap'?'beredskapslager'
+      :(inv.type||'inventar')==='pakke'?(inv.pakkeFast?'fast pakkeliste':'pakkeliste'):'inventarliste';
+    return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+' <span style="font-size:10px;color:var(--rose)">\u00b7 '+typeTxt+'</span></div>'
+      +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+  };
+  h+='<div class="card">'+fixed.map(rowFor).join('')+'</div>';
+  // Egne lister
+  h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
+  if(userLists.length){
+    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Egne lister</div>';
+    h+='<div class="card">'+userLists.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(rowFor).join('')+'</div>';
+  }
+  return h;
+}
 function gaverViewHTML(){
   var people=giftPeople();
   var h='<div class="view-title">Gaver</div>';
@@ -966,6 +1014,7 @@ function invValid(f){
   if(!(f.name||'').trim())return false;
   if(f.type==='prosjekt')return!!f.catId&&(f.goalIds||[]).length>0;
   if(f.type==='pakke')return f.pakkeFast||(f.eventIds||[]).length>0;
+  if(f.fixed)return true; // faste lister er alltid gyldige
   return!!f.catId; // inventarliste
 }
 function openInvModal(){modal={step:'inv',form:{name:'',type:'inventar',startDate:'',endDate:'',catId:'',hoursTotal:'',varValues:{},pakkeFast:false,goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
@@ -978,7 +1027,7 @@ function rmKnitNeedle(i){var k=mf().knit;if(k.needles.length>1)k.needles.splice(
 function dispName(iv){return(iv.subtype==='strikk'&&iv.knit&&(iv.knit.shortTitle||'').trim())?iv.knit.shortTitle.trim():iv.name;}
 function openEditInv(id){
   var inv=invById(id);if(!inv)return;
-  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',hoursTotal:inv.hoursTotal||'',varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
+  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',fixed:inv.fixed||'',qty:!!inv.qty,pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',hoursTotal:inv.hoursTotal||'',varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
 }
 function fieldNumKind(fd){
   var n=(fd.name||'').trim().toLowerCase();
@@ -1017,7 +1066,7 @@ function saveEditInv(){
 }
 function deleteInv(id){
   inventories=inventories.filter(function(i){return i.id!==id;});
-  save();closeModal();goPlanlegging();
+  save();closeModal();goLister();
 }
 function openInvSecModal(invId){modal={step:'invsec',form:{invId:invId,name:'',startDate:'',endDate:'',hours:''}};render();}
 function openEditInvSec(invId,secId){
@@ -1042,7 +1091,9 @@ function deleteInvSec(){
   save();closeModal();
 }
 function openInvItemModal(invId,secId){
-  modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:{},have:false,_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
+  var iv=invById(invId)||{};
+  var vals=iv.qty?{__unit:'n\u00f8ster'}:{};
+  modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:vals,have:false,_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
 }
 function openEditInvItem(invId,itemId){
   var inv=invById(invId);var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
@@ -1082,6 +1133,14 @@ function invRowToLater(invId,itemId){
   (inv.resultIds||[]).forEach(function(rid){var r=resultById(rid);if(r&&r.valueId&&!gids.includes(r.valueId))gids.push(r.valueId);});
   gids=gids.filter(function(x,i){return gids.indexOf(x)===i;});
   laters.push({id:'l'+Date.now()+Math.random().toString(36).slice(2,6),name:it.name,note:'Fra '+inv.name+(it.note?' \u00b7 '+it.note:''),goalIds:gids});
+  save();render();
+}
+function findFixedList(kind){return inventories.find(function(iv){return iv.fixed===kind;});}
+function laterToAnskaffelser(laterId){
+  var l=laters.find(function(x){return x.id===laterId;});if(!l)return;
+  var inv=findFixedList('anskaffelser');if(!inv)return;
+  inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:null,name:l.name,note:l.note||'',date:'',inCal:false,values:{__qty:'1',__unit:'stk'},have:false}]);
+  laters=laters.filter(function(x){return x.id!==laterId;});
   save();render();
 }
 function invItemToLater(){
@@ -1445,7 +1504,8 @@ function updateSaveBtn(){
   }
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId;
-  if(step==='invsec'||step==='invsec_edit'||step==='invitem'||step==='invitem_edit')enabled=(mf().name||'').trim().length>0;
+  if(step==='invsec'||step==='invsec_edit')enabled=(mf().name||'').trim().length>0;
+  if(step==='invitem'||step==='invitem_edit'){var iv2=invById(mf().invId)||{};enabled=(mf().name||'').trim().length>0&&(!iv2.qty||String((mf().values||{}).__qty||'').length>0);}
   if(step==='gift')enabled=(mf().person||'').trim().length>0&&(mf().what||'').trim().length>0;
   if(step==='inv'||step==='inv_edit')enabled=invValid(mf());
   if(step==='deposit')enabled=!!parseKr(mf().amount);
@@ -1821,6 +1881,16 @@ function modalHTML(){
     var invT=invById(f.invId)||{};
     var secOpts='<option value=""'+(!f.sectionId?' selected':'')+'>(uten overskrift)</option>'
       +(invT.sections||[]).map(function(sc){return'<option value="'+q(sc.id)+'"'+(f.sectionId===sc.id?' selected':'')+'>'+esc(sc.name)+'</option>';}).join('');
+    var qtyInput='';
+    if(invT.qty){
+      var qv=(f.values||{}).__qty||'';var qu=(f.values||{}).__unit||'n\u00f8ster';
+      qtyInput='<label class="field-lbl">Antall</label>'
+        +'<div style="display:flex;gap:8px;align-items:center">'
+        +'<input class="inp" type="text" inputmode="numeric" style="width:110px;margin:0" value="'+esc(qv)+'" placeholder="0" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');mf().values.__qty=this.value;updateSaveBtn()">'
+        +'<select class="inp" style="width:auto;margin:0" oninput="mf().values.__unit=this.value">'
+        +LIST_UNITS.map(function(u){return'<option value="'+u+'"'+(qu===u?' selected':'')+'>'+u+'</option>';}).join('')
+        +'</select></div>';
+    }
     var fieldInputs=(invT.fields||[]).map(function(fd){
       var kind=fieldNumKind(fd);
       var filt=kind==='int'?"this.value=this.value.replace(/[^0-9]/g,'');"
@@ -1838,8 +1908,9 @@ function modalHTML(){
     body='<div class="modal-title">'+(isEditT?(isProj?'Rediger milep\u00e6l':'Rediger punkt'):(isProj?'Ny milep\u00e6l':'Nytt punkt'))+'</div>'
       +'<label class="field-lbl">Navn</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. f\u00f4rede vinterst\u00f8vletter til penbruk \u2026" oninput="mf().name=this.value;updateSaveBtn()">'
-      +'<label class="field-lbl">Overskrift</label>'
-      +'<select class="inp" style="width:auto" oninput="mf().sectionId=this.value">'+secOpts+'</select>'
+      +(((invT.sections||[]).length)?'<label class="field-lbl">Overskrift</label>'
+      +'<select class="inp" style="width:auto" oninput="mf().sectionId=this.value">'+secOpts+'</select>':'')
+      +qtyInput
       +fieldInputs
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'
@@ -1856,7 +1927,7 @@ function modalHTML(){
       })():'')
       +(isEditT?'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" onclick="invItemToLater()">Sett p\u00e5 vent</button>':'')
       +(isEditT?'<button class="del-full-btn" onclick="deleteInvItem()">Slett punkt</button>':'')
-      +'<button class="save-btn" onclick="'+(isEditT?'saveEditInvItem()':'submitInvItem()')+'" '+((f.name||'').trim()?'':'disabled')+'>Lagre</button>';
+      +'<button class="save-btn" onclick="'+(isEditT?'saveEditInvItem()':'submitInvItem()')+'" '+(((f.name||'').trim()&&(!invT.qty||String((f.values||{}).__qty||'').length))?'':'disabled')+'>Lagre</button>';
 
   } else if(step==='deposit'){
     var depRes=resultById(f.resultId)||{};
@@ -2167,7 +2238,7 @@ function sidebarHTML(){
   var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow"></span>Dagbok</div>';
   h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
   h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='kategorier'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
-  h+='<div class="side-month'+(view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goGaver()"><span class="s-arrow"></span>Gaver</div>';
+  h+='<div class="side-month'+(view.kind==='lister'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goLister()"><span class="s-arrow"></span>Lister</div>';
   h+='<div class="side-month'+(view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goBudsjett(curYear)"><span class="s-arrow"></span>Budsjett og regnskap</div>';
   return h;
 }
@@ -3377,7 +3448,7 @@ function inventarViewHTML(){
   var isPack=(inv.type||'inventar')==='pakke';
   var isProj=(inv.type||'inventar')==='prosjekt';
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="goPlanlegging()">\u2039</button>'
+    +'<button class="icon-btn" onclick="'+(isProj?'goPlanlegging()':'goLister()')+'">\u2039</button>'
     +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
     +(isPack?' <span style="font-size:11px;font-weight:400;color:var(--rose)">pakkeliste</span>':isProj?' <span style="font-size:11px;font-weight:400;color:var(--rose)">'+(inv.subtype==='strikk'?'strikkeprosjekt':'prosjektplan')+'</span>':'')+'</div>'
@@ -3457,6 +3528,7 @@ function inventarViewHTML(){
       var v=(it.values||{})[fd.id];
       return v?esc(fd.name)+': '+esc(v):null;
     }).filter(Boolean).join(' \u00b7 ');
+    if(inv.qty&&(it.values||{}).__qty)vals=(esc((it.values||{}).__qty)+' '+esc((it.values||{}).__unit||''))+(vals?' \u00b7 '+vals:'');
     return'<div class="entry-row">'
       +'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>'
       +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj?'':' style="color:var(--amber)"')+'>'+esc(it.name)
@@ -3797,7 +3869,7 @@ function budsjettViewHTML(){
 function planleggingViewHTML(){
   var h='<div class="view-title">M\u00e5l, rutiner og planer</div>'
     +'<div class="view-sub">Verdier er slik du vil leve («Jeg tar vare på helsa»). Resultater er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['prosjekt','Prosjektplaner'],['inventar','Lister'],['senere','Satt p\u00e5 vent']];
+  var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['prosjekt','Prosjektplaner'],['senere','Satt p\u00e5 vent']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
@@ -4051,6 +4123,7 @@ function planleggingViewHTML(){
         +(l.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(l.note)+'</div>':'')
         +(gNames.length?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(gNames.join(' \u00b7 '))+'</div>':'')
         +'</div>'
+        +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="laterToAnskaffelser(\''+q(l.id)+'\')">\u2192 Anskaffelser</button>'
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditLater(\''+q(l.id)+'\')">\u270e</button>'
         +'</div>';
     });
@@ -4096,6 +4169,7 @@ function render(){
   else if(view.kind==='kalender')content=kalenderViewHTML();
   else if(view.kind==='uke')content=ukeViewHTML();
   else if(view.kind==='om')content=omViewHTML();
+  else if(view.kind==='lister')content=listerViewHTML();
   else if(view.kind==='gaver')content=gaverViewHTML();
   else if(view.kind==='gaveperson')content=gavePersonViewHTML();
   else if(view.kind==='oppsummering')content=oppsummeringViewHTML();
