@@ -2857,6 +2857,13 @@ function oppsummeringViewHTML(){
         +'</div>';
     });
     h+='</div>';
+    var fritt=frittTagCloudHTML();
+    if(fritt){
+      h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Frittst\u00e5ende gleder</div>'
+        +'<div class="card" style="padding:6px 14px 10px">'
+        +'<div style="font-size:11px;color:var(--muted);padding:2px 0 2px">Stikkord som ikke h\u00f8rer til en kategori.</div>'
+        +fritt+'</div>';
+    }
     if(selectedTag){
       var tge=entries.filter(function(e){return(e.tags||[]).includes(selectedTag);}).sort(function(a,b){return a.date<b.date?1:-1;});
       h+='<div class="view-sub" style="padding-top:10px;font-weight:600">#'+esc(selectedTag)+' · '+tge.length+'</div>'
@@ -3550,19 +3557,27 @@ function catUsage(catId){
   if(n)u.push(n+' innlegg');
   return u;
 }
-function catTagCloudHTML(catId){
-  var counts={};
-  Object.keys(tagCats).forEach(function(t){if(tagCats[t]===catId)counts[t]=0;});
-  if(!Object.keys(counts).length)return'';
-  entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
+function tagCloudSpread(counts){
+  // Nøytral ordsky: ingen kategorifarge, spredt utover, sortert etter hyppighet
   var words=Object.keys(counts).filter(function(w){return counts[w]>0;}).sort(function(a,b){return counts[b]-counts[a]||nbSort(a,b);});
   if(!words.length)return'';
   var max=Math.max.apply(null,words.map(function(w){return counts[w];}));
-  var col=catColor(catId);var tc=col?lightHex(col,0.62):null;
-  return'<div style="display:flex;flex-wrap:wrap;gap:5px;padding:4px 0 2px">'+words.map(function(w){
-    var size=11+Math.round((counts[w]/max)*7);
-    return'<button class="tag-pill" style="font-size:'+size+'px'+(tc?';background:'+tc+';border-color:'+tc+';color:var(--ink)':'')+'" onclick="selectTag(\''+q(w)+'\')">#'+esc(w)+'</button>';
+  return'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:6px 2px 4px">'+words.map(function(w){
+    var size=13+Math.round((counts[w]/max)*11);
+    return'<button class="cloud-word'+(selectedTag===w?' sel':'')+'" style="font-size:'+size+'px;color:var(--muted)" onclick="selectTag(\''+q(w)+'\')">#'+esc(w)+'</button>';
   }).join('')+'</div>';
+}
+function catTagCloudHTML(catId){
+  var counts={};
+  Object.keys(tagCats).forEach(function(t){if(tagCats[t]===catId)counts[t]=0;});
+  entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
+  return tagCloudSpread(counts);
+}
+function frittTagCloudHTML(){
+  var counts={};
+  var used=allTags();
+  Object.keys(used).forEach(function(t){if(!tagCats[t])counts[t]=used[t];});
+  return tagCloudSpread(counts);
 }
 function hashtagsViewHTML(){
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
