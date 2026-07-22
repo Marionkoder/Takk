@@ -296,6 +296,10 @@ var editMode=false;
 var modal=null;
 var drawerOpen=false;
 var gifts=[];
+var tagCats={};
+function tagColor(tag){var cid=tagCats[tag];if(!cid)return null;var col=catColor(cid);return col?lightHex(col,0.62):null;}
+function setTagCat(tag,catId){if(catId)tagCats[tag]=catId;else delete tagCats[tag];save();render();}
+function goHashtags(){view={kind:'hashtags'};drawerOpen=false;render();}
 // gift: {id, person, bdayId(valgfri), kind:'bursdag'|'jul'|'annet', year, what, idea:bool, greeting:bool(bursdagshilsen), card:bool(julekort), note}
 function giftPeople(){
   var names={};
@@ -355,6 +359,7 @@ function load(){
   try{budgetRows=JSON.parse(localStorage.getItem(SK+'_budget')||'[]');}catch(e){budgetRows=[];}
   try{deposits=JSON.parse(localStorage.getItem(SK+'_deposits')||'[]');}catch(e){deposits=[];}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
+  try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{tb=JSON.parse(localStorage.getItem(SK+'_tb')||'null')||tb;}catch(e){}
   // Defaultkategorier ved første oppstart — kan slettes fritt av brukeren
   var seeded=false;try{seeded=!!localStorage.getItem(SK+'_seeded');}catch(e){}
@@ -400,6 +405,7 @@ function save(){
   try{localStorage.setItem(SK+'_budget',JSON.stringify(budgetRows));}catch(e){}
   try{localStorage.setItem(SK+'_deposits',JSON.stringify(deposits));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
+  try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_tb',JSON.stringify(tb));}catch(e){}
 }
 
@@ -443,9 +449,11 @@ function ukeShift(days){recentDone={};
   var d=new Date(view.ws);d.setDate(d.getDate()+days);
   view.ws=isoDate(d);render();
 }
-function goOppsummering(){view={kind:'oppsummering'};selectedTag=null;drawerOpen=false;render();}
+function goOppsummering(){view={kind:'oppsummering'};selectedTag=null;selectedCat=null;drawerOpen=false;render();}
 function goPlanlegging(){view={kind:'planlegging'};drawerOpen=false;render();}
 function selectTag(t){selectedTag=(selectedTag===t)?null:t;render();}
+var selectedCat=null;
+function selectCat(id){selectedCat=(selectedCat===id)?null:id;render();}
 function setEdit(v){editMode=v;render();}
 
 /* ── Dagbok-handlinger ── */
@@ -1152,7 +1160,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,gifts:gifts,tagCats:tagCats},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -1171,7 +1179,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];gifts=d.gifts||[];tagCats=d.tagCats||{};
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -1299,8 +1307,10 @@ function cloudHTML(counts,clickable){
     var size=13+Math.round((c/max)*15);
     var lv=Math.min(5,1+Math.floor((c-1)/max*5));
     var cls='cloud-word lv'+lv+(c>10?' hot':'')+(clickable&&selectedTag===w?' sel':'');
-    if(clickable)return'<button class="'+cls+'" style="font-size:'+size+'px" onclick="selectTag(\''+q(w)+'\')">'+esc(w)+'</button>';
-    return'<span class="'+cls+'" style="font-size:'+size+'px;cursor:default">'+esc(w)+'</span>';
+    var tc=tagColor(w);
+    var stl='font-size:'+size+'px'+(tc?';background:'+tc+';border-color:'+tc+';color:var(--ink)':'');
+    if(clickable)return'<button class="'+cls+'" style="'+stl+'" onclick="selectTag(\''+q(w)+'\')">'+esc(w)+'</button>';
+    return'<span class="'+cls+'" style="'+stl+';cursor:default">'+esc(w)+'</span>';
   }).join('')+'</div></div>';
 }
 
@@ -1318,6 +1328,11 @@ function saveNewCat(){
   render();
 }
 function openNewMainCat(){modal={step:'cat_new',form:{_newMain:''}};modal._prevStep=null;render();}
+function addCommonCat(name){
+  if(cats.some(function(c){return!c.parentId&&c.name.toLowerCase()===name.toLowerCase();}))return;
+  cats.push({id:'c'+Date.now()+Math.random().toString(36).slice(2,6),name:name});
+  save();render();
+}
 function openEditCat(id){
   var c=cats.find(function(x){return x.id===id;});if(!c)return;
   modal={step:'cat_edit',form:{id:id,name:c.name,parentId:c.parentId||'',color:c.color||''}};render();
@@ -2131,7 +2146,8 @@ function entryRowHTML(e){
     var col=catColor(cid);
     return'<span class="entry-cat"'+(col?' style="background:'+col+';color:'+textOn(col)+'"':'')+'>'+esc((m?m.name+' / ':'')+c.name)+'</span>';
   }).join('')+(e.tags||[]).map(function(t){
-    return'<span class="tag-pill">#'+esc(t)+'</span>';
+    var tc=tagColor(t);
+    return'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>';
   }).join('');
   var pills=pillItems?'<div class="entry-cats">'+pillItems+'</div>':'';
   return'<div class="entry-row">'
@@ -2829,16 +2845,33 @@ function oppsummeringViewHTML(){
         var inner=esc(s.name)+' <span style="color:var(--rose)">'+s.count+'</span>';
         return editMode
           ?'<button class="freq-pill" onclick="openEditCat(\''+q(s.id)+'\')">✎ '+inner+'</button>'
-          :'<span class="freq-pill">'+inner+'</span>';
+          :'<button class="freq-pill'+(selectedCat===s.id?' sel':'')+'" onclick="selectCat(\''+q(s.id)+'\')">'+inner+'</button>';
       }).join('');
+      var catCloud=catTagCloudHTML(r.main.id);
       h+='<div class="freq-block">'
-        +'<div class="freq-main"><span>'+esc(r.main.name)+'</span>'
+        +'<div class="freq-main"'+(editMode?'':' style="cursor:pointer" onclick="selectCat(\''+q(r.main.id)+'\')"')+'><span'+(selectedCat===r.main.id?' style="color:var(--red)"':'')+'>'+esc(r.main.name)+'</span>'
         +(editMode?'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="openEditCat(\''+q(r.main.id)+'\')">✎</button>':'')
         +'<span class="freq-count" style="margin-left:auto">'+r.count+'</span></div>'
         +(subPills?'<div class="freq-subs">'+subPills+'</div>':'')
+        +catCloud
         +'</div>';
     });
     h+='</div>';
+    if(selectedTag){
+      var tge=entries.filter(function(e){return(e.tags||[]).includes(selectedTag);}).sort(function(a,b){return a.date<b.date?1:-1;});
+      h+='<div class="view-sub" style="padding-top:10px;font-weight:600">#'+esc(selectedTag)+' · '+tge.length+'</div>'
+        +'<div class="card">'+tge.map(entryRowHTML).join('')+'</div>';
+    }
+    if(selectedCat&&!editMode){
+      var sc=catById(selectedCat);
+      if(sc){
+        var scSubIds=cats.filter(function(c){return c.parentId===selectedCat;}).map(function(c){return c.id;});
+        var scEnt=entries.filter(function(e){return(e.cats||[]).some(function(c){return c===selectedCat||scSubIds.includes(c);});})
+          .sort(function(a,b){return a.date<b.date?1:-1;});
+        h+='<div class="view-sub" style="padding-top:10px;font-weight:600">'+esc(sc.name)+' · '+scEnt.length+' innlegg</div>'
+          +'<div class="card">'+(scEnt.length?scEnt.map(entryRowHTML).join(''):'<div class="empty">Ingen innlegg i denne kategorien.</div>')+'</div>';
+      }
+    }
   }
   return h;
 }
@@ -3488,6 +3521,10 @@ function innstillingerViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Administrer kategorier</div>'
     +'<div class="entry-date">se hva hver kategori er knyttet til, og finn ubrukte</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goHashtags()">'
+    +'<div class="entry-body"><div class="entry-text">Administrer hashtagger</div>'
+    +'<div class="entry-date">knytt stikkord til en kategori og gi dem farge</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   var hasPin=!!pinData();
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="openPinSetup()">'
     +'<div class="entry-body"><div class="entry-text">PIN-l\u00e5s</div>'
@@ -3512,6 +3549,49 @@ function catUsage(catId){
   n=entries.filter(function(e){return(e.cats||[]).includes(catId);}).length;
   if(n)u.push(n+' innlegg');
   return u;
+}
+function catTagCloudHTML(catId){
+  var counts={};
+  Object.keys(tagCats).forEach(function(t){if(tagCats[t]===catId)counts[t]=0;});
+  if(!Object.keys(counts).length)return'';
+  entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
+  var words=Object.keys(counts).filter(function(w){return counts[w]>0;}).sort(function(a,b){return counts[b]-counts[a]||nbSort(a,b);});
+  if(!words.length)return'';
+  var max=Math.max.apply(null,words.map(function(w){return counts[w];}));
+  var col=catColor(catId);var tc=col?lightHex(col,0.62):null;
+  return'<div style="display:flex;flex-wrap:wrap;gap:5px;padding:4px 0 2px">'+words.map(function(w){
+    var size=11+Math.round((counts[w]/max)*7);
+    return'<button class="tag-pill" style="font-size:'+size+'px'+(tc?';background:'+tc+';border-color:'+tc+';color:var(--ink)':'')+'" onclick="selectTag(\''+q(w)+'\')">#'+esc(w)+'</button>';
+  }).join('')+'</div>';
+}
+function hashtagsViewHTML(){
+  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
+    +'<button class="icon-btn" onclick="goInnstillinger()">\u2039</button>'
+    +'<div class="view-title" style="padding:0;flex:1">Hashtagger</div></div>'
+    +'<div class="view-sub">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
+  var counts=allTags();
+  var tags=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a]||nbSort(a,b);});
+  if(!tags.length)return h+'<div class="card"><div class="empty">Ingen stikkord enn\u00e5. Legg til stikkord n\u00e5r du skriver innlegg.</div></div>';
+  var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  h+='<div class="card">';
+  tags.forEach(function(t){
+    var tc=tagColor(t);
+    var curCat=tagCats[t]?catById(tagCats[t]):null;
+    h+='<div style="padding:8px 14px;border-bottom:1px solid var(--line)">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>'
+      +'<span style="font-size:11px;color:var(--muted)">'+counts[t]+' innlegg</span>'
+      +(curCat?'<span style="font-size:11px;color:var(--rose);margin-left:auto">'+esc(curCat.name)+'</span>':'')+'</div>'
+      +'<div class="chips">'
+      +'<button class="chip'+(!tagCats[t]?' on':'')+'" onclick="setTagCat(\''+q(t)+'\',\'\')">Ingen</button>'
+      +mains.map(function(mc){
+        var on=tagCats[t]===mc.id;var col=catColor(mc.id);
+        return'<button class="chip'+(on?' on':'')+'"'+(on&&col?' style="background:'+col+';border-color:'+col+';color:'+textOn(col)+'"':'')+' onclick="setTagCat(\''+q(t)+'\',\''+q(mc.id)+'\')">'+esc(mc.name)+'</button>';
+      }).join('')
+      +'</div></div>';
+  });
+  h+='</div>';
+  return h;
 }
 function kategorierViewHTML(){
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
@@ -3542,7 +3622,16 @@ function kategorierViewHTML(){
       .forEach(function(sc){h+=line(sc,true);});
   });
   h+='</div>';
-  h+='<button class="add-btn" onclick="openNewMainCat()">+ Ny hovedkategori</button>';
+  // Vanlige kategorier — legg til med ett trykk
+  var vanlige=['Kultur','Natur','Mat og drikke','Kreativitet','Kompetanse'];
+  var mangler=vanlige.filter(function(n){return!cats.some(function(c){return!c.parentId&&c.name.toLowerCase()===n.toLowerCase();});});
+  h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Legg til vanlige kategorier eller lag dine egne</div>';
+  if(mangler.length){
+    h+='<div class="chips" style="padding:0 12px">'+mangler.map(function(n){
+      return'<button class="chip-new" onclick="addCommonCat(\''+q(n)+'\')">+ '+esc(n)+'</button>';
+    }).join('')+'</div>';
+  }
+  h+='<button class="add-btn" onclick="openNewMainCat()">+ Lag din egen kategori</button>';
   return h;
 }
 
@@ -3988,6 +4077,7 @@ function render(){
   else if(view.kind==='inventar')content=inventarViewHTML();
   else if(view.kind==='budsjett')content=budsjettViewHTML();
   else if(view.kind==='innstillinger')content=innstillingerViewHTML();
+  else if(view.kind==='hashtags')content=hashtagsViewHTML();
   else if(view.kind==='kategorier')content=kategorierViewHTML();
   else if(view.kind==='planlegging')content=planleggingViewHTML();
 
