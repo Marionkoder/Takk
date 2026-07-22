@@ -311,6 +311,7 @@ function giftsFor(person){return gifts.filter(function(g){return(g.person||'').t
 function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.name||'').trim()===(person||'').trim();});}
 var LIST_UNITS=['n\u00f8ster','stk','g','kg','ml','dl'];
 function goLister(){view={kind:'lister'};drawerOpen=false;render();}
+function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 function goGaver(){view={kind:'gaver'};drawerOpen=false;render();}
 function openGiftModal(person){
   modal={step:'gift',form:{id:'',person:person||'',kind:'bursdag',year:curYear,what:'',idea:false,note:''}};render();
@@ -395,10 +396,13 @@ function load(){
   }
 
   // Faste lister: Planlagte anskaffelser + Beredskapslager (Gaveloggen er egen datastruktur)
+  inventories.forEach(function(iv){
+    if(iv.fixed==='anskaffelser'&&iv.name==='Planlagte anskaffelser')iv.name='Prioriterte innkj\u00f8p';
+  });
   var seededLists=false;try{seededLists=!!localStorage.getItem(SK+'_seededlists');}catch(e){}
   if(!seededLists){
     if(!inventories.some(function(iv){return iv.fixed==='anskaffelser';})){
-      inventories.push({id:'fixed_anskaffelser',name:'Planlagte anskaffelser',type:'inventar',fixed:'anskaffelser',qty:true,
+      inventories.push({id:'fixed_anskaffelser',name:'Prioriterte innkj\u00f8p',type:'inventar',fixed:'anskaffelser',qty:true,
         catId:'',fields:[],sections:[],items:[]});
     }
     if(!inventories.some(function(iv){return iv.fixed==='beredskap';})){
@@ -715,14 +719,25 @@ function listerViewHTML(){
   var userLists=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')!=='prosjekt';});
   var rowFor=function(inv){
     var c=invCounts(inv);
-    var typeTxt=inv.fixed==='anskaffelser'?'planlagte anskaffelser':inv.fixed==='beredskap'?'beredskapslager'
+    var typeTxt=inv.fixed==='anskaffelser'?'prioriterte innkj\u00f8p':inv.fixed==='beredskap'?'beredskapslager'
       :(inv.type||'inventar')==='pakke'?(inv.pakkeFast?'fast pakkeliste':'pakkeliste'):'inventarliste';
     return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
       +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+' <span style="font-size:10px;color:var(--rose)">\u00b7 '+typeTxt+'</span></div>'
       +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
   };
-  h+='<div class="card">'+fixed.map(rowFor).join('')+'</div>';
+  h+='<div class="card">';
+  fixed.forEach(function(inv){
+    h+=rowFor(inv);
+    // Venteliste rett under Prioriterte innkjøp
+    if(inv.fixed==='anskaffelser'){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goVenteliste()">'
+        +'<div class="entry-body"><div class="entry-text">Venteliste</div>'
+        +'<div class="entry-date">'+laters.length+(laters.length===1?' ting':' ting')+' venter</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    }
+  });
+  h+='</div>';
   // Egne lister
   h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
   if(userLists.length){
@@ -1366,10 +1381,8 @@ function cloudHTML(counts,clickable){
     var size=13+Math.round((c/max)*15);
     var lv=Math.min(5,1+Math.floor((c-1)/max*5));
     var cls='cloud-word lv'+lv+(c>10?' hot':'')+(clickable&&selectedTag===w?' sel':'');
-    var tc=tagColor(w);
-    var stl='font-size:'+size+'px'+(tc?';background:'+tc+';border-color:'+tc+';color:var(--ink)':'');
-    if(clickable)return'<button class="'+cls+'" style="'+stl+'" onclick="selectTag(\''+q(w)+'\')">'+esc(w)+'</button>';
-    return'<span class="'+cls+'" style="'+stl+';cursor:default">'+esc(w)+'</span>';
+    if(clickable)return'<button class="'+cls+'" style="font-size:'+size+'px" onclick="selectTag(\''+q(w)+'\')">'+esc(w)+'</button>';
+    return'<span class="'+cls+'" style="font-size:'+size+'px;cursor:default">'+esc(w)+'</span>';
   }).join('')+'</div></div>';
 }
 
@@ -3630,13 +3643,15 @@ function catUsage(catId){
   return u;
 }
 function tagCloudSpread(counts){
-  // Nøytral ordsky: ingen kategorifarge, spredt utover, sortert etter hyppighet
-  var words=Object.keys(counts).filter(function(w){return counts[w]>0;}).sort(function(a,b){return counts[b]-counts[a]||nbSort(a,b);});
+  // Ordsky: gradert fargeskala etter hyppighet, alfabetisk rekkefølge (ikke frekvenssortert)
+  var words=Object.keys(counts).filter(function(w){return counts[w]>0;}).sort(nbSort);
   if(!words.length)return'';
   var max=Math.max.apply(null,words.map(function(w){return counts[w];}));
-  return'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:6px 2px 4px">'+words.map(function(w){
-    var size=13+Math.round((counts[w]/max)*11);
-    return'<button class="cloud-word'+(selectedTag===w?' sel':'')+'" style="font-size:'+size+'px;color:var(--muted)" onclick="selectTag(\''+q(w)+'\')">#'+esc(w)+'</button>';
+  return'<div class="cloud" style="padding:6px 2px 4px">'+words.map(function(w){
+    var c=counts[w];
+    var size=13+Math.round((c/max)*13);
+    var lv=Math.min(5,1+Math.floor((c-1)/max*5));
+    return'<button class="cloud-word lv'+lv+(c>10?' hot':'')+(selectedTag===w?' sel':'')+'" style="font-size:'+size+'px" onclick="selectTag(\''+q(w)+'\')">#'+esc(w)+'</button>';
   }).join('')+'</div>';
 }
 function catTagCloudHTML(catId){
@@ -3869,7 +3884,7 @@ function budsjettViewHTML(){
 function planleggingViewHTML(){
   var h='<div class="view-title">M\u00e5l, rutiner og planer</div>'
     +'<div class="view-sub">Verdier er slik du vil leve («Jeg tar vare på helsa»). Resultater er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['prosjekt','Prosjektplaner'],['senere','Satt p\u00e5 vent']];
+  var ptabs=[['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser'],['bursdager','Bursdager'],['prosjekt','Prosjektplaner']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
@@ -4112,8 +4127,14 @@ function planleggingViewHTML(){
   }
 
   }
-  if(planTab==='senere'){
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Satt p\u00e5 vent <span style="font-weight:400;color:var(--rose)">\u00b7 venter p\u00e5 riktig tidspunkt</span></div>';
+  return h;
+}
+function ventelisteViewHTML(){
+  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
+    +'<button class="icon-btn" onclick="goLister()">\u2039</button>'
+    +'<div class="view-title" style="padding:0;flex:1">Venteliste</div></div>'
+    +'<div class="view-sub">Ting som venter p\u00e5 riktig tidspunkt. Send til Prioriterte innkj\u00f8p n\u00e5r det er aktuelt.</div>';
+  h+='<button class="add-btn" onclick="openLaterModal()">+ Sett p\u00e5 vent</button>';
   if(laters.length){
     h+='<div class="card">';
     laters.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(l){
@@ -4123,14 +4144,13 @@ function planleggingViewHTML(){
         +(l.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(l.note)+'</div>':'')
         +(gNames.length?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(gNames.join(' \u00b7 '))+'</div>':'')
         +'</div>'
-        +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="laterToAnskaffelser(\''+q(l.id)+'\')">\u2192 Anskaffelser</button>'
+        +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="laterToAnskaffelser(\''+q(l.id)+'\')">\u2192 Innkj\u00f8p</button>'
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditLater(\''+q(l.id)+'\')">\u270e</button>'
         +'</div>';
     });
     h+='</div>';
-  }
-  h+='<button class="add-btn" onclick="openLaterModal()">+ Sett p\u00e5 vent</button>';
-
+  } else {
+    h+='<div class="card"><div class="empty">Ingenting p\u00e5 vent akkurat n\u00e5.</div></div>';
   }
   return h;
 }
@@ -4170,6 +4190,7 @@ function render(){
   else if(view.kind==='uke')content=ukeViewHTML();
   else if(view.kind==='om')content=omViewHTML();
   else if(view.kind==='lister')content=listerViewHTML();
+  else if(view.kind==='venteliste')content=ventelisteViewHTML();
   else if(view.kind==='gaver')content=gaverViewHTML();
   else if(view.kind==='gaveperson')content=gavePersonViewHTML();
   else if(view.kind==='oppsummering')content=oppsummeringViewHTML();
