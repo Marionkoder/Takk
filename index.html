@@ -3585,18 +3585,16 @@ function hashtagsViewHTML(){
     +'<div class="view-title" style="padding:0;flex:1">Hashtagger</div></div>'
     +'<div class="view-sub">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
   var counts=allTags();
-  var tags=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a]||nbSort(a,b);});
+  var tags=Object.keys(counts);
   if(!tags.length)return h+'<div class="card"><div class="empty">Ingen stikkord enn\u00e5. Legg til stikkord n\u00e5r du skriver innlegg.</div></div>';
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
-  h+='<div class="card">';
-  tags.forEach(function(t){
+  var byFreq=function(a,b){return counts[b]-counts[a]||nbSort(a,b);};
+  var tagRow=function(t){
     var tc=tagColor(t);
-    var curCat=tagCats[t]?catById(tagCats[t]):null;
-    h+='<div style="padding:8px 14px;border-bottom:1px solid var(--line)">'
+    return'<div style="padding:8px 14px;border-bottom:1px solid var(--line)">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
       +'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>'
-      +'<span style="font-size:11px;color:var(--muted)">'+counts[t]+' innlegg</span>'
-      +(curCat?'<span style="font-size:11px;color:var(--rose);margin-left:auto">'+esc(curCat.name)+'</span>':'')+'</div>'
+      +'<span style="font-size:11px;color:var(--muted)">'+counts[t]+' innlegg</span></div>'
       +'<div class="chips">'
       +'<button class="chip'+(!tagCats[t]?' on':'')+'" onclick="setTagCat(\''+q(t)+'\',\'\')">Ingen</button>'
       +mains.map(function(mc){
@@ -3604,8 +3602,22 @@ function hashtagsViewHTML(){
         return'<button class="chip'+(on?' on':'')+'"'+(on&&col?' style="background:'+col+';border-color:'+col+';color:'+textOn(col)+'"':'')+' onclick="setTagCat(\''+q(t)+'\',\''+q(mc.id)+'\')">'+esc(mc.name)+'</button>';
       }).join('')
       +'</div></div>';
+  };
+  // Frittstående gleder øverst — stikkord uten kategori
+  var fritt=tags.filter(function(t){return!tagCats[t];}).sort(byFreq);
+  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Frittst\u00e5ende gleder</div>';
+  if(fritt.length)h+='<div class="card">'+fritt.map(tagRow).join('')+'</div>';
+  else h+='<div class="card"><div class="empty">Alle stikkord er knyttet til en kategori.</div></div>';
+  // Deretter hver kategori med sine stikkord
+  mains.forEach(function(mc){
+    var mine=tags.filter(function(t){return tagCats[t]===mc.id;}).sort(byFreq);
+    if(!mine.length)return;
+    var col=catColor(mc.id);
+    h+='<div class="view-sub" style="padding-top:12px;font-weight:600;display:flex;align-items:center;gap:8px">'
+      +(col?'<span style="width:11px;height:11px;border-radius:50%;background:'+col+';display:inline-block"></span>':'')
+      +esc(mc.name)+'</div>'
+      +'<div class="card">'+mine.map(tagRow).join('')+'</div>';
   });
-  h+='</div>';
   return h;
 }
 function kategorierViewHTML(){
