@@ -322,6 +322,97 @@ function giftsFor(person){return gifts.filter(function(g){return(g.person||'').t
 function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.name||'').trim()===(person||'').trim();});}
 var DEFAULT_UNITS=['n\u00f8ster','stk','boks','g','kg','ml','dl'];
 var customUnits=[];
+var places={l1:[],l2:[],l3:[]};
+var BEREDSKAP_SEKSJONER=[
+  {id:'bs_drikke',name:'Drikke'},
+  {id:'bs_forstehjelp',name:'Førstehjelp'},
+  {id:'bs_hygiene',name:'Hygiene'},
+  {id:'bs_kjoling',name:'Kjøling'},
+  {id:'bs_mat',name:'Mat'},
+  {id:'bs_matlaging',name:'Matlaging uten strøm'},
+  {id:'bs_medisiner',name:'Medisiner'},
+  {id:'bs_oppvarming',name:'Oppvarming'},
+  {id:'bs_reservestrom',name:'Reservestrøm'},
+  {id:'bs_transport',name:'Transport'}
+];
+var BEREDSKAP_FORSLAG={
+  bs_oppvarming:['Ved'],
+  bs_hygiene:['Toalettpapir'],
+  bs_reservestrom:['Nødlader'],
+  bs_transport:['Sykkel']
+};
+function addBeredskapItem(invId,secId,name){
+  var inv=invById(invId);if(!inv)return;
+  inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:secId,name:name,note:'',date:'',inCal:false,values:{__qty:'1',__unit:'stk'},have:false}]);
+  save();render();
+}
+function listHasQty(inv){return !!inv&&(inv.type||'inventar')!=='prosjekt';}
+function listHasPlass(inv){return !!inv&&(inv.type||'inventar')==='inventar';}
+function itemPlaceTxt(it){
+  var v=it.values||{};
+  return [v.__p1,v.__p2,v.__p3].filter(Boolean).join(' \u00b7 ');
+}
+function setItemPlace(lv,val){
+  var f=mf();f.values=f.values||{};
+  if(val==='__new'){f._addPlace=lv;render();return;}
+  f.values['__p'+lv]=val;
+  if(lv===1){f.values.__p2='';f.values.__p3='';}
+  if(lv===2){f.values.__p3='';}
+  render();
+}
+function commitNewPlace(){
+  var f=mf();var lv=f._addPlace||1;
+  var nm=addPlace(lv,f._newPlace||'');
+  if(nm){
+    f.values=f.values||{};f.values['__p'+lv]=nm;
+    if(lv===1){f.values.__p2='';f.values.__p3='';}
+    if(lv===2){f.values.__p3='';}
+  }
+  f._addPlace=0;f._newPlace='';render();
+}
+function placesFor(lv){return (places['l'+lv]||[]).slice().sort(nbSort);}
+function addPlace(lv,name){
+  name=(name||'').trim();if(!name)return'';
+  var key='l'+lv;places[key]=places[key]||[];
+  var hit=places[key].find(function(x){return x.toLowerCase()===name.toLowerCase();});
+  if(hit)return hit;
+  places[key].push(name);save();return name;
+}
+function rmPlace(lv,name){
+  var key='l'+lv;
+  places[key]=(places[key]||[]).filter(function(x){return x!==name;});
+  save();render();
+}
+function goPlassering(){view={kind:'plassering'};drawerOpen=false;render();}
+function plasseringViewHTML(){
+  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
+    +'<button class="icon-btn" onclick="goInnstillinger()">\u2039</button>'
+    +'<div class="view-title" style="padding:0;flex:1">Plassering</div></div>'
+    +'<div class="view-sub">Tre niv\u00e5er du kan velge mellom n\u00e5r du legger inn ting i inventarlistene. Niv\u00e5 1 er p\u00e5krevd, de to neste er frivillige.</div>';
+  var lvl=[[1,'Niv\u00e5 1','F.eks. Hus, Hytte, Garasje'],[2,'Niv\u00e5 2','F.eks. Kj\u00f8kkenet, Kjelleren, Loftet'],[3,'Niv\u00e5 3','F.eks. \u00d8verste hylle, Skuff 2']];
+  lvl.forEach(function(L){
+    var lv=L[0];var list=placesFor(lv);
+    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">'+L[1]+'</div>'
+      +'<div class="card" style="padding:12px 14px">';
+    if(list.length){
+      h+='<div class="chips" style="margin-bottom:8px">'+list.map(function(n){
+        return'<button class="chip on" onclick="rmPlace('+lv+',\''+q(n)+'\')">'+esc(n)+' \u00d7</button>';
+      }).join('')+'</div>';
+    } else {
+      h+='<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Ingen enn\u00e5.</div>';
+    }
+    h+='<div style="display:flex;gap:8px;align-items:center">'
+      +'<input class="inp" id="pl-inp-'+lv+'" type="text" style="flex:1;margin:0" placeholder="'+L[2]+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();commitPlace('+lv+');}">'
+      +'<button class="chip" onclick="commitPlace('+lv+')">+ Legg til</button></div>'
+      +'</div>';
+  });
+  h+='<div class="hint-box">Niv\u00e5 2 og 3 er felles for alle steder \u2014 \u00abKj\u00f8kkenet\u00bb kan brukes b\u00e5de under Hus og Hytte. Endrer du niv\u00e5 1 p\u00e5 en ting, nullstilles niv\u00e5ene under.</div>';
+  return h;
+}
+function commitPlace(lv){
+  var el=document.getElementById('pl-inp-'+lv);if(!el)return;
+  addPlace(lv,el.value);render();
+}
 function allUnits(){return DEFAULT_UNITS.concat(customUnits.filter(function(u){return DEFAULT_UNITS.indexOf(u)<0;}));}
 function addCustomUnit(u){
   u=(u||'').trim();
@@ -615,6 +706,8 @@ function load(){
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
+  try{places=JSON.parse(localStorage.getItem(SK+'_places')||'{"l1":[],"l2":[],"l3":[]}');}catch(e){places={l1:[],l2:[],l3:[]};}
+  places.l1=places.l1||[];places.l2=places.l2||[];places.l3=places.l3||[];
   try{tb=JSON.parse(localStorage.getItem(SK+'_tb')||'null')||tb;}catch(e){}
   // Defaultkategorier ved første oppstart — kan slettes fritt av brukeren
   var seeded=false;try{seeded=!!localStorage.getItem(SK+'_seeded');}catch(e){}
@@ -660,10 +753,42 @@ function load(){
     if(!inventories.some(function(iv){return iv.fixed==='beredskap';})){
       inventories.push({id:'fixed_beredskap',name:'Beredskapslager',type:'inventar',fixed:'beredskap',qty:true,
         catId:'',fields:[],
-        sections:[{id:'ber_mat',name:'Mat og drikke'},{id:'ber_varme',name:'Varme og kulde'},{id:'ber_strom',name:'Str\u00f8m og lys'},{id:'ber_kom',name:'Kommunikasjon'}],
+        sections:JSON.parse(JSON.stringify(BEREDSKAP_SEKSJONER)),
         items:[]});
     }
     try{localStorage.setItem(SK+'_seededlists','1');}catch(e){}
+    save();
+  }
+
+  // Nullstill beredskapskategoriene til det nye settet (én gang)
+  var ber2=false;try{ber2=!!localStorage.getItem(SK+'_beredskap2');}catch(e){}
+  if(!ber2){
+    var bl=inventories.find(function(iv){return iv.fixed==='beredskap';});
+    if(bl){
+      var keepIds={};BEREDSKAP_SEKSJONER.forEach(function(x){keepIds[x.id]=1;});
+      // Punkter i gamle kategorier mister overskriften, men beholdes
+      (bl.items||[]).forEach(function(it){if(it.sectionId&&!keepIds[it.sectionId])it.sectionId=null;});
+      var have={};(bl.sections||[]).forEach(function(sc){have[sc.id]=1;});
+      bl.sections=(bl.sections||[]).filter(function(sc){return keepIds[sc.id];});
+      BEREDSKAP_SEKSJONER.forEach(function(x){
+        if(!bl.sections.some(function(sc){return sc.id===x.id;}))bl.sections.push({id:x.id,name:x.name});
+      });
+    }
+    try{localStorage.setItem(SK+'_beredskap2','1');}catch(e){}
+    save();
+  }
+
+  // Antall på alle eksisterende punkter i lister som nå har antall
+  var qtyAll=false;try{qtyAll=!!localStorage.getItem(SK+'_qtyall');}catch(e){}
+  if(!qtyAll){
+    inventories.forEach(function(iv){
+      if((iv.type||'inventar')==='prosjekt')return;
+      (iv.items||[]).forEach(function(it){
+        it.values=it.values||{};
+        if(!String(it.values.__qty||'').length){it.values.__qty='1';it.values.__unit=it.values.__unit||'stk';}
+      });
+    });
+    try{localStorage.setItem(SK+'_qtyall','1');}catch(e){}
     save();
   }
   render();
@@ -682,6 +807,7 @@ function save(){
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
+  try{localStorage.setItem(SK+'_places',JSON.stringify(places));}catch(e){}
   try{localStorage.setItem(SK+'_tb',JSON.stringify(tb));}catch(e){}
 }
 
@@ -1001,12 +1127,7 @@ function omViewHTML(){
 }
 function listerViewHTML(){
   var h='<div class="view-title">Lister</div>';
-  h+='<div class="view-sub">Faste lister og dine egne. Gaveloggen kan ikke slettes; enkeltoppf\u00f8ringer kan.</div>';
-  // Gaveloggen (egen datastruktur)
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goGaver()">'
-    +'<div class="entry-body"><div class="entry-text">Gavelogg</div>'
-    +'<div class="entry-date">'+giftPeople().length+' personer</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  h+='<div class="view-sub">Faste lister og dine egne.</div>';
   // Faste lister
   var fixed=inventories.filter(function(iv){return iv.fixed;}).sort(function(a,b){return a.fixed<b.fixed?-1:1;});
   var userLists=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')!=='prosjekt';});
@@ -1464,7 +1585,7 @@ function deleteInvSec(){
 }
 function openInvItemModal(invId,secId){
   var iv=invById(invId)||{};
-  var vals=iv.qty?{__unit:'n\u00f8ster'}:{};
+  var vals=listHasQty(iv)?{__unit:'n\u00f8ster'}:{};
   modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:vals,have:false,_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
 }
 function openEditInvItem(invId,itemId){
@@ -1591,7 +1712,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,gifts:gifts,tagCats:tagCats,customUnits:customUnits},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -1610,7 +1731,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -1661,12 +1782,12 @@ function openEditEntry(id){
   render();
 }
 function openRoutineModal(){
-  modal={step:'routine',form:{name:'',cats:[],months:[],goalIds:[],resultIds:[],freq:'',ease:'',minutes:'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',goalIds:[],resultIds:[],freq:'',ease:'',minutes:'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openEditRoutine(id){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
-  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),months:[].concat(r.months||[]),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),freq:r.freq||'',ease:r.ease||'',minutes:r.minutes||'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),freq:r.freq||'',ease:r.ease||'',minutes:r.minutes||'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openBdayModal(){
@@ -1696,6 +1817,11 @@ function mf(){return modal.form;}
 function toggleFormCat(id){
   var a=mf().cats;
   mf().cats=a.includes(id)?a.filter(function(x){return x!==id;}):[].concat(a,[id]);
+  render();
+}
+function toggleFormDay(d){
+  var a=mf().days||[];
+  mf().days=a.includes(d)?a.filter(function(x){return x!==d;}):[].concat(a,[d]).sort(function(x,y){return x-y;});
   render();
 }
 function toggleFormMonth(m){
@@ -1836,13 +1962,13 @@ function saveEditEntry(){
 function routineValid(){var f=mf();return(f.name||'').trim().length>0;}
 function submitRoutine(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
-  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,months:f.months,goalIds:f.goalIds||[],resultIds:f.resultIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),minutes:Number(f.minutes)||0,log:[]});
+  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),minutes:Number(f.minutes)||0,log:[]});
   save();closeModal();
 }
 function saveEditRoutine(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var r=routines.find(function(x){return x.id===f.id;});if(!r)return;
-  r.name=name;r.cats=f.cats;r.months=f.months;r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.minutes=Number(f.minutes)||0;
+  r.name=name;r.cats=f.cats;r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.minutes=Number(f.minutes)||0;
   save();closeModal();
 }
 function submitEvent(){
@@ -1876,7 +2002,7 @@ function updateSaveBtn(){
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId;
   if(step==='invsec'||step==='invsec_edit')enabled=(mf().name||'').trim().length>0;
-  if(step==='invitem'||step==='invitem_edit'){var iv2=invById(mf().invId)||{};enabled=(mf().name||'').trim().length>0&&(!iv2.qty||String((mf().values||{}).__qty||'').length>0);}
+  if(step==='invitem'||step==='invitem_edit'){var iv2=invById(mf().invId)||{};enabled=(mf().name||'').trim().length>0&&(!listHasQty(iv2)||String((mf().values||{}).__qty||'').length>0)&&(!listHasPlass(iv2)||String((mf().values||{}).__p1||'').length>0);}
   if(step==='gift')enabled=(mf().person||'').trim().length>0&&(mf().what||'').trim().length>0;
   if(step==='inv'||step==='inv_edit')enabled=invValid(mf());
   if(step==='deposit')enabled=!!parseKr(mf().amount);
@@ -2270,7 +2396,7 @@ function modalHTML(){
     var secOpts='<option value=""'+(!f.sectionId?' selected':'')+'>(uten overskrift)</option>'
       +(invT.sections||[]).map(function(sc){return'<option value="'+q(sc.id)+'"'+(f.sectionId===sc.id?' selected':'')+'>'+esc(sc.name)+'</option>';}).join('');
     var qtyInput='';
-    if(invT.qty){
+    if(listHasQty(invT)){
       var qv=(f.values||{}).__qty||'';var qu=(f.values||{}).__unit||'n\u00f8ster';
       qtyInput='<label class="field-lbl">Antall</label>'
         +'<div style="display:flex;gap:8px;align-items:center">'
@@ -2282,6 +2408,27 @@ function modalHTML(){
         +(f._addUnit?'<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'
           +'<input class="inp" type="text" style="margin:0;flex:1" placeholder="F.eks. flasker, ruller, par \u2026" value="'+esc(f._newUnit||'')+'" oninput="mf()._newUnit=this.value">'
           +'<button class="chip" onclick="commitNewUnit()">Legg til</button></div>':'');
+    }
+    var plassInput='';
+    if(listHasPlass(invT)){
+      var pv=[(f.values||{}).__p1||'',(f.values||{}).__p2||'',(f.values||{}).__p3||''];
+      var lvName=['Sted','Rom eller omr\u00e5de','N\u00f8yaktig plass'];
+      plassInput='<label class="field-lbl">Plassering</label>';
+      [1,2,3].forEach(function(lv){
+        var opts=placesFor(lv);var cur=pv[lv-1];
+        var dis=(lv>1&&!pv[lv-2]);
+        plassInput+='<select class="inp" style="width:100%;margin:0 0 6px 0"'+(dis?' disabled':'')+' oninput="setItemPlace('+lv+',this.value)">'
+          +'<option value="">'+(lv===1?'Velg sted \u2026':'('+lvName[lv-1].toLowerCase()+' \u2013 valgfritt)')+'</option>'
+          +opts.map(function(o){return'<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>';}).join('')
+          +'<option value="__new">+ Ny plassering \u2026</option>'
+          +'</select>';
+      });
+      if(f._addPlace){
+        plassInput+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+          +'<input class="inp" type="text" style="margin:0;flex:1" placeholder="Ny plassering p\u00e5 niv\u00e5 '+f._addPlace+'" value="'+esc(f._newPlace||'')+'" oninput="mf()._newPlace=this.value">'
+          +'<button class="chip" onclick="commitNewPlace()">Legg til</button></div>';
+      }
+      plassInput+='<div class="hint">Niv\u00e5 1 m\u00e5 fylles ut. Endrer du det, nullstilles niv\u00e5ene under.</div>';
     }
     var fieldInputs=(invT.fields||[]).map(function(fd){
       var kind=fieldNumKind(fd);
@@ -2303,6 +2450,7 @@ function modalHTML(){
       +(((invT.sections||[]).length)?'<label class="field-lbl">Overskrift</label>'
       +'<select class="inp" style="width:auto" oninput="mf().sectionId=this.value">'+secOpts+'</select>':'')
       +qtyInput
+      +plassInput
       +fieldInputs
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'
@@ -2319,7 +2467,7 @@ function modalHTML(){
       })():'')
       +(isEditT?'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" onclick="invItemToLater()">Sett p\u00e5 vent</button>':'')
       +(isEditT?'<button class="del-full-btn" onclick="deleteInvItem()">Slett punkt</button>':'')
-      +'<button class="save-btn" onclick="'+(isEditT?'saveEditInvItem()':'submitInvItem()')+'" '+(((f.name||'').trim()&&(!invT.qty||String((f.values||{}).__qty||'').length))?'':'disabled')+'>Lagre</button>';
+      +'<button class="save-btn" onclick="'+(isEditT?'saveEditInvItem()':'submitInvItem()')+'" '+(((f.name||'').trim()&&(!listHasQty(invT)||String((f.values||{}).__qty||'').length)&&(!listHasPlass(invT)||String((f.values||{}).__p1||'').length))?'':'disabled')+'>Lagre</button>';
 
   } else if(step==='deposit'){
     var depRes=resultById(f.resultId)||{};
@@ -2539,7 +2687,15 @@ function modalHTML(){
       +'<button class="chip'+(f.freq==='even'?' on':'')+'" onclick="mf().freq=\'even\';render()">Partallsuker</button>'
       +'<button class="chip'+(f.freq==='yearly'?' on':'')+'" onclick="mf().freq=\'yearly\';render()">\u00c5rlig</button>'
       +'</div>'
-      +(f.freq?'<div class="hint">Rutinen får én knapp per aktuell uke, og krysses av per uke.</div>':'')
+      +(f.freq==='daily'?'<label class="field-lbl">Dager (tom = hver dag)</label>'
+        +'<div class="chips">'+UKEDAGER_FULL.map(function(d,i){
+            return'<button class="chip'+((f.days||[]).includes(i)?' on':'')+'" onclick="toggleFormDay('+i+')">'+d.charAt(0).toUpperCase()+d.slice(1,2)+'</button>';
+          }).join('')+'</div>'
+        +'<div class="hint">Velg faste dager, eller la stå tomt for hver dag.</div>':'')
+      +(isWeeklyFreq(f.freq)?'<label class="field-lbl">Ganger per uke</label>'
+        +'<input class="inp" type="text" inputmode="numeric" style="width:90px" placeholder="1" value="'+esc(f.perWeek||'')+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');mf().perWeek=this.value">'
+        +'<div class="hint">La stå tomt for én gang. Setter du 2, får rutinen to avkrysninger i uka — du velger selv hvilke dager.</div>':'')
+      +(f.freq&&f.freq!=='daily'&&f.freq!=='yearly'?'<div class="hint">Rutinen får én knapp per aktuell uke, og krysses av per uke.</div>':'')
       +'<label class="field-lbl">Måneder (tom = hver måned)</label>'
       +'<div class="chips">'+monthChips+'</div>'
       +'<label class="field-lbl">Kategori(er)</label>'
@@ -2705,13 +2861,22 @@ function periodTodoItems(scope){
     if(r.freq==='daily'){
       // Daglige rutiner vises bare i dagbokboksene, aldri i kalenderen
       if(!scope.daily)return;
-      pushR(r,'d'+scope.daily,'daglig');
+      var rd=r.days||[];
+      if(rd.length&&rd.indexOf(dow(new Date(scope.daily+'T00:00:00')))<0)return;
+      pushR(r,'d'+scope.daily,rd.length?UKEDAGER_FULL[dow(new Date(scope.daily+'T00:00:00'))]:'daglig');
     } else if(r.freq==='yearly'){
       pushR(r,'y'+scope.y,'\u00e5rlig');
     } else if(isWeekly(r)){
       if(r.freq==='odd'&&scope.wk%2===0)return;
       if(r.freq==='even'&&scope.wk%2===1)return;
-      pushR(r,scope.wKey,'');
+      var n=Number(r.perWeek)||1;
+      if(n<=1){
+        pushR(r,scope.wKey,'');
+      } else {
+        var log=r.log||[];var dn=0;
+        for(var gi=1;gi<=n;gi++){if(log.includes(scope.wKey+'#'+gi))dn++;}
+        for(var gj=1;gj<=n;gj++){pushR(r,scope.wKey+'#'+gj,dn+' av '+n+' denne uka');}
+      }
     } else {
       pushR(r,scope.ym,'hver m\u00e5ned');
     }
@@ -3091,7 +3256,8 @@ function dayListHTML(m,y,evList,weeklyRoutines,msList){
   return h;
 }
 
-function isWeekly(r){return r.freq==='weekly'||r.freq==='odd'||r.freq==='even';}
+function isWeeklyFreq(fq){return fq==='weekly'||fq==='odd'||fq==='even';}
+function isWeekly(r){return isWeeklyFreq(r.freq);}
 function weekYear(date){
   var d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
   var day=(d.getUTCDay()+6)%7;
@@ -3987,7 +4153,8 @@ function inventarViewHTML(){
       var v=(it.values||{})[fd.id];
       return v?esc(fd.name)+': '+esc(v):null;
     }).filter(Boolean).join(' \u00b7 ');
-    if(inv.qty&&(it.values||{}).__qty)vals=(esc((it.values||{}).__qty)+' '+esc((it.values||{}).__unit||''))+(vals?' \u00b7 '+vals:'');
+    if(listHasQty(inv)&&(it.values||{}).__qty)vals=(esc((it.values||{}).__qty)+' '+esc((it.values||{}).__unit||''))+(vals?' \u00b7 '+vals:'');
+    var plTxt=listHasPlass(inv)?itemPlaceTxt(it):'';
     return'<div class="entry-row">'
       +'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>'
       +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj?'':' style="color:var(--amber)"')+'>'+esc(it.name)
@@ -3999,6 +4166,7 @@ function inventarViewHTML(){
         })():'')
       +'</div>'
       +(vals?'<div class="entry-date">'+vals+'</div>':'')
+      +(plTxt?'<div class="entry-date" style="color:var(--rose)">'+esc(plTxt)+'</div>':'')
       +(it.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(it.note)+'</div>':'')
 
       +(function(){
@@ -4014,6 +4182,7 @@ function inventarViewHTML(){
 
   var secs=[].concat(inv.sections||[]);
   if(isProj)secs.sort(function(a,b){return(a.startDate||'9999')<(b.startDate||'9999')?-1:(a.startDate||'9999')>(b.startDate||'9999')?1:nbSort(a.name,b.name);});
+  else secs.sort(function(a,b){return nbSort(a.name,b.name);});
   var lone=(inv.items||[]).filter(function(it){return!it.sectionId||!secs.some(function(sc){return sc.id===it.sectionId;});});
   h+='<div class="card">';
   secs.forEach(function(sc){
@@ -4031,6 +4200,15 @@ function inventarViewHTML(){
       +(editMode?'<button class="icon-btn" style="font-size:11px;padding:1px 7px" onclick="openEditInvSec(\''+q(inv.id)+'\',\''+q(sc.id)+'\')">\u270e</button>':'')
       +'<button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="openInvItemModal(\''+q(inv.id)+'\',\''+q(sc.id)+'\')">'+(isProj?'+ milep\u00e6l':'+ punkt')+'</button>'
       +'</div>';
+    if(inv.fixed==='beredskap'&&(BEREDSKAP_FORSLAG[sc.id]||[]).length){
+      var brukt={};(inv.items||[]).forEach(function(it){brukt[(it.name||'').toLowerCase()]=1;});
+      var forslag=(BEREDSKAP_FORSLAG[sc.id]||[]).filter(function(n){return!brukt[n.toLowerCase()];});
+      if(forslag.length){
+        h+='<div class="chips" style="padding:2px 14px 4px">'+forslag.map(function(n){
+          return'<button class="chip" style="font-size:11px" onclick="addBeredskapItem(\''+q(inv.id)+'\',\''+q(sc.id)+'\',\''+q(n)+'\')">+ '+esc(n)+'</button>';
+        }).join('')+'</div>';
+      }
+    }
     var rowsHtml=items.map(itemRow).join('');
     h+=rowsHtml||(invShowMissing?'':'<div style="padding:2px 14px 8px;font-size:12px;color:var(--muted)">Ingen punkter enn\u00e5.</div>');
   });
@@ -4062,6 +4240,10 @@ function innstillingerViewHTML(){
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goKategorier()">'
     +'<div class="entry-body"><div class="entry-text">Administrer kategorier</div>'
     +'<div class="entry-date">se hva hver kategori er knyttet til, og finn ubrukte</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goPlassering()">'
+    +'<div class="entry-body"><div class="entry-text">Administrer plassering</div>'
+    +'<div class="entry-date">hvor ting befinner seg \u2014 tre niv\u00e5er</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goHashtags()">'
     +'<div class="entry-body"><div class="entry-text">Administrer hashtagger</div>'
@@ -4451,9 +4633,15 @@ function planleggingViewHTML(){
     h+='<div class="card">';
     routines.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(r){
       var months=(r.months||[]).length?(r.months||[]).map(function(m){return MND_FULL[m-1].slice(0,3);}).join(', '):'hver måned';
-      if(r.freq==='daily')months+=' · daglig';
+      if(r.freq==='daily'){
+        var rdays=(r.days||[]);
+        months+=rdays.length
+          ? ' · '+rdays.map(function(i){return UKEDAGER_FULL[i].slice(0,3);}).join(', ')
+          : ' · daglig';
+      }
       if(r.freq==='yearly')months+=' · én gang i året';
       if(r.freq==='weekly')months+=' · ukentlig';
+      if(isWeekly(r)&&Number(r.perWeek)>1)months+=' · '+Number(r.perWeek)+' ganger i uka';
       if(r.freq==='odd')months+=' · oddetallsuker';
       if(r.freq==='even')months+=' · partallsuker';
       var gNames=(r.goalIds||[]).map(function(gid){var g=goalById(gid);return g?g.name:null;}).filter(Boolean)
@@ -4631,6 +4819,7 @@ function render(){
   else if(view.kind==='budsjett')content=budsjettViewHTML();
   else if(view.kind==='innstillinger')content=innstillingerViewHTML();
   else if(view.kind==='personlig')content=personligViewHTML();
+  else if(view.kind==='plassering')content=plasseringViewHTML();
   else if(view.kind==='hashtags')content=hashtagsViewHTML();
   else if(view.kind==='kategorier')content=kategorierViewHTML();
   else if(view.kind==='planlegging')content=planleggingViewHTML();
