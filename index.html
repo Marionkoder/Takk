@@ -358,8 +358,30 @@ function forslagNavn(f){return typeof f==='string'?f:(f&&f.n)||'';}
 function forslagEnhet(f){return (f&&f.u)||'stk';}
 function addBeredskapItem(invId,secId,name,unit){
   var inv=invById(invId);if(!inv)return;
-  inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:secId,name:name,note:'',date:'',inCal:false,values:{__qty:'1',__unit:unit||'stk'},have:false}]);
+  inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:secId,name:name,note:'',date:'',inCal:false,values:{__qty:'1',__unit:unit||'stk',__exp:'na'},have:false}]);
   save();render();
+}
+function expStatus(v){
+  if(!v||v==='na')return null;
+  var t=isoDate(today);
+  if(v<t)return{c:'var(--red)',txt:'utg\u00e5tt '+fmtDate(v)};
+  var d=new Date(v+'T00:00:00'),now=new Date(t+'T00:00:00');
+  var days=Math.round((d-now)/86400000);
+  if(days<14)return{c:'#C0651C',txt:'utl\u00f8per '+fmtDate(v)};
+  var three=new Date(now);three.setMonth(three.getMonth()+3);
+  if(d<three)return{c:'#8F7415',txt:'utl\u00f8per '+fmtDate(v)};
+  return{c:'var(--muted)',txt:'utl\u00f8per '+fmtDate(v)};
+}
+function listHasExp(inv){return !!inv&&inv.fixed==='beredskap';}
+function toggleExpNA(){var f=mf();f.values=f.values||{};f.values.__exp=(f.values.__exp==='na')?'':'na';render();}
+function invItemToInnkjop(){
+  var f=mf();var inv=invById(f.invId);if(!inv)return;
+  var target=findFixedList('anskaffelser');if(!target)return;
+  var v=f.values||{};
+  target.items=(target.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:'ik_passer',
+    name:(f.name||'').trim(),note:'Fra '+inv.name+((f.note||'').trim()?' \u00b7 '+(f.note||'').trim():''),
+    date:'',inCal:false,values:{__qty:v.__qty||'1',__unit:v.__unit||'stk'},have:false}]);
+  save();closeModal();
 }
 function listHasQty(inv){return !!inv&&(inv.type||'inventar')!=='prosjekt';}
 function listHasPlass(inv){return !!inv&&(inv.type||'inventar')==='inventar';}
@@ -439,6 +461,23 @@ function addCustomUnit(u){
 function goLister(){view={kind:'lister'};drawerOpen=false;render();}
 function goBeredskap(){view={kind:'beredskap'};drawerOpen=false;render();}
 function goUtstyr(){view={kind:'utstyr'};drawerOpen=false;render();}
+function goOkonomi(){view={kind:'okonomi'};drawerOpen=false;render();}
+function okonomiHubHTML(){
+  var h='<div class="view-title">\u00d8konomi</div>';
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBudsjett(curYear)">'
+    +'<div class="entry-body"><div class="entry-text">Budsjett og regnskap</div>'
+    +'<div class="entry-date">planlagt og faktisk, kvartal for kvartal</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  var ansk=findFixedList('anskaffelser');
+  if(ansk){
+    var c=invCounts(ansk);
+    h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(ansk.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(ansk.name)+'</div>'
+      +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  }
+  return h;
+}
 function goListOversikt(invId){view={kind:'listoversikt',invId:invId};drawerOpen=false;render();}
 function fixedListHubHTML(key,title,sub){
   var inv=findFixedList(key);
@@ -894,6 +933,38 @@ function load(){
     save();
   }
 
+  // Utemøbler med underkategorier
+  var uts2=false;try{uts2=!!localStorage.getItem(SK+'_utstyr2');}catch(e){}
+  if(!uts2){
+    var ul=inventories.find(function(iv){return iv.fixed==='utstyr';});
+    if(ul){
+      ul.sections=ul.sections||[];
+      [{id:'us_utemobler',name:'Utemøbler',parentId:''},
+       {id:'us_ligge',name:'Liggemøbler',parentId:'us_utemobler'},
+       {id:'us_sitte',name:'Sittemøbler',parentId:'us_utemobler'},
+       {id:'us_sol',name:'Solskjerming',parentId:'us_utemobler'}].forEach(function(x){
+        if(!ul.sections.some(function(sc){return sc.id===x.id;}))ul.sections.push({id:x.id,name:x.name,parentId:x.parentId});
+      });
+    }
+    try{localStorage.setItem(SK+'_utstyr2','1');}catch(e){}
+    save();
+  }
+
+  // Prioriteringer på innkjøpslista
+  var ik1=false;try{ik1=!!localStorage.getItem(SK+'_innkjop1');}catch(e){}
+  if(!ik1){
+    var il=inventories.find(function(iv){return iv.fixed==='anskaffelser';});
+    if(il){
+      il.sections=il.sections||[];
+      [{id:'ik_haster',name:'Haster'},{id:'ik_passer',name:'Ordnes når det passer'},{id:'ik_vent',name:'Satt på vent'}].forEach(function(x){
+        if(!il.sections.some(function(sc){return sc.id===x.id;}))il.sections.push({id:x.id,name:x.name,parentId:''});
+      });
+      (il.items||[]).forEach(function(it){if(!it.sectionId)it.sectionId='ik_passer';});
+    }
+    try{localStorage.setItem(SK+'_innkjop1','1');}catch(e){}
+    save();
+  }
+
   // Antall på alle eksisterende punkter i lister som nå har antall
   var qtyAll=false;try{qtyAll=!!localStorage.getItem(SK+'_qtyall');}catch(e){}
   if(!qtyAll){
@@ -1245,7 +1316,7 @@ function listerViewHTML(){
   var h='<div class="view-title">Lister</div>';
   h+='<div class="view-sub">Faste lister og dine egne.</div>';
   // Faste lister
-  var fixed=inventories.filter(function(iv){return iv.fixed&&iv.fixed!=='beredskap'&&iv.fixed!=='utstyr';}).sort(function(a,b){return a.fixed<b.fixed?-1:1;});
+  var fixed=[];
   var userLists=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')!=='prosjekt';});
   var rowFor=function(inv){
     var c=invCounts(inv);
@@ -1256,18 +1327,11 @@ function listerViewHTML(){
       +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
   };
-  h+='<div class="card">';
-  fixed.forEach(function(inv){
-    h+=rowFor(inv);
-    // Venteliste rett under Prioriterte innkjøp
-    if(inv.fixed==='anskaffelser'){
-      h+='<div class="entry-row" style="cursor:pointer" onclick="goVenteliste()">'
-        +'<div class="entry-body"><div class="entry-text">Venteliste</div>'
-        +'<div class="entry-date">'+laters.length+(laters.length===1?' ting':' ting')+' venter</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    }
-  });
-  h+='</div>';
+  h+='<div class="card">'
+    +'<div class="entry-row" style="cursor:pointer" onclick="goVenteliste()">'
+    +'<div class="entry-body"><div class="entry-text">Venteliste</div>'
+    +'<div class="entry-date">'+laters.length+' ting venter</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   // Egne lister
   h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
   var packs=userLists.filter(function(iv){return(iv.type||'inventar')==='pakke';}).sort(function(a,b){return nbSort(a.name,b.name);});
@@ -1677,21 +1741,21 @@ function deleteInv(id){
   inventories=inventories.filter(function(i){return i.id!==id;});
   save();closeModal();goLister();
 }
-function openInvSecModal(invId){modal={step:'invsec',form:{invId:invId,name:'',startDate:'',endDate:'',hours:''}};render();}
+function openInvSecModal(invId){modal={step:'invsec',form:{invId:invId,name:'',parentId:'',startDate:'',endDate:'',hours:''}};render();}
 function openEditInvSec(invId,secId){
   var inv=invById(invId);var sec=(inv.sections||[]).find(function(x){return x.id===secId;});if(!sec)return;
-  modal={step:'invsec_edit',form:{invId:invId,id:secId,name:sec.name,startDate:sec.startDate||'',endDate:sec.endDate||'',hours:sec.hours||''}};render();
+  modal={step:'invsec_edit',form:{invId:invId,id:secId,name:sec.name,parentId:sec.parentId||'',startDate:sec.startDate||'',endDate:sec.endDate||'',hours:sec.hours||''}};render();
 }
 function submitInvSec(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
   var inv=invById(f.invId);if(!inv)return;
-  inv.sections=(inv.sections||[]).concat([{id:'is'+Date.now()+Math.random().toString(36).slice(2,6),name:n,startDate:f.startDate||'',endDate:f.endDate||'',hours:numVal(f.hours)||''}]);
+  inv.sections=(inv.sections||[]).concat([{id:'is'+Date.now()+Math.random().toString(36).slice(2,6),name:n,parentId:f.parentId||'',startDate:f.startDate||'',endDate:f.endDate||'',hours:numVal(f.hours)||''}]);
   save();closeModal();
 }
 function saveEditInvSec(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
   var inv=invById(f.invId);var sec=(inv.sections||[]).find(function(x){return x.id===f.id;});if(!sec)return;
-  sec.name=n;sec.startDate=f.startDate||'';sec.endDate=f.endDate||'';sec.hours=numVal(f.hours)||'';save();closeModal();
+  sec.name=n;sec.parentId=f.parentId||'';sec.startDate=f.startDate||'';sec.endDate=f.endDate||'';sec.hours=numVal(f.hours)||'';save();closeModal();
 }
 function deleteInvSec(){
   var f=mf();var inv=invById(f.invId);if(!inv)return;
@@ -1702,6 +1766,7 @@ function deleteInvSec(){
 function openInvItemModal(invId,secId){
   var iv=invById(invId)||{};
   var vals=listHasQty(iv)?{__unit:'n\u00f8ster'}:{};
+  if(iv.fixed==='anskaffelser'&&!secId)secId='ik_passer';
   modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:vals,have:false,_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
 }
 function openEditInvItem(invId,itemId){
@@ -2118,7 +2183,7 @@ function updateSaveBtn(){
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId;
   if(step==='invsec'||step==='invsec_edit')enabled=(mf().name||'').trim().length>0;
-  if(step==='invitem'||step==='invitem_edit'){var iv2=invById(mf().invId)||{};enabled=(mf().name||'').trim().length>0&&(!listHasQty(iv2)||String((mf().values||{}).__qty||'').length>0)&&(!listHasPlass(iv2)||String((mf().values||{}).__p1||'').length>0);}
+  if(step==='invitem'||step==='invitem_edit'){var iv2=invById(mf().invId)||{};enabled=(mf().name||'').trim().length>0&&(!listHasQty(iv2)||String((mf().values||{}).__qty||'').length>0)&&(!listHasPlass(iv2)||String((mf().values||{}).__p1||'').length>0)&&(!listHasExp(iv2)||String((mf().values||{}).__exp||'').length>0);}
   if(step==='gift')enabled=(mf().person||'').trim().length>0&&(mf().what||'').trim().length>0;
   if(step==='inv'||step==='inv_edit')enabled=invValid(mf());
   if(step==='deposit')enabled=!!parseKr(mf().amount);
@@ -2503,6 +2568,15 @@ function modalHTML(){
          +'<label class="field-lbl">Forventet tidsbruk <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 timer</span></label>'
          +'<input class="inp" type="text" inputmode="decimal" style="width:120px" value="'+esc(String(f.hours||''))+'" placeholder="f.eks. 8" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\');mf().hours=this.value">'
         :'')
+      +(!isProjS&&secInv?(function(){
+        var tops=(secInv.sections||[]).filter(function(x){return !x.parentId&&x.id!==f.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
+        if(!tops.length)return'';
+        return'<label class="field-lbl">Underkategori av <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+          +'<select class="inp" style="width:100%" oninput="mf().parentId=this.value;render()">'
+          +'<option value=""'+(!f.parentId?' selected':'')+'>(egen hovedkategori)</option>'
+          +tops.map(function(t){return'<option value="'+q(t.id)+'"'+(f.parentId===t.id?' selected':'')+'>'+esc(t.name)+'</option>';}).join('')
+          +'</select>';
+      })():'')
       +(isEditS?confirmBtn('invsec','Slett overskrift og punktene under','deleteInvSec()'):'')
       +'<button class="save-btn" onclick="'+(isEditS?'saveEditInvSec()':'submitInvSec()')+'" '+((f.name||'').trim()?'':'disabled')+'>Lagre</button>';
 
@@ -2546,6 +2620,17 @@ function modalHTML(){
       }
       plassInput+='<div class="hint">Niv\u00e5 1 m\u00e5 fylles ut. Endrer du det, nullstilles niv\u00e5ene under.</div>';
     }
+    var expInput='';
+    if(listHasExp(invT)){
+      var ev=(f.values||{}).__exp||'';var naE=ev==='na';
+      var st=expStatus(ev);
+      expInput='<label class="field-lbl">Utl\u00f8psdato</label>'
+        +'<div style="display:flex;gap:8px;align-items:center">'
+        +'<input class="inp" type="date" style="width:auto;margin:0" value="'+esc(naE?'':ev)+'"'+(naE?' disabled':'')+' oninput="mf().values.__exp=this.value;updateSaveBtn()">'
+        +'<button class="chip'+(naE?' on':'')+'" onclick="toggleExpNA()">Ikke relevant</button></div>'
+        +(st?'<div style="font-size:12px;color:'+st.c+';padding-top:4px">'+st.txt+'</div>':'')
+        +'<div class="hint">Sett en dato, eller marker at det ikke er relevant.</div>';
+    }
     var fieldInputs=(invT.fields||[]).map(function(fd){
       var kind=fieldNumKind(fd);
       var filt=kind==='int'?"this.value=this.value.replace(/[^0-9]/g,'');"
@@ -2563,10 +2648,11 @@ function modalHTML(){
     body='<div class="modal-title">'+(isEditT?(isProj?'Rediger milep\u00e6l':'Rediger punkt'):(isProj?'Ny milep\u00e6l':'Nytt punkt'))+'</div>'
       +'<label class="field-lbl">Navn</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. f\u00f4rede vinterst\u00f8vletter til penbruk \u2026" oninput="mf().name=this.value;updateSaveBtn()">'
-      +(((invT.sections||[]).length)?'<label class="field-lbl">Overskrift</label>'
+      +(((invT.sections||[]).length)?'<label class="field-lbl">'+(invT.fixed==='anskaffelser'?'Prioritering':'Overskrift')+'</label>'
       +'<select class="inp" style="width:auto" oninput="mf().sectionId=this.value">'+secOpts+'</select>':'')
       +qtyInput
       +plassInput
+      +expInput
       +fieldInputs
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'
@@ -2581,9 +2667,11 @@ function modalHTML(){
         return'<label class="field-lbl">Finnes ogs\u00e5 p\u00e5</label><div class="chips">'+chips+'</div>'
           +'<div class="hint">Haken synkroniseres p\u00e5 tvers av listene \u2014 har du den ett sted, har du den overalt. Variabler med samme navn kopieres med; plassering under overskrift og \u00f8vrige felter styres per liste.</div>';
       })():'')
-      +(isEditT?'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" onclick="invItemToLater()">Sett p\u00e5 vent</button>':'')
+      +(isEditT?(invT.fixed==='beredskap'
+        ?'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" onclick="invItemToInnkjop()">Kj\u00f8p</button>'
+        :'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" onclick="invItemToLater()">Sett p\u00e5 vent</button>'):'')
       +(isEditT?'<button class="del-full-btn" onclick="deleteInvItem()">Slett punkt</button>':'')
-      +'<button class="save-btn" onclick="'+(isEditT?'saveEditInvItem()':'submitInvItem()')+'" '+(((f.name||'').trim()&&(!listHasQty(invT)||String((f.values||{}).__qty||'').length)&&(!listHasPlass(invT)||String((f.values||{}).__p1||'').length))?'':'disabled')+'>Lagre</button>';
+      +'<button class="save-btn" onclick="'+(isEditT?'saveEditInvItem()':'submitInvItem()')+'" '+(((f.name||'').trim()&&(!listHasQty(invT)||String((f.values||{}).__qty||'').length)&&(!listHasPlass(invT)||String((f.values||{}).__p1||'').length)&&(!listHasExp(invT)||String((f.values||{}).__exp||'').length))?'':'disabled')+'>Lagre</button>';
 
   } else if(step==='deposit'){
     var depRes=resultById(f.resultId)||{};
@@ -2923,8 +3011,8 @@ function sidebarHTML(){
   h+='<div class="side-month'+(view.kind==='beredskap'?'" style="color:var(--red)':'')+'" onclick="goBeredskap()"><span class="s-arrow"></span>Beredskap</div>';
   h+='<div class="side-month'+(view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goBursdager()"><span class="s-arrow"></span>Bursdager</div>';
   h+='<div class="side-month'+(view.kind==='utstyr'?'" style="color:var(--red)':'')+'" onclick="goUtstyr()"><span class="s-arrow"></span>Utstyr</div>';
+  h+='<div class="side-month'+(view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goOkonomi()"><span class="s-arrow"></span>\u00d8konomi</div>';
   h+='<div class="side-month'+(view.kind==='lister'?'" style="color:var(--red)':'')+'" onclick="goLister()"><span class="s-arrow"></span>Lister</div>';
-  h+='<div class="side-month'+(view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goBudsjett(curYear)"><span class="s-arrow"></span>Budsjett og regnskap</div>';
   return h;
 }
 
@@ -4278,7 +4366,7 @@ function inventarViewHTML(){
   var isPack=(inv.type||'inventar')==='pakke';
   var isProj=(inv.type||'inventar')==='prosjekt';
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="'+(isProj?'goPlanlegging()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':'goLister()')+'">\u2039</button>'
+    +'<button class="icon-btn" onclick="'+(isProj?'goPlanlegging()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='anskaffelser'?'goOkonomi()':'goLister()')+'">\u2039</button>'
     +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
     +(isPack?' <span style="font-size:11px;font-weight:400;color:var(--rose)">pakkeliste</span>':isProj?' <span style="font-size:11px;font-weight:400;color:var(--rose)">'+(inv.subtype==='strikk'?'strikkeprosjekt':'prosjekt')+'</span>':'')+'</div>'
@@ -4360,6 +4448,7 @@ function inventarViewHTML(){
     }).filter(Boolean).join(' \u00b7 ');
     if(listHasQty(inv)&&(it.values||{}).__qty)vals=(esc((it.values||{}).__qty)+' '+esc((it.values||{}).__unit||''))+(vals?' \u00b7 '+vals:'');
     var plTxt=listHasPlass(inv)?itemPlaceTxt(it):'';
+    var expSt=listHasExp(inv)?expStatus((it.values||{}).__exp):null;
     return'<div class="entry-row">'
       +'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>'
       +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj?'':' style="color:var(--amber)"')+'>'+esc(it.name)
@@ -4372,6 +4461,7 @@ function inventarViewHTML(){
       +'</div>'
       +(vals?'<div class="entry-date">'+vals+'</div>':'')
       +(plTxt?'<div class="entry-date" style="color:var(--rose)">'+esc(plTxt)+'</div>':'')
+      +(expSt?'<div class="entry-date" style="color:'+expSt.c+'">'+esc(expSt.txt)+'</div>':'')
       +(it.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(it.note)+'</div>':'')
 
       +(function(){
@@ -4390,13 +4480,17 @@ function inventarViewHTML(){
   else secs.sort(function(a,b){return nbSort(a.name,b.name);});
   var lone=(inv.items||[]).filter(function(it){return!it.sectionId||!secs.some(function(sc){return sc.id===it.sectionId;});});
   h+='<div class="card">';
-  secs.forEach(function(sc){
+  var secBlock=function(sc,ind){
+    var out='';
     var items=(inv.items||[]).filter(function(it){return it.sectionId===sc.id;}).sort(function(a,b){
       if(isProj)return(a.date||'9999')<(b.date||'9999')?-1:(a.date||'9999')>(b.date||'9999')?1:nbSort(a.name,b.name);
       return nbSort(a.name,b.name);});
     var phaseOut=isProj&&((sc.startDate&&inv.startDate&&sc.startDate<inv.startDate)||(sc.endDate&&inv.endDate&&sc.endDate>inv.endDate));
-    h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 2px">'
-      +'<span style="flex:1"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+esc(sc.name)+'</span>'
+    var titleStyle=ind
+      ?'font-size:12px;font-weight:600;color:var(--ink)'
+      :'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)';
+    out+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 2px '+(14+ind)+'px">'
+      +'<span style="flex:1"><span style="'+titleStyle+'">'+esc(sc.name)+'</span>'
       +(isProj&&(sc.startDate||sc.endDate||sc.hours)?'<span style="font-size:11px;color:'+(phaseOut?'var(--amber)':'var(--muted)')+'"> \u00b7 '
         +(sc.startDate?fmtDate(sc.startDate):'?')+(sc.startDate||sc.endDate?' \u2013 '+(sc.endDate?fmtDate(sc.endDate):'?'):'')
         +(sc.hours?' \u00b7 '+String(sc.hours).replace('.',',')+' t':'')
@@ -4409,14 +4503,23 @@ function inventarViewHTML(){
       var brukt={};(inv.items||[]).forEach(function(it){brukt[(it.name||'').toLowerCase()]=1;});
       var forslag=(BEREDSKAP_FORSLAG[sc.id]||[]).filter(function(f){return!brukt[forslagNavn(f).toLowerCase()];});
       if(forslag.length){
-        h+='<div class="chips" style="padding:2px 14px 4px">'+forslag.map(function(f){
+        out+='<div class="chips" style="padding:2px 14px 4px '+(14+ind)+'px">'+forslag.map(function(f){
           var fn=forslagNavn(f);
           return'<button class="chip" style="font-size:11px" onclick="addBeredskapItem(\''+q(inv.id)+'\',\''+q(sc.id)+'\',\''+q(fn)+'\',\''+q(forslagEnhet(f))+'\')">+ '+esc(fn)+'</button>';
         }).join('')+'</div>';
       }
     }
     var rowsHtml=items.map(itemRow).join('');
-    h+=rowsHtml||(invShowMissing?'':'<div style="padding:2px 14px 8px;font-size:12px;color:var(--muted)">Ingen punkter enn\u00e5.</div>');
+    var body=rowsHtml||(invShowMissing?'':'<div style="padding:2px 14px 8px;font-size:12px;color:var(--muted)">Ingen punkter enn\u00e5.</div>');
+    out+=ind?'<div style="padding-left:'+ind+'px">'+body+'</div>':body;
+    return out;
+  };
+  var isChildOf={};
+  secs.forEach(function(sc){if(sc.parentId&&secs.some(function(x){return x.id===sc.parentId;}))isChildOf[sc.id]=sc.parentId;});
+  secs.forEach(function(sc){
+    if(isChildOf[sc.id])return;
+    h+=secBlock(sc,0);
+    secs.forEach(function(cs){if(isChildOf[cs.id]===sc.id)h+=secBlock(cs,16);});
   });
   if(lone.length){
     if(secs.length)h+='<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">Uten overskrift</div>';
@@ -4958,7 +5061,7 @@ function ventelisteViewHTML(){
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goLister()">\u2039</button>'
     +'<div class="view-title" style="padding:0;flex:1">Venteliste</div></div>'
-    +'<div class="view-sub">Ting som venter p\u00e5 riktig tidspunkt. Send til Prioriterte innkj\u00f8p n\u00e5r det er aktuelt.</div>';
+    +'<div class="view-sub">Ting som venter p\u00e5 riktig tidspunkt. Innkj\u00f8p h\u00e5ndteres i innkj\u00f8pslista under \u00d8konomi.</div>';
   h+='<button class="add-btn" onclick="openLaterModal()">+ Sett p\u00e5 vent</button>';
   if(laters.length){
     h+='<div class="card">';
@@ -4969,7 +5072,6 @@ function ventelisteViewHTML(){
         +(l.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(l.note)+'</div>':'')
         +(gNames.length?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(gNames.join(' \u00b7 '))+'</div>':'')
         +'</div>'
-        +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="laterToAnskaffelser(\''+q(l.id)+'\')">\u2192 Innkj\u00f8p</button>'
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditLater(\''+q(l.id)+'\')">\u270e</button>'
         +'</div>';
     });
@@ -5020,6 +5122,7 @@ function render(){
   else if(view.kind==='lister')content=listerViewHTML();
   else if(view.kind==='beredskap')content=fixedListHubHTML('beredskap','Beredskap','Det du trenger for \u00e5 klare deg selv en uke.');
   else if(view.kind==='utstyr')content=fixedListHubHTML('utstyr','Utstyr','Ting du eier, ordnet etter bruk og plassering.');
+  else if(view.kind==='okonomi')content=okonomiHubHTML();
   else if(view.kind==='listoversikt')content=listOversiktViewHTML();
   else if(view.kind==='venteliste')content=ventelisteViewHTML();
   else if(view.kind==='gaver')content=gaverViewHTML();
