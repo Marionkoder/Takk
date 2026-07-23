@@ -344,11 +344,11 @@ var BEREDSKAP_FORSLAG={
   bs_drikke:[{n:'Drikkevann',u:'liter'},{n:'Kaffe'}],
   bs_forstehjelp:[{n:'Gnagsårplaster'}],
   bs_hygiene:[{n:'Håndsprit'},{n:'Håndsåpe'},{n:'Toalettpapir'}],
-  bs_mat:[{n:'Matolje'},{n:'Salt'}],
-  bs_matlaging:[{n:'Bålpanne'},{n:'Kull'},{n:'Kullgrill'},{n:'Propan'},{n:'Rødsprit'},{n:'Stormkjøkken'},{n:'Tennvæske'},{n:'Vedovn med kokeplate'}],
+  bs_mat:[{n:'Frysetørret mat'},{n:'Matolje'},{n:'Salt'}],
+  bs_matlaging:[{n:'Bålpanne'},{n:'Grillkull'},{n:'Kullgrill'},{n:'Propan'},{n:'Rødsprit'},{n:'Stormkjøkken'},{n:'Tennvæske'},{n:'Vedovn med kokeplate'}],
   bs_medisiner:[{n:'Jodtabletter'},{n:'Smertestillende/febernedsettende'}],
   bs_lys:[{n:'Lommelykt'},{n:'Stearinlys'}],
-  bs_oppvarming:[{n:'Ulltepper'},{n:'Varmeflaske'},{n:'Ved'}],
+  bs_oppvarming:[{n:'Opptenningsbrikker'},{n:'Opptenningsved'},{n:'Ulltepper'},{n:'Varmeflaske'},{n:'Ved'},{n:'Øks'}],
   bs_reservestrom:[{n:'Nødlader'}],
   bs_transport:[{n:'Sykkel'}],
   bs_betaling:[{n:'Kontanter',u:'kroner'}],
@@ -373,6 +373,31 @@ function expStatus(v){
   return{c:'var(--muted)',txt:'utl\u00f8per '+fmtDate(v)};
 }
 function listHasExp(inv){return !!inv&&inv.fixed==='beredskap';}
+function listHasDetails(inv){return !!inv&&(inv.fixed==='beredskap'||inv.fixed==='utstyr');}
+var TILSTAND=['Som ny','Brukt, men velfungerende','Slitt','Må repareres eller vedlikeholdes','Må erstattes'];
+function setItemVal(k,val){var f=mf();f.values=f.values||{};f.values[k]=(f.values[k]===val?'':val);render();}
+function invItemErstatt(){
+  var f=mf();var inv=invById(f.invId);if(!inv)return;
+  var target=findFixedList('anskaffelser');if(!target)return;
+  var v=f.values||{};
+  target.items=(target.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:'ik_passer',
+    name:'Erstattes: '+(f.name||'').trim(),note:'Fra '+inv.name,date:'',inCal:false,
+    values:{__qty:v.__qty||'1',__unit:v.__unit||'stk'},have:false}]);
+  f._erstattSendt=true;save();render();
+}
+function setInvPlanned(invId,itemId){
+  var inv=invById(invId);if(!inv)return;
+  var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
+  if(it.planned){it.planned=false;save();render();return;}
+  var target=findFixedList('anskaffelser');
+  if(target){
+    var v=it.values||{};
+    target.items=(target.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:'ik_passer',
+      name:it.name,note:'Fra '+inv.name,date:'',inCal:false,
+      values:{__qty:v.__qty||'1',__unit:v.__unit||'stk'},have:false}]);
+  }
+  it.planned=true;save();render();
+}
 function toggleExpNA(){var f=mf();f.values=f.values||{};f.values.__exp=(f.values.__exp==='na')?'':'na';render();}
 function invItemToInnkjop(){
   var f=mf();var inv=invById(f.invId);if(!inv)return;
@@ -479,6 +504,64 @@ function okonomiHubHTML(){
   return h;
 }
 function goListOversikt(invId){view={kind:'listoversikt',invId:invId};drawerOpen=false;render();}
+function setInvQa(invId,v){var inv=invById(invId);if(!inv)return;inv.qaDate=v||'';save();render();}
+function oversiktTree(inv,onlyHave){
+  var UTEN='\u2013 uten plassering';
+  var tree={};
+  (inv.items||[]).forEach(function(it){
+    if(onlyHave&&!it.have)return;
+    var v=it.values||{};
+    var p1=(v.__p1||'').trim()||UTEN;
+    var p2=(v.__p2||'').trim();
+    var p3=(v.__p3||'').trim();
+    tree[p1]=tree[p1]||{};tree[p1][p2]=tree[p1][p2]||{};
+    tree[p1][p2][p3]=tree[p1][p2][p3]||[];
+    tree[p1][p2][p3].push(it);
+  });
+  return {tree:tree,UTEN:UTEN};
+}
+function oversiktSortKeys(o,UTEN){
+  return Object.keys(o).sort(function(a,b){
+    if(a===UTEN)return 1;if(b===UTEN)return -1;
+    if(a==='')return -1;if(b==='')return 1;
+    return nbSort(a,b);
+  });
+}
+function printOversikt(invId){
+  var inv=invById(invId);if(!inv)return;
+  var area=document.getElementById('print-area');if(!area)return;
+  var t=oversiktTree(inv,true);
+  var h='<h1>Oversikt over det som er p\u00e5 plass</h1>'
+    +'<div class="p-sub">'+esc(inv.name)+(inv.qaDate?' \u00b7 sist kvalitetssikret '+fmtDate(inv.qaDate):'')+' \u00b7 skrevet ut '+fmtDate(isoDate(today))+'</div>';
+  oversiktSortKeys(t.tree,t.UTEN).forEach(function(p1){
+    h+='<h2>'+esc(p1)+'</h2>';
+    oversiktSortKeys(t.tree[p1],t.UTEN).forEach(function(p2){
+      if(p2)h+='<div style="font-weight:bold;margin-top:4pt">'+esc(p2)+'</div>';
+      oversiktSortKeys(t.tree[p1][p2],t.UTEN).forEach(function(p3){
+        if(p3)h+='<div style="font-style:italic;margin-left:8pt">'+esc(p3)+'</div>';
+        t.tree[p1][p2][p3].slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(it){
+          var v=it.values||{};
+          var bits=[];
+          if(v.__qty)bits.push(v.__qty+' '+(v.__unit||''));
+          if(v.__merke)bits.push(v.__merke);
+          if(v.__tilstand)bits.push(v.__tilstand);
+          if(v.__exp&&v.__exp!=='na')bits.push('utl\u00f8per '+fmtDate(v.__exp));
+          h+='<div style="margin-left:'+(p3?16:p2?8:0)+'pt">\u2610 '+esc(it.name)+(bits.length?' <span style="color:#444">\u2014 '+esc(bits.join(' \u00b7 '))+'</span>':'')+'</div>';
+        });
+      });
+    });
+  });
+  var mangler=(inv.items||[]).filter(function(it){return !it.have;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  if(mangler.length){
+    h+='<h2>Mangler</h2>';
+    mangler.forEach(function(it){
+      h+='<div>\u2610 '+esc(it.name)+(it.planned?' <span style="color:#444">\u2014 innkj\u00f8p planlagt</span>':'')+'</div>';
+    });
+  }
+  h+='<div class="p-foot">Gode dager \u00b7 skrevet ut '+fmtDate(isoDate(today))+'</div>';
+  area.innerHTML=h;
+  try{window.print();}catch(e){alert('Utskrift st\u00f8ttes ikke her \u2014 \u00e5pne appen i nettleseren og pr\u00f8v derfra.');}
+}
 function fixedListHubHTML(key,title,sub){
   var inv=findFixedList(key);
   var h='<div class="view-title">'+esc(title)+'</div>';
@@ -500,54 +583,62 @@ function listOversiktViewHTML(){
   var back=inv&&inv.fixed==='utstyr'?'goUtstyr()':'goBeredskap()';
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="'+back+'">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">Oversikt</div></div>';
+    +'<div class="view-title" style="padding:0;flex:1;font-size:19px">Oversikt over det som er p\u00e5 plass</div>'
+    +(inv?'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="printOversikt(\''+q(inv.id)+'\')">Skriv ut</button>':'')
+    +'</div>';
   if(!inv)return h+'<div class="card"><div class="empty">Fant ikke lista.</div></div>';
-  h+='<div class="view-sub">'+esc(inv.name)+' ordnet etter hvor tingene er.</div>';
-  var items=inv.items||[];
-  if(!items.length)return h+'<div class="card"><div class="empty">Ingen punkter enn\u00e5. Legg dem inn under Liste, s\u00e5 dukker de opp her etter plassering.</div></div>';
-  var UTEN='\u2013 uten plassering';
-  var tree={};
-  items.forEach(function(it){
-    var v=it.values||{};
-    var p1=(v.__p1||'').trim()||UTEN;
-    var p2=(v.__p2||'').trim();
-    var p3=(v.__p3||'').trim();
-    tree[p1]=tree[p1]||{};
-    tree[p1][p2]=tree[p1][p2]||{};
-    tree[p1][p2][p3]=tree[p1][p2][p3]||[];
-    tree[p1][p2][p3].push(it);
-  });
-  var sortKeys=function(o){
-    return Object.keys(o).sort(function(a,b){
-      if(a===UTEN)return 1;if(b===UTEN)return -1;
-      if(a==='')return -1;if(b==='')return 1;
-      return nbSort(a,b);
-    });
-  };
+  h+='<div class="card" style="padding:12px 14px">'
+    +'<label class="field-lbl" style="margin-top:0">Sist kvalitetssikret</label>'
+    +'<input class="inp" type="date" style="width:auto;margin:0" value="'+esc(inv.qaDate||'')+'" oninput="setInvQa(\''+q(inv.id)+'\',this.value)">'
+    +(inv.qaDate?'':'<div class="hint">Sett dato n\u00e5r du sist gikk gjennom og sjekket at alt stemmer.</div>')
+    +'</div>';
+  var t=oversiktTree(inv,true);
+  var paaPlass=(inv.items||[]).filter(function(it){return it.have;});
   var rowFor=function(it){
     var sec=(inv.sections||[]).find(function(x){return x.id===it.sectionId;});
     var v=it.values||{};
     var meta=[];
     if(v.__qty)meta.push(esc(v.__qty)+' '+esc(v.__unit||''));
     if(sec)meta.push(esc(sec.name));
+    if(v.__merke)meta.push(esc(v.__merke));
+    var expSt=listHasExp(inv)?expStatus(v.__exp):null;
     return'<div class="entry-row" style="padding-left:0">'
-      +'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>'
-      +'<div class="entry-body"><div class="entry-text"'+(it.have?'':' style="color:var(--amber)"')+'>'+esc(it.name)+'</div>'
+      +'<div class="entry-body"><div class="entry-text">'+esc(it.name)+'</div>'
       +(meta.length?'<div class="entry-date">'+meta.join(' \u00b7 ')+'</div>':'')
+      +(expSt?'<div class="entry-date" style="color:'+expSt.c+'">'+esc(expSt.txt)+'</div>':'')
+      +(v.__tilstand?'<div class="entry-date" style="color:'+(v.__tilstand==='M\u00e5 erstattes'?'var(--red)':v.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(v.__tilstand)+'</div>':'')
       +'</div></div>';
   };
-  h+='<div class="card">';
-  sortKeys(tree).forEach(function(p1){
-    h+='<div style="padding:10px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+esc(p1)+'</div>';
-    sortKeys(tree[p1]).forEach(function(p2){
-      if(p2)h+='<div style="padding:4px 14px 0 24px;font-size:13px;font-weight:600;color:var(--ink)">'+esc(p2)+'</div>';
-      sortKeys(tree[p1][p2]).forEach(function(p3){
-        if(p3)h+='<div style="padding:2px 14px 0 36px;font-size:12px;color:var(--muted)">'+esc(p3)+'</div>';
-        h+='<div style="padding-left:'+(p3?36:p2?24:14)+'px">'+tree[p1][p2][p3].slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(rowFor).join('')+'</div>';
+  if(!paaPlass.length){
+    h+='<div class="card"><div class="empty">Ingenting er merket som p\u00e5 plass enn\u00e5.</div></div>';
+  } else {
+    h+='<div class="card">';
+    oversiktSortKeys(t.tree,t.UTEN).forEach(function(p1){
+      h+='<div style="padding:10px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+esc(p1)+'</div>';
+      oversiktSortKeys(t.tree[p1],t.UTEN).forEach(function(p2){
+        if(p2)h+='<div style="padding:4px 14px 0 24px;font-size:13px;font-weight:600;color:var(--ink)">'+esc(p2)+'</div>';
+        oversiktSortKeys(t.tree[p1][p2],t.UTEN).forEach(function(p3){
+          if(p3)h+='<div style="padding:2px 14px 0 36px;font-size:12px;color:var(--muted)">'+esc(p3)+'</div>';
+          h+='<div style="padding-left:'+(p3?36:p2?24:14)+'px">'+t.tree[p1][p2][p3].slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(rowFor).join('')+'</div>';
+        });
       });
     });
-  });
-  h+='</div>';
+    h+='</div>';
+  }
+  var mangler=(inv.items||[]).filter(function(it){return !it.have;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  if(mangler.length){
+    h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Dette mangler</div>'
+      +'<div class="card">';
+    mangler.forEach(function(it){
+      var sec=(inv.sections||[]).find(function(x){return x.id===it.sectionId;});
+      h+='<div class="entry-row"><div class="entry-body">'
+        +'<div class="entry-text" style="color:var(--amber)">'+esc(it.name)+'</div>'
+        +(sec?'<div class="entry-date">'+esc(sec.name)+'</div>':'')
+        +(it.planned?'<div class="entry-date" style="color:var(--rose)">innkj\u00f8p planlagt</div>':'')
+        +'</div></div>';
+    });
+    h+='</div>';
+  }
   return h;
 }
 function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
@@ -1177,11 +1268,14 @@ function resultCatMatch(r,entryCats){
     return!!(c&&c.parentId&&sc.includes(c.parentId));
   });
 }
-function openResultModal(){modal={step:'result',form:{name:'',valueId:'',month:curMonth,year:curYear+1,subCats:[],achieved:false,targetAmount:'',amountType:'spar',invIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:''}};render();}
+function openResultModal(){modal={step:'result',form:{name:'',valueId:'',month:curMonth,year:curYear+1,subCats:[],achieved:false,targetAmount:'',amountType:'spar',invIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
 function openEditResult(id){
   var r=resultById(id);if(!r)return;
   var linkedInvs=inventories.filter(function(iv){return(iv.resultIds||[]).includes(id);}).map(function(iv){return iv.id;});
-  modal={step:'result_edit',form:{id:id,name:r.name,valueId:r.valueId,month:r.month,year:r.year,subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'spar',invIds:linkedInvs,budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:''}};render();
+  modal={step:'result_edit',form:{id:id,name:r.name,valueId:r.valueId,month:r.month,year:r.year,subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'spar',invIds:linkedInvs,budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
+    forutsetninger:r.forutsetninger||'',risikoer:r.risikoer||'',
+    routineIds:routines.filter(function(x){return (x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;}),
+    eventIds:events.filter(function(x){return !x.bday&&(x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;})}};render();
 }
 function syncResultInvs(resultId,invIds){
   inventories.forEach(function(iv){
@@ -1211,6 +1305,25 @@ function addPersonTag(){
   f._ptInput='';render();
 }
 function rmPersonTag(t){var f=mf();f.personTags=(f.personTags||[]).filter(function(x){return normTag(x)!==normTag(t);});render();}
+function syncResultRoutines(resultId,ids){
+  routines.forEach(function(r){
+    var has=(r.resultIds||[]).indexOf(resultId)>=0;
+    var want=(ids||[]).indexOf(r.id)>=0;
+    if(want&&!has)r.resultIds=[].concat(r.resultIds||[],[resultId]);
+    if(!want&&has)r.resultIds=(r.resultIds||[]).filter(function(x){return x!==resultId;});
+  });
+}
+function syncResultEvents(resultId,ids){
+  events.forEach(function(e){
+    if(e.bday)return;
+    var has=(e.resultIds||[]).indexOf(resultId)>=0;
+    var want=(ids||[]).indexOf(e.id)>=0;
+    if(want&&!has)e.resultIds=[].concat(e.resultIds||[],[resultId]);
+    if(!want&&has)e.resultIds=(e.resultIds||[]).filter(function(x){return x!==resultId;});
+  });
+}
+function toggleResRoutine(id){var a=mf().routineIds||[];mf().routineIds=a.indexOf(id)>=0?a.filter(function(x){return x!==id;}):[].concat(a,[id]);render();}
+function toggleResEvent(id){var a=mf().eventIds||[];mf().eventIds=a.indexOf(id)>=0?a.filter(function(x){return x!==id;}):[].concat(a,[id]);render();}
 function addResultMs(){
   var f=mf();var n=(f._msName||'').trim();if(!n)return;
   f.milestones=(f.milestones||[]).concat([{id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),name:n,date:f._msDate||'',done:false}]);
@@ -1246,7 +1359,8 @@ function placeResultFormInBudget(){
 function submitResult(){
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId)return;
   var newId='x'+Date.now()+Math.random().toString(36).slice(2,6);
-  results.push({id:newId,name:name,valueId:f.valueId,month:Number(f.month),year:Number(f.year),subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'spar',milestones:f.milestones||[]});
+  results.push({id:newId,name:name,valueId:f.valueId,month:Number(f.month),year:Number(f.year),subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'spar',milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
+  syncResultRoutines(newId,f.routineIds);syncResultEvents(newId,f.eventIds);
   syncResultInvs(newId,f.invIds);
   save();closeModal();
 }
@@ -1257,6 +1371,8 @@ function saveEditResult(){
   r.subCats=f.subCats||[];r.achieved=!!f.achieved;r.targetAmount=parseKr(f.targetAmount);
   r.amountType=f.amountType||'spar';
   r.milestones=f.milestones||[];
+  r.forutsetninger=(f.forutsetninger||'').trim();r.risikoer=(f.risikoer||'').trim();
+  syncResultRoutines(r.id,f.routineIds);syncResultEvents(r.id,f.eventIds);
   syncResultInvs(r.id,f.invIds);
   save();closeModal();
 }
@@ -2631,6 +2747,29 @@ function modalHTML(){
         +(st?'<div style="font-size:12px;color:'+st.c+';padding-top:4px">'+st.txt+'</div>':'')
         +'<div class="hint">Sett en dato, eller marker at det ikke er relevant.</div>';
     }
+    var detailInputs='';
+    if(listHasDetails(invT)){
+      var dv=f.values||{};
+      detailInputs='<label class="field-lbl">Merke</label>'
+        +'<input class="inp" type="text" value="'+esc(dv.__merke||'')+'" placeholder="F.eks. Primus, Fj\u00e4llr\u00e4ven \u2026" oninput="mf().values.__merke=this.value">'
+        +'<label class="field-lbl">Kj\u00f8pt n\u00e5r og hvor <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+        +'<input class="inp" type="text" value="'+esc(dv.__kjopt||'')+'" placeholder="F.eks. 2021, eller mars 2021 hos XXL" oninput="mf().values.__kjopt=this.value">'
+        +'<label class="field-lbl">Kvittering</label>'
+        +'<div class="chips">'
+          +'<button class="chip'+(dv.__kvitt==='ja'?' on':'')+'" onclick="setItemVal(\'__kvitt\',\'ja\')">Ja</button>'
+          +'<button class="chip'+(dv.__kvitt==='nei'?' on':'')+'" onclick="setItemVal(\'__kvitt\',\'nei\')">Nei</button>'
+        +'</div>'
+        +'<div class="hint">Tips: Samle alle de fysiske kvitteringene dine ett sted. Ta bilde av dem og legg i en mappe sammen med digitale kvitteringer. Print ut viktige digitale kvitteringer.</div>'
+        +'<label class="field-lbl">Tilstand</label>'
+        +'<div class="chips">'+TILSTAND.map(function(t){
+            return'<button class="chip'+(dv.__tilstand===t?' on':'')+'" onclick="setItemVal(\'__tilstand\',\''+q(t)+'\')">'+esc(t)+'</button>';
+          }).join('')+'</div>'
+        +(dv.__tilstand==='M\u00e5 erstattes'
+          ?(f._erstattSendt
+            ?'<div class="hint-box" style="color:var(--red)">Lagt p\u00e5 innkj\u00f8pslista som \u00abErstattes: '+esc((f.name||'').trim())+'\u00bb.</div>'
+            :'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" onclick="invItemErstatt()">Send \u00abErstattes: '+esc((f.name||'').trim())+'\u00bb til innkj\u00f8pslista</button>')
+          :'');
+    }
     var fieldInputs=(invT.fields||[]).map(function(fd){
       var kind=fieldNumKind(fd);
       var filt=kind==='int'?"this.value=this.value.replace(/[^0-9]/g,'');"
@@ -2653,6 +2792,7 @@ function modalHTML(){
       +qtyInput
       +plassInput
       +expInput
+      +detailInputs
       +fieldInputs
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'
@@ -2825,6 +2965,22 @@ function modalHTML(){
             +'</div>';
         }).join('');
       })():'')
+      +'<label class="field-lbl">Forutsetninger for \u00e5 lykkes</label>'
+      +'<textarea class="inp" rows="2" placeholder="Hva m\u00e5 v\u00e6re p\u00e5 plass?" oninput="mf().forutsetninger=this.value">'+esc(f.forutsetninger||'')+'</textarea>'
+      +'<label class="field-lbl">Risikoer for \u00e5 mislykkes</label>'
+      +'<textarea class="inp" rows="2" placeholder="Hva kan komme i veien?" oninput="mf().risikoer=this.value">'+esc(f.risikoer||'')+'</textarea>'
+      +'<label class="field-lbl">Rutiner og planer som gj\u00f8r det lettere \u00e5 lykkes</label>'
+      +(routines.length?'<div class="chips">'+routines.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(rt){
+          return'<button class="chip'+((f.routineIds||[]).indexOf(rt.id)>=0?' on':'')+'" onclick="toggleResRoutine(\''+q(rt.id)+'\')">'+esc(rt.name)+'</button>';
+        }).join('')+'</div>':'<div class="hint">Ingen rutiner \u00e5 koble til enn\u00e5.</div>')
+      +(function(){
+        var evs=events.filter(function(e){return !e.bday;}).sort(function(a,b){return nbSort(a.name,b.name);});
+        if(!evs.length)return'';
+        return'<div class="chips" style="margin-top:6px">'+evs.map(function(ev){
+          return'<button class="chip'+((f.eventIds||[]).indexOf(ev.id)>=0?' on':'')+'" onclick="toggleResEvent(\''+q(ev.id)+'\')">'+esc(ev.name)+'</button>';
+        }).join('')+'</div>';
+      })()
+      +'<div class="hint">Velg rutiner og hendelser som b\u00e6rer dette resultatet. De vises i Oversikt-tabellen.</div>'
       +'<label class="field-lbl">Milep\u00e6ler <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfrie delm\u00e5l p\u00e5 veien</span></label>'
       +((f.milestones||[]).length?'<div style="margin-bottom:6px">'+(f.milestones||[]).slice().sort(function(a,b){return(a.date||'9999')<(b.date||'9999')?-1:1;}).map(function(m){
           return'<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'
@@ -4449,8 +4605,16 @@ function inventarViewHTML(){
     if(listHasQty(inv)&&(it.values||{}).__qty)vals=(esc((it.values||{}).__qty)+' '+esc((it.values||{}).__unit||''))+(vals?' \u00b7 '+vals:'');
     var plTxt=listHasPlass(inv)?itemPlaceTxt(it):'';
     var expSt=listHasExp(inv)?expStatus((it.values||{}).__exp):null;
+    var dRow=[];
+    if(listHasDetails(inv)){
+      var dvv=it.values||{};
+      if(dvv.__merke)dRow.push(esc(dvv.__merke));
+      if(dvv.__tilstand)dRow.push('<span style="color:'+(dvv.__tilstand==='M\u00e5 erstattes'?'var(--red)':dvv.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(dvv.__tilstand)+'</span>');
+      if(dvv.__kjopt)dRow.push('kj\u00f8pt '+esc(dvv.__kjopt));
+    }
+    var twoBtn=listHasDetails(inv);
     return'<div class="entry-row">'
-      +'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>'
+      +(twoBtn?'':'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>')
       +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj?'':' style="color:var(--amber)"')+'>'+esc(it.name)
       +(isProj&&it.date?(function(){
           var ps=it.sectionId?(inv.sections||[]).find(function(x){return x.id===it.sectionId;}):null;
@@ -4462,6 +4626,7 @@ function inventarViewHTML(){
       +(vals?'<div class="entry-date">'+vals+'</div>':'')
       +(plTxt?'<div class="entry-date" style="color:var(--rose)">'+esc(plTxt)+'</div>':'')
       +(expSt?'<div class="entry-date" style="color:'+expSt.c+'">'+esc(expSt.txt)+'</div>':'')
+      +(dRow.length?'<div class="entry-date">'+dRow.join(' \u00b7 ')+'</div>':'')
       +(it.note?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(it.note)+'</div>':'')
 
       +(function(){
@@ -4469,8 +4634,12 @@ function inventarViewHTML(){
         var others=inventories.filter(function(iv){return iv.id!==inv.id&&(iv.items||[]).some(function(x){return x.syncId===it.syncId;});}).map(function(iv){return iv.name;});
         return others.length?'<div style="font-size:11px;color:var(--rose)">Ogs\u00e5 p\u00e5: '+esc(others.join(' \u00b7 '))+'</div>':'';
       })()
+      +(twoBtn?'<div class="chips" style="padding-top:5px">'
+          +'<button class="chip'+(it.have?' on':'')+'" style="font-size:11px" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'P\u00e5 plass':'Mangler')+'</button>'
+          +(it.have?'':'<button class="chip'+(it.planned?' on':'')+'" style="font-size:11px" onclick="setInvPlanned(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.planned?'Innkj\u00f8p planlagt':'Sett p\u00e5 innkj\u00f8pslista')+'</button>')
+        +'</div>':'')
       +'</div>'
-      +(it.have||isPack||isProj?'':'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="invRowToLater(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u2192 Vent</button>')
+      +(twoBtn||it.have||isPack||isProj?'':'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="invRowToLater(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u2192 Vent</button>')
       +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u270e</button>'
       +'</div>';
   };
@@ -4501,11 +4670,12 @@ function inventarViewHTML(){
       +'</div>';
     if((BEREDSKAP_FORSLAG[sc.id]||[]).length){
       var brukt={};(inv.items||[]).forEach(function(it){brukt[(it.name||'').toLowerCase()]=1;});
-      var forslag=(BEREDSKAP_FORSLAG[sc.id]||[]).filter(function(f){return!brukt[forslagNavn(f).toLowerCase()];});
+      var forslag=(BEREDSKAP_FORSLAG[sc.id]||[]);
       if(forslag.length){
         out+='<div class="chips" style="padding:2px 14px 4px '+(14+ind)+'px">'+forslag.map(function(f){
           var fn=forslagNavn(f);
-          return'<button class="chip" style="font-size:11px" onclick="addBeredskapItem(\''+q(inv.id)+'\',\''+q(sc.id)+'\',\''+q(fn)+'\',\''+q(forslagEnhet(f))+'\')">+ '+esc(fn)+'</button>';
+          var used=!!brukt[fn.toLowerCase()];
+          return'<button class="chip" style="font-size:11px'+(used?';opacity:.42':'')+'" title="'+(used?'Lagt inn \u2014 kan legges inn flere steder':'')+'" onclick="addBeredskapItem(\''+q(inv.id)+'\',\''+q(sc.id)+'\',\''+q(fn)+'\',\''+q(forslagEnhet(f))+'\')">+ '+esc(fn)+'</button>';
         }).join('')+'</div>';
       }
     }
@@ -4914,6 +5084,8 @@ function planleggingViewHTML(){
           var ic=invCounts(iv);
           return'<div class="entry-date"><button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(iv.name)+' \u00b7 '+ic.have+'/'+ic.total+(ic.missing?' \u00b7 <span style="color:var(--amber)">mangler '+ic.missing+'</span>':'')+' \u203a</button></div>';
         }).join('')
+        +(r.forutsetninger?'<div style="font-size:11px;color:var(--muted);margin-top:3px"><span style="color:var(--rose)">Forutsetninger:</span> '+esc(r.forutsetninger)+'</div>':'')
+        +(r.risikoer?'<div style="font-size:11px;color:var(--muted)"><span style="color:var(--amber)">Risikoer:</span> '+esc(r.risikoer)+'</div>':'')
         +(function(){
           var ms=(r.milestones||[]).slice().sort(function(a,b){return(a.date||'9999')<(b.date||'9999')?-1:1;});
           if(!ms.length)return'';
