@@ -79,8 +79,9 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .tab.on{color:var(--red);border-bottom-color:var(--red)}
 
 /* Innhold */
-.view-title{font-size:15px;font-weight:700;padding:16px 16px 2px}
-.view-sub{font-size:12px;color:var(--muted);padding:0 16px 8px}
+.view-title{font-size:21px;font-weight:800;letter-spacing:-.2px;color:var(--title,var(--ink));padding:18px 16px 2px;line-height:1.25}
+.sec-title{font-size:15px;font-weight:700;color:var(--ink);padding:20px 16px 4px}
+.view-sub{font-size:12px;color:var(--muted);padding:0 16px 8px;line-height:1.55}
 .card{background:var(--card);border-radius:14px;overflow:hidden;margin:8px 12px 4px;border:1px solid var(--line)}
 .entry-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
 .entry-row:last-child{border-bottom:none}
@@ -454,7 +455,7 @@ function plasseringViewHTML(){
   var lvl=[[1,'Niv\u00e5 1','F.eks. Hus, Hytte, Garasje'],[2,'Niv\u00e5 2','F.eks. Kj\u00f8kkenet, Kjelleren, Loftet'],[3,'Niv\u00e5 3','F.eks. \u00d8verste hylle, Skuff 2']];
   lvl.forEach(function(L){
     var lv=L[0];var list=placesFor(lv);
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">'+L[1]+'</div>'
+    h+='<div class="sec-title">'+L[1]+'</div>'
       +'<div class="card" style="padding:12px 14px">';
     if(list.length){
       h+='<div class="chips" style="margin-bottom:8px">'+list.map(function(n){
@@ -583,7 +584,7 @@ function listOversiktViewHTML(){
   var back=inv&&inv.fixed==='utstyr'?'goUtstyr()':'goBeredskap()';
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="'+back+'">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1;font-size:19px">Oversikt over det som er p\u00e5 plass</div>'
+    +'<div class="view-title" style="padding:0;flex:1;font-size:17px;line-height:1.2">Oversikt over det som er p\u00e5 plass</div>'
     +(inv?'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="printOversikt(\''+q(inv.id)+'\')">Skriv ut</button>':'')
     +'</div>';
   if(!inv)return h+'<div class="card"><div class="empty">Fant ikke lista.</div></div>';
@@ -627,7 +628,7 @@ function listOversiktViewHTML(){
   }
   var mangler=(inv.items||[]).filter(function(it){return !it.have;}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(mangler.length){
-    h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Dette mangler</div>'
+    h+='<div class="sec-title">Dette mangler</div>'
       +'<div class="card">';
     mangler.forEach(function(it){
       var sec=(inv.sections||[]).find(function(x){return x.id===it.sectionId;});
@@ -1460,7 +1461,7 @@ function listerViewHTML(){
       +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 '+c.missing+'</span>':'')+'</div></div></div>';
   };
   if(packs.length||invs.length){
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Egne lister</div>';
+    h+='<div class="sec-title">Egne lister</div>';
     h+='<div style="display:flex;gap:8px;padding:0 12px">'
       +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);padding:2px 2px 6px">Pakkelister</div>'
@@ -1493,7 +1494,7 @@ function gaverViewHTML(){
     if(!items.length)return'<span style="color:var(--line)">\u00b7</span>';
     return items.map(function(g){return esc(g.what);}).join('<br>');
   };
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Gaveoversikt</div>';
+  h+='<div class="sec-title">Gaveoversikt</div>';
   if(!years.length){
     h+='<div class="card"><div class="empty">Ingen gitte gaver logget enn\u00e5 \u2014 bare id\u00e9er. N\u00e5r du registrerer en gitt gave, dukker den opp i oversikten.</div></div>';
   } else {
@@ -1533,7 +1534,7 @@ function gaverViewHTML(){
   // Personer uten gitte gaver (bare idéer) — så de ikke forsvinner
   var onlyIdeas=people.filter(function(pn){return!given.some(function(g){return(g.person||'').trim()===pn;});});
   if(onlyIdeas.length){
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Bare id\u00e9er enn\u00e5</div><div class="card">';
+    h+='<div class="sec-title">Bare id\u00e9er enn\u00e5</div><div class="card">';
     onlyIdeas.forEach(function(pn){
       var ideas=giftsFor(pn).filter(function(g){return g.idea;}).length;
       h+='<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(pn)+'\')">'
@@ -1569,7 +1570,7 @@ function gavePersonViewHTML(){
   // Idébank øverst
   var ideas=gs.filter(function(g){return g.idea;});
   if(ideas.length){
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Gaveidéer</div><div class="card">';
+    h+='<div class="sec-title">Gaveidéer</div><div class="card">';
     ideas.forEach(function(g){
       h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(g.what)+'</div>'
         +'<div class="entry-date">'+giftKindLabel(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
@@ -1582,7 +1583,7 @@ function gavePersonViewHTML(){
   var given=gs.filter(function(g){return!g.idea;});
   var years=Array.from(new Set(given.map(function(g){return g.year;}))).sort(function(a,b){return b-a;});
   if(years.length){
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Gitt</div>';
+    h+='<div class="sec-title">Gitt</div>';
     years.forEach(function(y){
       h+='<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+y+'</div><div class="card">';
       ['bursdag','jul','annet'].forEach(function(k){
@@ -1596,7 +1597,7 @@ function gavePersonViewHTML(){
     });
   }
   // Bursdagshilsen og julekort — per år
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Hilsener i \u00e5r</div><div class="card" style="padding:8px 0">'
+  h+='<div class="sec-title">Hilsener i \u00e5r</div><div class="card" style="padding:8px 0">'
     +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
     +'<span style="flex:1;font-size:13px">Bursdagshilsen '+curYear+'</span>'
     +'<button class="chip'+(greetDone(pn,curYear,'bursdag')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'bursdag\')">'+(greetDone(pn,curYear,'bursdag')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
@@ -1610,7 +1611,7 @@ function gavePersonViewHTML(){
   // Takknemlig for — innlegg som handler om personen (via valgte hashtagger)
   var pTags=personTagsFor(pn);
   var pEntries=entriesForPerson(pn);
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Takknemlig for</div>';
+  h+='<div class="sec-title">Takknemlig for</div>';
   if(!pTags.length){
     h+='<div class="card"><div class="empty">Knytt en eller flere hashtagger til '+esc(pn)+' (rediger bursdagen, eller bruk «Tilknytt hashtagg»), så vises takknemlighetsinnlegg om denne personen her.</div></div>';
   } else if(!pEntries.length){
@@ -1642,7 +1643,7 @@ function personligViewHTML(){
   // Min bursdag
   var myb=myBirthday();
   var myn=celebrationName();
-  h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Min bursdag</div>'
+  h+='<div class="sec-title">Min bursdag</div>'
     +'<div class="card" style="padding:14px">'
     +'<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Legg inn din egen bursdag, s\u00e5 f\u00e5r du en liten feiring i appen p\u00e5 dagen \u2014 et tilbakeblikk p\u00e5 \u00e5ret som har g\u00e5tt.</div>'
     +'<label class="field-lbl">Navn <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 til hilsenen</span></label>'
@@ -3187,7 +3188,7 @@ function evShort(e){
   return (e.day?e.day+'. ':'')+MND_FULL[e.month-1].slice(0,3);
 }
 function oversiktViewHTML(){
-  var h='<div class="view-sub" style="padding-top:12px;font-weight:600">Oversikt</div>'
+  var h='<div class="sec-title">Oversikt</div>'
     +'<div class="view-sub">Hvordan verdiene henger sammen med resultater, rutiner og hendelser.</div>';
   var vals=goals.slice().sort(function(a,b){return nbSort(a.name,b.name);});
   if(!vals.length)return h+'<div class="card"><div class="empty">Ingen verdier ennå. Legg inn en verdi først, så vokser oversikten fram.</div></div>';
@@ -3246,7 +3247,7 @@ function oversiktViewHTML(){
   var freeR=routines.filter(function(x){return !(x.goalIds||[]).length&&!(x.resultIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
   var freeE=events.filter(function(x){return !x.bday&&!(x.goalIds||[]).length&&!(x.resultIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(freeR.length||freeE.length){
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Uten kobling</div>'
+    h+='<div class="sec-title">Uten kobling</div>'
       +'<div class="card">';
     freeR.forEach(function(r){
       h+='<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')"><div class="entry-body">'
@@ -3434,7 +3435,7 @@ function hjemViewHTML(){
   // Dagens innlegg
   var todaysEntries=entries.filter(function(e){return e.date===todayIso;});
   if(todaysEntries.length){
-    h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Skrevet i dag</div>'
+    h+='<div class="sec-title">Skrevet i dag</div>'
       +'<div class="card">'+todaysEntries.map(entryRowHTML).join('')+'</div>';
   }
 
@@ -3463,7 +3464,7 @@ function hjemViewHTML(){
     return d>=1&&d<=14;
   }).sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b);});
   if(soonBdays.length){
-    h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Bursdager de neste to ukene</div><div class="card">';
+    h+='<div class="sec-title">Bursdager de neste to ukene</div><div class="card">';
     soonBdays.forEach(function(e){
       var d=daysToNextBday(e);
       var nAge=bdayNextAge(e);
@@ -3491,7 +3492,7 @@ function hjemViewHTML(){
   });
   var memKeys=Object.keys(memYears).map(Number).sort(function(a,b){return b-a;});
   if(memKeys.length){
-    h+='<div class="view-sub" style="padding-top:10px;font-weight:600">P\u00e5 denne dagen</div><div class="card">';
+    h+='<div class="sec-title">P\u00e5 denne dagen</div><div class="card">';
     memKeys.forEach(function(ey){
       var diff=curYear-ey;
       h+='<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'
@@ -3506,14 +3507,14 @@ function hjemViewHTML(){
   var earlier=entries.filter(function(e){return e.date.slice(5)===mmdd&&e.date<todayIso;})
     .sort(function(a,b){return a.date<b.date?1:-1;});
   if(earlier.length){
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600;color:var(--red)">På denne dagen tidligere år</div>'
+    h+='<div class="sec-title" style="color:var(--red)">På denne dagen tidligere år</div>'
       +'<div class="card">'+earlier.map(entryRowHTML).join('')+'</div>';
   }
 
   // Denne dagen og denne uka — kompakte bokser per hovedkategori
   var todo=periodTodoItems({wk:weekNum(today),wKey:'w'+weekYear(today)+'-'+pad(weekNum(today)),ym:curYear+'-'+pad(curMonth),m:curMonth,y:curYear,includeDatedWeek:true,daily:isoDate(today)});
   if(todo.items.length){
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Denne dagen og denne uka <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>'
+    h+='<div class="sec-title">Denne dagen og denne uka <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>'
       +catBoxesHTML(todo.items);
   } else if(todo.total>0){
     h+='<div class="view-sub" style="padding-top:12px;color:var(--red)">\u2713 Alt som h\u00f8rer til i dag og denne uka er gjort.</div>';
@@ -3534,7 +3535,7 @@ function hjemViewHTML(){
   });
   var archYears=Object.keys(byYear).map(Number).sort(function(a,b){return b-a;});
   if(archYears.length){
-    h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Tidligere i dagboka</div><div class="card">';
+    h+='<div class="sec-title">Tidligere i dagboka</div><div class="card">';
     archYears.forEach(function(ay){
       var months=Object.keys(byYear[ay]).map(Number).sort(function(a,b){return b-a;});
       var total=months.reduce(function(a,mm){return a+byYear[ay][mm];},0);
@@ -3582,7 +3583,7 @@ function dagbokViewHTML(){
     var mmdd=todayIso.slice(5);
     var yearAgo=entries.filter(function(e){return e.date.slice(5)===mmdd&&e.date<todayIso;});
     if(yearAgo.length){
-      h+='<div class="view-sub" style="padding-top:12px;color:var(--red);font-weight:600">På denne datoen tidligere</div>'
+      h+='<div class="sec-title" style="color:var(--red)">På denne datoen tidligere</div>'
         +'<div class="card">'+yearAgo.map(entryRowHTML).join('')+'</div>';
     }
   }
@@ -3812,7 +3813,7 @@ function ukeViewHTML(){
   // Rutiner og hendelser uten dato — kompakte bokser per hovedkategori
   var wtodo=periodTodoItems({wk:wk,wKey:wKey,ym:ym,m:m,y:y,includeUndated:true});
   if(wtodo.items.length){
-    h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Rutiner og hendelser <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>'
+    h+='<div class="sec-title">Rutiner og hendelser <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>'
       +catBoxesHTML(wtodo.items);
   } else if(wtodo.total>0){
     h+='<div class="view-sub" style="padding-top:10px;color:var(--red)">\u2713 Alt for denne uka er gjort.</div>';
@@ -3879,7 +3880,7 @@ function rutinerViewHTML(){
     .sort(function(a,b){return(a.day||99)-(b.day||99)||nbSort(a.name,b.name);});
 
   {
-    h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Hendelser p\u00e5 dato <span style="font-weight:400;color:var(--rose)">\u00b7 med prosjektmilep\u00e6ler \u2014 rutiner hakes av i ukesvisningen</span></div>';
+    h+='<div class="sec-title">Hendelser p\u00e5 dato <span style="font-weight:400;color:var(--rose)">\u00b7 med prosjektmilep\u00e6ler \u2014 rutiner hakes av i ukesvisningen</span></div>';
     var dated=monthEvents.filter(function(e){return e.day;});
     var undated=monthEvents.filter(function(e){return!e.day;});
     h+='<div class="card">'+dayListHTML(m,effY,dated,[],milestonesFor(m,effY))+'</div>';
@@ -3934,7 +3935,7 @@ function oppsummeringViewHTML(){
     h+=cloud;
     if(selectedTag){
       var tagged=entries.filter(function(e){return(e.tags||[]).includes(selectedTag);});
-      h+='<div class="view-sub" style="padding-top:10px;font-weight:600">#'+esc(selectedTag)+' · '+tagged.length+'</div>'
+      h+='<div class="sec-title">#'+esc(selectedTag)+' · '+tagged.length+'</div>'
         +'<div class="card">'+tagged.map(entryRowHTML).join('')+'</div>';
     }
   }
@@ -3954,7 +3955,7 @@ function oppsummeringViewHTML(){
     });
     rows.sort(function(a,b){return b.count-a.count||nbSort(a.main.name,b.main.name);});
 
-    h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Kategorier</div><div class="card">';
+    h+='<div class="sec-title">Kategorier</div><div class="card">';
     rows.forEach(function(r){
       var subPills=r.subs.map(function(s){
         var inner=esc(s.name)+' <span style="color:var(--rose)">'+s.count+'</span>';
@@ -3974,14 +3975,14 @@ function oppsummeringViewHTML(){
     h+='</div>';
     var fritt=frittTagCloudHTML();
     if(fritt){
-      h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Frittst\u00e5ende gleder</div>'
+      h+='<div class="sec-title">Frittst\u00e5ende gleder</div>'
         +'<div class="card" style="padding:6px 14px 10px">'
         +'<div style="font-size:11px;color:var(--muted);padding:2px 0 2px">Stikkord som ikke h\u00f8rer til en kategori.</div>'
         +fritt+'</div>';
     }
     if(selectedTag){
       var tge=entries.filter(function(e){return(e.tags||[]).includes(selectedTag);}).sort(function(a,b){return a.date<b.date?1:-1;});
-      h+='<div class="view-sub" style="padding-top:10px;font-weight:600">#'+esc(selectedTag)+' · '+tge.length+'</div>'
+      h+='<div class="sec-title">#'+esc(selectedTag)+' · '+tge.length+'</div>'
         +'<div class="card">'+tge.map(entryRowHTML).join('')+'</div>';
     }
     if(selectedCat&&!editMode){
@@ -3990,7 +3991,7 @@ function oppsummeringViewHTML(){
         var scSubIds=cats.filter(function(c){return c.parentId===selectedCat;}).map(function(c){return c.id;});
         var scEnt=entries.filter(function(e){return(e.cats||[]).some(function(c){return c===selectedCat||scSubIds.includes(c);});})
           .sort(function(a,b){return a.date<b.date?1:-1;});
-        h+='<div class="view-sub" style="padding-top:10px;font-weight:600">'+esc(sc.name)+' · '+scEnt.length+' innlegg</div>'
+        h+='<div class="sec-title">'+esc(sc.name)+' · '+scEnt.length+' innlegg</div>'
           +'<div class="card">'+(scEnt.length?scEnt.map(entryRowHTML).join(''):'<div class="empty">Ingen innlegg i denne kategorien.</div>')+'</div>';
       }
     }
@@ -4046,13 +4047,13 @@ function rapportViewHTML(){
 
   var monthEntries=entries.filter(function(e){return e.date.slice(0,7)===ym;});
   var mCloud=cloudHTML(tagCountsFor(monthEntries),false);
-  if(mCloud)h+='<div class="view-sub" style="padding-top:8px;font-weight:600">Stikkord i '+MND_FULL[m-1]+'</div>'+mCloud;
+  if(mCloud)h+='<div class="sec-title">Stikkord i '+MND_FULL[m-1]+'</div>'+mCloud;
   var monthRoutines=routines.filter(function(r){var mo=r.months||[];return!mo.length||mo.includes(m);});
   var doneR=monthRoutines.filter(function(r){return routineMonthStatus(r,m,y).done;});
   var mEvents=monthEventsFor(m,y);
   var doneE=mEvents.filter(function(e){return evDone(e,y);});
 
-  h+='<div class="view-sub" style="padding-top:10px;font-weight:600">M\u00e5neden i tall</div>'
+  h+='<div class="sec-title">M\u00e5neden i tall</div>'
     +'<div class="card"><div style="display:flex;justify-content:space-around;text-align:center;padding:12px 10px">'
     +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+monthEntries.length+'</div><div style="font-size:11px;color:var(--muted)">innlegg</div></div>'
     +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneR.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+monthRoutines.length+'</span></div><div style="font-size:11px;color:var(--muted)">rutiner</div></div>'
@@ -4146,7 +4147,7 @@ function rapportViewHTML(){
   var prevMonths=[];
   for(var pm=1;pm<curMonth;pm++){if(hasMonthContent(pm,curYear)&&!(pm===m&&curYear===y))prevMonths.push(pm);}
   if(prevMonths.length){
-    h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Tidligere m\u00e5nedsrapporter i '+curYear+'</div>'
+    h+='<div class="sec-title">Tidligere m\u00e5nedsrapporter i '+curYear+'</div>'
       +'<div class="card"><div class="rt-chips">'
       +prevMonths.map(function(pm){
         return'<button class="rt-btn" onclick="goRapport('+pm+','+curYear+')">'+MND_FULL[pm-1]+'</button>';
@@ -4184,7 +4185,7 @@ function arsrapportViewHTML(){
 
   var yearEntries=entries.filter(function(e){return e.date.slice(0,4)===String(y)&&Number(e.date.slice(5,7))>=fromM;});
   var yCloud=cloudHTML(tagCountsFor(yearEntries),false);
-  if(yCloud)h+='<div class="view-sub" style="padding-top:8px;font-weight:600">Stikkord i '+y+'</div>'+yCloud;
+  if(yCloud)h+='<div class="sec-title">Stikkord i '+y+'</div>'+yCloud;
   var logCount=0;
   routines.forEach(function(r){(r.log||[]).forEach(function(k){
     if(k.charAt(0)==='w'){
@@ -4198,7 +4199,7 @@ function arsrapportViewHTML(){
     });
   }
 
-  h+='<div class="view-sub" style="padding-top:10px;font-weight:600">\u00c5ret i tall</div>'
+  h+='<div class="sec-title">\u00c5ret i tall</div>'
     +'<div class="card"><div style="display:flex;justify-content:space-around;text-align:center;padding:12px 10px">'
     +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+yearEntries.length+'</div><div style="font-size:11px;color:var(--muted)">innlegg</div></div>'
     +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+logCount+'</div><div style="font-size:11px;color:var(--muted)">rutiner gjort</div></div>'
@@ -4215,7 +4216,7 @@ function arsrapportViewHTML(){
     });
     var balP=eInP-eUtP,balA=eInA-eUtA;
     var yDeps=deposits.filter(function(d){return d.date.slice(0,4)===String(y);}).reduce(function(a,d){return a+d.amount;},0);
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">\u00d8konomi</div>'
+    h+='<div class="sec-title">\u00d8konomi</div>'
       +'<div class="card"><div style="padding:10px 14px;font-size:13px">'
       +'Inntekter '+fmtKr(eInA)+' av '+fmtKr(eInP)+' kr \u00b7 utgifter '+fmtKr(eUtA)+' av '+fmtKr(eUtP)+' kr'
       +'<div style="margin-top:4px">Balanse: plan '+fmtKr(balP)+' kr \u00b7 faktisk <span style="color:'+(balA<0?'var(--amber)':'var(--red)')+';font-weight:700">'+fmtKr(balA)+' kr</span></div>'
@@ -4316,7 +4317,7 @@ function arsrapportViewHTML(){
 
   var yrs=yearsWithContent().filter(function(yy){return yy!==y;});
   if(yrs.length){
-    h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Andre \u00e5rsrapporter</div>'
+    h+='<div class="sec-title">Andre \u00e5rsrapporter</div>'
       +'<div class="card"><div class="rt-chips">'
       +yrs.map(function(yy){return'<button class="rt-btn" onclick="goArsrapport('+yy+')">'+yy+'</button>';}).join('')
       +'</div></div>';
@@ -4392,7 +4393,7 @@ function ganttHTML(){
   months.forEach(function(mo,i){
     if(i>0&&(mo.m===1||mo.m===4||mo.m===7||mo.m===10))qLines.push(pct(mo.y+'-'+pad(mo.m)+'-01'));
   });
-  var h='<div class="view-sub" style="padding-top:8px;font-weight:600">Prosjektene i tid</div>'
+  var h='<div class="sec-title">Prosjektene i tid</div>'
     +'<div class="card" style="padding:10px 14px 12px">';
   // Månedslinjal: JAN FEB MAR \u2026 med diskret kvartalsskille
   h+='<div style="display:flex;margin-left:88px">';
@@ -4803,7 +4804,7 @@ function hashtagsViewHTML(){
   };
   // Frittstående gleder øverst — stikkord uten kategori
   var fritt=tags.filter(function(t){return!tagCats[t];}).sort(byFreq);
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Frittst\u00e5ende gleder</div>';
+  h+='<div class="sec-title">Frittst\u00e5ende gleder</div>';
   if(fritt.length)h+='<div class="card">'+fritt.map(tagRow).join('')+'</div>';
   else h+='<div class="card"><div class="empty">Alle stikkord er knyttet til en kategori.</div></div>';
   // Deretter hver kategori med sine stikkord
@@ -4811,7 +4812,7 @@ function hashtagsViewHTML(){
     var mine=tags.filter(function(t){return tagCats[t]===mc.id;}).sort(byFreq);
     if(!mine.length)return;
     var col=catColor(mc.id);
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600;display:flex;align-items:center;gap:8px">'
+    h+='<div class="sec-title" style="display:flex;align-items:center;gap:8px">'
       +(col?'<span style="width:11px;height:11px;border-radius:50%;background:'+col+';display:inline-block"></span>':'')
       +esc(mc.name)+'</div>'
       +'<div class="card">'+mine.map(tagRow).join('')+'</div>';
@@ -4850,7 +4851,7 @@ function kategorierViewHTML(){
   // Vanlige kategorier — legg til med ett trykk
   var vanlige=['Kultur','Natur','Mat og drikke','Kreativitet','Kompetanse'];
   var mangler=vanlige.filter(function(n){return!cats.some(function(c){return!c.parentId&&c.name.toLowerCase()===n.toLowerCase();});});
-  h+='<div class="view-sub" style="padding-top:14px;font-weight:600">Legg til vanlige kategorier eller lag dine egne</div>';
+  h+='<div class="sec-title">Legg til vanlige kategorier eller lag dine egne</div>';
   if(mangler.length){
     h+='<div class="chips" style="padding:0 12px">'+mangler.map(function(n){
       return'<button class="chip-new" onclick="addCommonCat(\''+q(n)+'\')">+ '+esc(n)+'</button>';
@@ -4979,7 +4980,7 @@ function budsjettViewHTML(){
 
   var saveGoals=results.filter(function(r){return r.targetAmount&&(r.amountType||'spar')==='spar';}).sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month);});
   if(saveGoals.length){
-    h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Sparem\u00e5l</div><div class="card">';
+    h+='<div class="sec-title">Sparem\u00e5l</div><div class="card">';
     saveGoals.forEach(function(r){
       h+='<div class="entry-row"><div class="entry-body">'
         +'<div class="entry-text"'+(r.achieved?' style="opacity:.55"':'')+'>'+esc(r.name)+resultDeadlineHTML(r)+'</div>'
@@ -5004,7 +5005,7 @@ function planleggingViewHTML(){
     h+=oversiktViewHTML();
   }
   if(planTab==='verdier'){
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Verdier</div>';
+  h+='<div class="sec-title">Verdier</div>';
   h+='<button class="add-btn" onclick="openGoalModal()">+ Ny verdi</button>';
   if(!goals.length){
     h+='<div class="card"><div class="empty">Ingen verdier ennå. En verdi er identitetsmålet — hvem du vil være — og eier en hovedkategori.</div></div>';
@@ -5069,7 +5070,7 @@ function planleggingViewHTML(){
 
   }
   if(planTab==='resultater'){
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Resultater <span style="font-weight:400;color:var(--rose)">\u00b7 m\u00e5lbare, med frist</span></div>';
+  h+='<div class="sec-title">Resultater <span style="font-weight:400;color:var(--rose)">\u00b7 m\u00e5lbare, med frist</span></div>';
   h+='<button class="add-btn" onclick="openResultModal()">+ Nytt resultat</button>';
   if(results.length){
     h+='<div class="card">';
@@ -5109,7 +5110,7 @@ function planleggingViewHTML(){
 
   }
   if(planTab==='rutiner'){
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Rutiner</div>';
+  h+='<div class="sec-title">Rutiner</div>';
   h+='<button class="add-btn" onclick="openRoutineModal()">+ Ny rutine</button>';
   if(!routines.length){
     h+='<div class="card"><div class="empty">Ingen rutiner ennå.</div></div>';
@@ -5148,7 +5149,7 @@ function planleggingViewHTML(){
 
   }
   if(planTab==='hendelser'){
-  h+='<div class="view-sub" style="padding-top:10px;font-weight:600">Hendelser</div>';
+  h+='<div class="sec-title">Hendelser</div>';
   h+='<button class="add-btn" onclick="openEventModal()">+ Ny hendelse</button>';
   if(!events.length){
     h+='<div class="card"><div class="empty">Ingen hendelser ennå.</div></div>';
@@ -5170,7 +5171,7 @@ function planleggingViewHTML(){
   }
   }
   if(planTab==='prosjekt'){
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Prosjekter</div>';
+  h+='<div class="sec-title">Prosjekter</div>';
   h+='<button class="add-btn" onclick="openProjModal()">+ Nytt prosjekt</button>';
   h+=ganttHTML();
   var allProj=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});
@@ -5194,14 +5195,14 @@ function planleggingViewHTML(){
   } else {
     if(activeProj.length)h+='<div class="card">'+activeProj.map(projRow).join('')+'</div>';
     if(doneProj.length){
-      h+='<div class="view-sub" style="padding-top:16px;font-weight:600">Ferdigstilte prosjekter</div>'
+      h+='<div class="sec-title">Ferdigstilte prosjekter</div>'
         +'<div class="card">'+doneProj.map(projRow).join('')+'</div>';
     }
   }
   }
 
   if(planTab==='inventar'){
-  h+='<div class="view-sub" style="padding-top:12px;font-weight:600">Lister</div>';
+  h+='<div class="sec-title">Lister</div>';
   h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
   h+='<div class="chips" style="padding:4px 12px 0">'
     +[['alle','Alle'],['pakke','Pakkelister'],['inventar','Inventarlister']].map(function(t){
