@@ -320,7 +320,7 @@ function giftPeople(){
 }
 function giftsFor(person){return gifts.filter(function(g){return(g.person||'').trim()===(person||'').trim();});}
 function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.name||'').trim()===(person||'').trim();});}
-var DEFAULT_UNITS=['n\u00f8ster','stk','boks','g','kg','ml','dl'];
+var DEFAULT_UNITS=['n\u00f8ster','stk','boks','g','kg','ml','dl','liter'];
 var customUnits=[];
 var places={l1:[],l2:[],l3:[]};
 var BEREDSKAP_SEKSJONER=[
@@ -336,14 +336,21 @@ var BEREDSKAP_SEKSJONER=[
   {id:'bs_transport',name:'Transport'}
 ];
 var BEREDSKAP_FORSLAG={
-  bs_oppvarming:['Ved'],
-  bs_hygiene:['Toalettpapir'],
-  bs_reservestrom:['Nødlader'],
-  bs_transport:['Sykkel']
+  bs_drikke:[{n:'Drikkevann',u:'liter'},{n:'Kaffe'}],
+  bs_forstehjelp:[{n:'Gnagsårplaster'}],
+  bs_hygiene:[{n:'Toalettpapir'}],
+  bs_mat:[{n:'Matolje'},{n:'Salt'}],
+  bs_matlaging:[{n:'Bålpanne'},{n:'Kull'},{n:'Kullgrill'},{n:'Propan'},{n:'Rødsprit'},{n:'Stormkjøkken'},{n:'Tennvæske'},{n:'Vedovn med kokeplate'}],
+  bs_medisiner:[{n:'Jodtabletter'},{n:'Smertestillende/febernedsettende'}],
+  bs_oppvarming:[{n:'Ved'}],
+  bs_reservestrom:[{n:'Nødlader'}],
+  bs_transport:[{n:'Sykkel'}]
 };
-function addBeredskapItem(invId,secId,name){
+function forslagNavn(f){return typeof f==='string'?f:(f&&f.n)||'';}
+function forslagEnhet(f){return (f&&f.u)||'stk';}
+function addBeredskapItem(invId,secId,name,unit){
   var inv=invById(invId);if(!inv)return;
-  inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:secId,name:name,note:'',date:'',inCal:false,values:{__qty:'1',__unit:'stk'},have:false}]);
+  inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:secId,name:name,note:'',date:'',inCal:false,values:{__qty:'1',__unit:unit||'stk'},have:false}]);
   save();render();
 }
 function listHasQty(inv){return !!inv&&(inv.type||'inventar')!=='prosjekt';}
@@ -4289,10 +4296,11 @@ function inventarViewHTML(){
       +'</div>';
     if(inv.fixed==='beredskap'&&(BEREDSKAP_FORSLAG[sc.id]||[]).length){
       var brukt={};(inv.items||[]).forEach(function(it){brukt[(it.name||'').toLowerCase()]=1;});
-      var forslag=(BEREDSKAP_FORSLAG[sc.id]||[]).filter(function(n){return!brukt[n.toLowerCase()];});
+      var forslag=(BEREDSKAP_FORSLAG[sc.id]||[]).filter(function(f){return!brukt[forslagNavn(f).toLowerCase()];});
       if(forslag.length){
-        h+='<div class="chips" style="padding:2px 14px 4px">'+forslag.map(function(n){
-          return'<button class="chip" style="font-size:11px" onclick="addBeredskapItem(\''+q(inv.id)+'\',\''+q(sc.id)+'\',\''+q(n)+'\')">+ '+esc(n)+'</button>';
+        h+='<div class="chips" style="padding:2px 14px 4px">'+forslag.map(function(f){
+          var fn=forslagNavn(f);
+          return'<button class="chip" style="font-size:11px" onclick="addBeredskapItem(\''+q(inv.id)+'\',\''+q(sc.id)+'\',\''+q(fn)+'\',\''+q(forslagEnhet(f))+'\')">+ '+esc(fn)+'</button>';
         }).join('')+'</div>';
       }
     }
