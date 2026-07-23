@@ -320,31 +320,39 @@ function giftPeople(){
 }
 function giftsFor(person){return gifts.filter(function(g){return(g.person||'').trim()===(person||'').trim();});}
 function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.name||'').trim()===(person||'').trim();});}
-var DEFAULT_UNITS=['n\u00f8ster','stk','boks','g','kg','ml','dl','liter'];
+var DEFAULT_UNITS=['n\u00f8ster','stk','boks','g','kg','ml','dl','liter','kroner'];
 var customUnits=[];
 var places={l1:[],l2:[],l3:[]};
 var BEREDSKAP_SEKSJONER=[
+  {id:'bs_betaling',name:'Betaling'},
   {id:'bs_drikke',name:'Drikke'},
   {id:'bs_forstehjelp',name:'Førstehjelp'},
   {id:'bs_hygiene',name:'Hygiene'},
   {id:'bs_kjoling',name:'Kjøling'},
+  {id:'bs_kommunikasjon',name:'Kommunikasjon'},
+  {id:'bs_lys',name:'Lys'},
   {id:'bs_mat',name:'Mat'},
   {id:'bs_matlaging',name:'Matlaging uten strøm'},
   {id:'bs_medisiner',name:'Medisiner'},
   {id:'bs_oppvarming',name:'Oppvarming'},
   {id:'bs_reservestrom',name:'Reservestrøm'},
-  {id:'bs_transport',name:'Transport'}
+  {id:'bs_transport',name:'Transport'},
+  {id:'bs_dokumenter',name:'Viktige dokumenter'}
 ];
+var BEREDSKAP_NYE3=['bs_betaling','bs_kommunikasjon','bs_lys','bs_dokumenter'];
 var BEREDSKAP_FORSLAG={
   bs_drikke:[{n:'Drikkevann',u:'liter'},{n:'Kaffe'}],
   bs_forstehjelp:[{n:'Gnagsårplaster'}],
-  bs_hygiene:[{n:'Toalettpapir'}],
+  bs_hygiene:[{n:'Håndsprit'},{n:'Håndsåpe'},{n:'Toalettpapir'}],
   bs_mat:[{n:'Matolje'},{n:'Salt'}],
   bs_matlaging:[{n:'Bålpanne'},{n:'Kull'},{n:'Kullgrill'},{n:'Propan'},{n:'Rødsprit'},{n:'Stormkjøkken'},{n:'Tennvæske'},{n:'Vedovn med kokeplate'}],
   bs_medisiner:[{n:'Jodtabletter'},{n:'Smertestillende/febernedsettende'}],
-  bs_oppvarming:[{n:'Ved'}],
+  bs_lys:[{n:'Lommelykt'},{n:'Stearinlys'}],
+  bs_oppvarming:[{n:'Ulltepper'},{n:'Varmeflaske'},{n:'Ved'}],
   bs_reservestrom:[{n:'Nødlader'}],
-  bs_transport:[{n:'Sykkel'}]
+  bs_transport:[{n:'Sykkel'}],
+  bs_betaling:[{n:'Kontanter',u:'kroner'}],
+  bs_dokumenter:[{n:'Førerkort (digitalt)'},{n:'Førerkort (fysisk)'},{n:'Kopi av førerkort'},{n:'Kopi av nasjonalt ID-kort'},{n:'Kopi av pass'},{n:'Nasjonalt ID-kort'},{n:'Pass'}]
 };
 function forslagNavn(f){return typeof f==='string'?f:(f&&f.n)||'';}
 function forslagEnhet(f){return (f&&f.u)||'stk';}
@@ -429,6 +437,80 @@ function addCustomUnit(u){
   return u;
 }
 function goLister(){view={kind:'lister'};drawerOpen=false;render();}
+function goBeredskap(){view={kind:'beredskap'};drawerOpen=false;render();}
+function goUtstyr(){view={kind:'utstyr'};drawerOpen=false;render();}
+function goListOversikt(invId){view={kind:'listoversikt',invId:invId};drawerOpen=false;render();}
+function fixedListHubHTML(key,title,sub){
+  var inv=findFixedList(key);
+  var h='<div class="view-title">'+esc(title)+'</div>';
+  if(sub)h+='<div class="view-sub">'+sub+'</div>';
+  if(!inv)return h+'<div class="card"><div class="empty">Lista finnes ikke.</div></div>';
+  var c=invCounts(inv);
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goListOversikt(\''+q(inv.id)+'\')">'
+    +'<div class="entry-body"><div class="entry-text">Oversikt</div>'
+    +'<div class="entry-date">hvor tingene er \u2014 ordnet etter plassering</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
+    +'<div class="entry-body"><div class="entry-text">Liste</div>'
+    +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  return h;
+}
+function listOversiktViewHTML(){
+  var inv=invById(view.invId);
+  var back=inv&&inv.fixed==='utstyr'?'goUtstyr()':'goBeredskap()';
+  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
+    +'<button class="icon-btn" onclick="'+back+'">\u2039</button>'
+    +'<div class="view-title" style="padding:0;flex:1">Oversikt</div></div>';
+  if(!inv)return h+'<div class="card"><div class="empty">Fant ikke lista.</div></div>';
+  h+='<div class="view-sub">'+esc(inv.name)+' ordnet etter hvor tingene er.</div>';
+  var items=inv.items||[];
+  if(!items.length)return h+'<div class="card"><div class="empty">Ingen punkter enn\u00e5. Legg dem inn under Liste, s\u00e5 dukker de opp her etter plassering.</div></div>';
+  var UTEN='\u2013 uten plassering';
+  var tree={};
+  items.forEach(function(it){
+    var v=it.values||{};
+    var p1=(v.__p1||'').trim()||UTEN;
+    var p2=(v.__p2||'').trim();
+    var p3=(v.__p3||'').trim();
+    tree[p1]=tree[p1]||{};
+    tree[p1][p2]=tree[p1][p2]||{};
+    tree[p1][p2][p3]=tree[p1][p2][p3]||[];
+    tree[p1][p2][p3].push(it);
+  });
+  var sortKeys=function(o){
+    return Object.keys(o).sort(function(a,b){
+      if(a===UTEN)return 1;if(b===UTEN)return -1;
+      if(a==='')return -1;if(b==='')return 1;
+      return nbSort(a,b);
+    });
+  };
+  var rowFor=function(it){
+    var sec=(inv.sections||[]).find(function(x){return x.id===it.sectionId;});
+    var v=it.values||{};
+    var meta=[];
+    if(v.__qty)meta.push(esc(v.__qty)+' '+esc(v.__unit||''));
+    if(sec)meta.push(esc(sec.name));
+    return'<div class="entry-row" style="padding-left:0">'
+      +'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>'
+      +'<div class="entry-body"><div class="entry-text"'+(it.have?'':' style="color:var(--amber)"')+'>'+esc(it.name)+'</div>'
+      +(meta.length?'<div class="entry-date">'+meta.join(' \u00b7 ')+'</div>':'')
+      +'</div></div>';
+  };
+  h+='<div class="card">';
+  sortKeys(tree).forEach(function(p1){
+    h+='<div style="padding:10px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+esc(p1)+'</div>';
+    sortKeys(tree[p1]).forEach(function(p2){
+      if(p2)h+='<div style="padding:4px 14px 0 24px;font-size:13px;font-weight:600;color:var(--ink)">'+esc(p2)+'</div>';
+      sortKeys(tree[p1][p2]).forEach(function(p3){
+        if(p3)h+='<div style="padding:2px 14px 0 36px;font-size:12px;color:var(--muted)">'+esc(p3)+'</div>';
+        h+='<div style="padding-left:'+(p3?36:p2?24:14)+'px">'+tree[p1][p2][p3].slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(rowFor).join('')+'</div>';
+      });
+    });
+  });
+  h+='</div>';
+  return h;
+}
 function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 function commitNewUnit(){
   var f=mf();var u=addCustomUnit(f._newUnit||'');
@@ -785,6 +867,33 @@ function load(){
     save();
   }
 
+  // Legg til de fire nye beredskapskategoriene (kun de nye — respekterer det brukeren har slettet)
+  var ber3=false;try{ber3=!!localStorage.getItem(SK+'_beredskap3');}catch(e){}
+  if(!ber3){
+    var bl3=inventories.find(function(iv){return iv.fixed==='beredskap';});
+    if(bl3){
+      bl3.sections=bl3.sections||[];
+      BEREDSKAP_NYE3.forEach(function(nid){
+        if(bl3.sections.some(function(sc){return sc.id===nid;}))return;
+        var def=BEREDSKAP_SEKSJONER.find(function(x){return x.id===nid;});
+        if(def)bl3.sections.push({id:def.id,name:def.name});
+      });
+    }
+    try{localStorage.setItem(SK+'_beredskap3','1');}catch(e){}
+    save();
+  }
+
+  // Utstyrsliste
+  var uts1=false;try{uts1=!!localStorage.getItem(SK+'_utstyr1');}catch(e){}
+  if(!uts1){
+    if(!inventories.some(function(iv){return iv.fixed==='utstyr';})){
+      inventories.push({id:'fixed_utstyr',name:'Utstyr',type:'inventar',fixed:'utstyr',qty:true,catId:'',fields:[],
+        sections:[{id:'us_friluft',name:'Friluftsliv'},{id:'us_hage',name:'Hagearbeid'}],items:[]});
+    }
+    try{localStorage.setItem(SK+'_utstyr1','1');}catch(e){}
+    save();
+  }
+
   // Antall på alle eksisterende punkter i lister som nå har antall
   var qtyAll=false;try{qtyAll=!!localStorage.getItem(SK+'_qtyall');}catch(e){}
   if(!qtyAll){
@@ -1136,7 +1245,7 @@ function listerViewHTML(){
   var h='<div class="view-title">Lister</div>';
   h+='<div class="view-sub">Faste lister og dine egne.</div>';
   // Faste lister
-  var fixed=inventories.filter(function(iv){return iv.fixed;}).sort(function(a,b){return a.fixed<b.fixed?-1:1;});
+  var fixed=inventories.filter(function(iv){return iv.fixed&&iv.fixed!=='beredskap'&&iv.fixed!=='utstyr';}).sort(function(a,b){return a.fixed<b.fixed?-1:1;});
   var userLists=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')!=='prosjekt';});
   var rowFor=function(inv){
     var c=invCounts(inv);
@@ -2811,7 +2920,9 @@ function sidebarHTML(){
   var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow"></span>Dagbok</div>';
   h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
   h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='kategorier'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
+  h+='<div class="side-month'+(view.kind==='beredskap'?'" style="color:var(--red)':'')+'" onclick="goBeredskap()"><span class="s-arrow"></span>Beredskap</div>';
   h+='<div class="side-month'+(view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goBursdager()"><span class="s-arrow"></span>Bursdager</div>';
+  h+='<div class="side-month'+(view.kind==='utstyr'?'" style="color:var(--red)':'')+'" onclick="goUtstyr()"><span class="s-arrow"></span>Utstyr</div>';
   h+='<div class="side-month'+(view.kind==='lister'?'" style="color:var(--red)':'')+'" onclick="goLister()"><span class="s-arrow"></span>Lister</div>';
   h+='<div class="side-month'+(view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goBudsjett(curYear)"><span class="s-arrow"></span>Budsjett og regnskap</div>';
   return h;
@@ -4167,7 +4278,7 @@ function inventarViewHTML(){
   var isPack=(inv.type||'inventar')==='pakke';
   var isProj=(inv.type||'inventar')==='prosjekt';
   var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="'+(isProj?'goPlanlegging()':'goLister()')+'">\u2039</button>'
+    +'<button class="icon-btn" onclick="'+(isProj?'goPlanlegging()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':'goLister()')+'">\u2039</button>'
     +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
     +(isPack?' <span style="font-size:11px;font-weight:400;color:var(--rose)">pakkeliste</span>':isProj?' <span style="font-size:11px;font-weight:400;color:var(--rose)">'+(inv.subtype==='strikk'?'strikkeprosjekt':'prosjekt')+'</span>':'')+'</div>'
@@ -4294,7 +4405,7 @@ function inventarViewHTML(){
       +(editMode?'<button class="icon-btn" style="font-size:11px;padding:1px 7px" onclick="openEditInvSec(\''+q(inv.id)+'\',\''+q(sc.id)+'\')">\u270e</button>':'')
       +'<button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="openInvItemModal(\''+q(inv.id)+'\',\''+q(sc.id)+'\')">'+(isProj?'+ milep\u00e6l':'+ punkt')+'</button>'
       +'</div>';
-    if(inv.fixed==='beredskap'&&(BEREDSKAP_FORSLAG[sc.id]||[]).length){
+    if((BEREDSKAP_FORSLAG[sc.id]||[]).length){
       var brukt={};(inv.items||[]).forEach(function(it){brukt[(it.name||'').toLowerCase()]=1;});
       var forslag=(BEREDSKAP_FORSLAG[sc.id]||[]).filter(function(f){return!brukt[forslagNavn(f).toLowerCase()];});
       if(forslag.length){
@@ -4907,6 +5018,9 @@ function render(){
   else if(view.kind==='bursdager')content=bursdagerHubHTML();
   else if(view.kind==='bursdagsliste')content=bursdagslisteViewHTML();
   else if(view.kind==='lister')content=listerViewHTML();
+  else if(view.kind==='beredskap')content=fixedListHubHTML('beredskap','Beredskap','Det du trenger for \u00e5 klare deg selv en uke.');
+  else if(view.kind==='utstyr')content=fixedListHubHTML('utstyr','Utstyr','Ting du eier, ordnet etter bruk og plassering.');
+  else if(view.kind==='listoversikt')content=listOversiktViewHTML();
   else if(view.kind==='venteliste')content=ventelisteViewHTML();
   else if(view.kind==='gaver')content=gaverViewHTML();
   else if(view.kind==='gaveperson')content=gavePersonViewHTML();
