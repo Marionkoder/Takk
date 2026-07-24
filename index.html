@@ -635,7 +635,8 @@ function listOversiktViewHTML(){
   var rowFor=function(it){
     var v=it.values||{};
     var qty=v.__qty?esc(v.__qty)+(v.__unit?' '+esc(v.__unit):''):'';
-    return'<div style="display:flex;align-items:baseline;gap:7px;line-height:0.5;padding:5px 14px 5px 0">'
+    var needsMaint=v.__tilstand==='M\u00e5 repareres eller vedlikeholdes';
+    return'<div style="display:flex;align-items:baseline;gap:7px;line-height:0.5;padding:5px 14px 5px 6px;margin:1px 8px'+(needsMaint?';background:#FDF3C7;border-radius:5px':'')+'">'
       +'<span style="flex-shrink:0;color:#000;font-size:9px">\u25cf</span>'
       +'<span style="flex:1;font-size:13px;color:var(--ink)">'+esc(it.name)+(qty?' <span style="color:var(--muted);font-size:12px">\u00b7 '+qty+'</span>':'')+'</span>'
       +'</div>';
@@ -1816,7 +1817,7 @@ function invCounts(inv){
   var have=items.filter(function(it){return it.have;}).length;
   return{have:have,total:items.length,missing:items.length-have};
 }
-function goInventar(id){view={kind:'inventar',invId:id};invShowMissing=false;drawerOpen=false;render();}
+function goInventar(id){view={kind:'inventar',invId:id};invShowMissing=false;utstyrDrillReset();drawerOpen=false;render();}
 function toggleInvMissing(){invShowMissing=!invShowMissing;render();}
 function toggleInvItem(invId,itemId){
   var inv=invById(invId);if(!inv)return;
@@ -1978,7 +1979,11 @@ function deleteInv(id){
   inventories=inventories.filter(function(i){return i.id!==id;});
   save();closeModal();goLister();
 }
-function openInvSecModal(invId){modal={step:'invsec',form:{invId:invId,name:'',parentId:'',startDate:'',endDate:'',hours:''}};render();}
+var utstyrDrill=[];
+function utstyrDrillInto(id){utstyrDrill.push(id);render();}
+function utstyrDrillBack(){utstyrDrill.pop();render();}
+function utstyrDrillReset(){utstyrDrill=[];}
+function openInvSecModal(invId,parentId){modal={step:'invsec',form:{invId:invId,name:'',parentId:parentId||'',startDate:'',endDate:'',hours:''}};render();}
 function openEditInvSec(invId,secId){
   var inv=invById(invId);var sec=(inv.sections||[]).find(function(x){return x.id===secId;});if(!sec)return;
   modal={step:'invsec_edit',form:{invId:invId,id:secId,name:sec.name,parentId:sec.parentId||'',startDate:sec.startDate||'',endDate:sec.endDate||'',hours:sec.hours||''}};render();
@@ -4929,6 +4934,46 @@ function inventarViewHTML(){
   if(isProj)secs.sort(function(a,b){return(a.startDate||'9999')<(b.startDate||'9999')?-1:(a.startDate||'9999')>(b.startDate||'9999')?1:nbSort(a.name,b.name);});
   else secs.sort(function(a,b){return nbSort(a.name,b.name);});
   var lone=(inv.items||[]).filter(function(it){return!it.sectionId||!secs.some(function(sc){return sc.id===it.sectionId;});});
+
+  if(inv.fixed==='utstyr'){
+    var countRec=function(sc){
+      var direct=(inv.items||[]).filter(function(it){return it.sectionId===sc.id;}).length;
+      var kidsOf=secs.filter(function(x){return x.parentId===sc.id;});
+      return direct+kidsOf.reduce(function(a,k){return a+countRec(k);},0);
+    };
+    var curId=utstyrDrill.length?utstyrDrill[utstyrDrill.length-1]:null;
+    var curSec=curId?secs.find(function(s){return s.id===curId;}):null;
+    var kids=secs.filter(function(sc){return(sc.parentId||'')===(curId||'');}).sort(function(a,b){return nbSort(a.name,b.name);});
+    if(curSec){
+      var upName=utstyrDrill.length>1?(secs.find(function(s){return s.id===utstyrDrill[utstyrDrill.length-2];})||{}).name:'Utstyr';
+      h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="utstyrDrillBack()">\u2039 '+esc(upName||'Utstyr')+'</button></div>';
+      h+='<div style="padding:6px 12px 0;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(curSec.name)+'</div>';
+    }
+    if(kids.length){
+      h+='<div class="card">'+kids.map(function(sc){
+        var cnt=countRec(sc);
+        return'<div class="entry-row" style="cursor:pointer" onclick="utstyrDrillInto(\''+q(sc.id)+'\')">'
+          +'<div class="entry-body"><div class="entry-text" style="font-weight:700">'+esc(sc.name)+'</div>'
+          +'<div class="entry-date">'+cnt+' oppf\u00f8ring'+(cnt===1?'':'er')+'</div></div>'
+          +(editMode?'<button class="icon-btn" style="font-size:11px;padding:1px 7px;align-self:center" onclick="event.stopPropagation();openEditInvSec(\''+q(inv.id)+'\',\''+q(sc.id)+'\')">\u270e</button>':'')
+          +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
+          +'</div>';
+      }).join('')+'</div>';
+    }
+    var directItems=(curSec?(inv.items||[]).filter(function(it){return it.sectionId===curSec.id;}):lone).sort(function(a,b){return nbSort(a.name,b.name);});
+    if(!curSec&&kids.length&&lone.length)h+='<div style="padding:8px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">Uten overskrift</div>';
+    if(directItems.length){
+      h+='<div class="card">'+directItems.map(itemRow).join('')+'</div>';
+    } else if(curSec&&!kids.length){
+      h+='<div class="card"><div class="empty">Ingen punkter her enn\u00e5.</div></div>';
+    } else if(!curSec&&!kids.length&&!lone.length){
+      h+='<div class="card"><div class="empty">Tom liste. Start med en overskrift, eller legg punkter rett inn.</div></div>';
+    }
+    h+='<button class="add-btn" onclick="openInvSecModal(\''+q(inv.id)+'\',\''+(curSec?q(curSec.id):'')+'\')">'+(curSec?'+ Ny underoverskrift':'+ Ny overskrift')+'</button>'
+      +'<button class="add-btn" onclick="openInvItemModal(\''+q(inv.id)+'\',\''+(curSec?q(curSec.id):'')+'\')">+ Nytt punkt</button>';
+    return h;
+  }
+
   h+='<div class="card">';
   var secBlock=function(sc,ind){
     var out='';
