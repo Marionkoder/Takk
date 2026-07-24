@@ -481,9 +481,8 @@ function rmPlace(lv,name){
 }
 function goPlassering(){view={kind:'plassering'};drawerOpen=false;render();}
 function plasseringViewHTML(){
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="goInnstillinger()">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">Plassering</div></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
+    +'<div class="view-title">Plassering</div>'
     +'<div class="view-sub">Tre niv\u00e5er du kan velge mellom n\u00e5r du legger inn ting i inventarlistene. Niv\u00e5 1 er p\u00e5krevd, de to neste er frivillige.</div>';
   var lvl=[[1,'Niv\u00e5 1','F.eks. Hus, Hytte, Garasje'],[2,'Niv\u00e5 2','F.eks. Kj\u00f8kkenet, Kjelleren, Loftet'],[3,'Niv\u00e5 3','F.eks. \u00d8verste hylle, Skuff 2']];
   lvl.forEach(function(L){
@@ -615,8 +614,8 @@ function fixedListHubHTML(key,title,sub){
 function listOversiktViewHTML(){
   var inv=invById(view.invId);
   var back=inv&&inv.fixed==='utstyr'?'goUtstyr()':'goBeredskap()';
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="'+back+'">\u2039</button>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+back+'">\u2039</button></div>'
+    +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
     +'<div class="view-title" style="padding:0;flex:1;font-size:17px;line-height:1.2">Oversikt over det som er p\u00e5 plass</div>'
     +(inv?'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="printOversikt(\''+q(inv.id)+'\')">Skriv ut</button>':'')
     +'</div>';
@@ -629,30 +628,25 @@ function listOversiktViewHTML(){
   var t=oversiktTree(inv,true);
   var paaPlass=(inv.items||[]).filter(function(it){return it.have;});
   var rowFor=function(it){
-    var sec=(inv.sections||[]).find(function(x){return x.id===it.sectionId;});
     var v=it.values||{};
-    var meta=[];
-    if(v.__qty)meta.push(esc(v.__qty)+' '+esc(v.__unit||''));
-    if(sec)meta.push(esc(sec.name));
-    if(v.__merke)meta.push(esc(v.__merke));
-    var expSt=listHasExp(inv)?expStatus(v.__exp):null;
-    return'<div class="entry-row" style="padding-left:0">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(it.name)+'</div>'
-      +(meta.length?'<div class="entry-date">'+meta.join(' \u00b7 ')+'</div>':'')
-      +(expSt?'<div class="entry-date" style="color:'+expSt.c+'">'+esc(expSt.txt)+'</div>':'')
-      +(v.__tilstand?'<div class="entry-date" style="color:'+(v.__tilstand==='M\u00e5 erstattes'?'var(--red)':v.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(v.__tilstand)+'</div>':'')
-      +'</div></div>';
+    var qty=v.__qty?esc(v.__qty)+(v.__unit?' '+esc(v.__unit):''):'';
+    return'<div style="display:flex;align-items:baseline;gap:7px;line-height:0.5;padding:5px 14px 5px 0">'
+      +'<span style="flex-shrink:0;color:#000;font-size:9px">\u25cf</span>'
+      +'<span style="flex:1;font-size:13px;color:var(--ink)">'+esc(it.name)+(qty?' <span style="color:var(--muted);font-size:12px">\u00b7 '+qty+'</span>':'')+'</span>'
+      +'</div>';
   };
   if(!paaPlass.length){
     h+='<div class="card"><div class="empty">Ingenting er merket som p\u00e5 plass enn\u00e5.</div></div>';
   } else {
     h+='<div class="card">';
     oversiktSortKeys(t.tree,t.UTEN).forEach(function(p1){
-      h+='<div style="padding:10px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(p1)+'</div>';
+      var soleLvl=oversiktSortKeys(t.tree[p1],t.UTEN).every(function(p2){return!p2&&Object.keys(t.tree[p1][p2]).every(function(p3){return!p3;});});
+      h+='<div style="padding:10px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)'+(soleLvl?';text-decoration:underline':'')+'">'+esc(p1)+'</div>';
       oversiktSortKeys(t.tree[p1],t.UTEN).forEach(function(p2){
-        if(p2)h+='<div style="padding:4px 14px 0 24px;font-size:13px;font-weight:600;color:var(--ink)">'+esc(p2)+'</div>';
+        var soleLvl2=p2&&Object.keys(t.tree[p1][p2]).every(function(p3){return!p3;});
+        if(p2)h+='<div style="padding:4px 14px 0 24px;font-size:13px;font-weight:600;color:var(--ink)'+(soleLvl2?';text-decoration:underline':'')+'">'+esc(p2)+'</div>';
         oversiktSortKeys(t.tree[p1][p2],t.UTEN).forEach(function(p3){
-          if(p3)h+='<div style="padding:2px 14px 0 36px;font-size:12px;color:var(--muted)">'+esc(p3)+'</div>';
+          if(p3)h+='<div style="padding:2px 14px 0 36px;font-size:12px;color:var(--muted);text-decoration:underline">'+esc(p3)+'</div>';
           h+='<div style="padding-left:'+(p3?36:p2?24:14)+'px">'+t.tree[p1][p2][p3].slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(rowFor).join('')+'</div>';
         });
       });
@@ -851,9 +845,8 @@ function bursdagerHubHTML(){
 }
 function bursdagslisteViewHTML(){
   var bdays=events.filter(function(e){return e.bday;}).sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="goBursdager()">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">Bursdagsliste <span style="font-size:12px;font-weight:400;color:var(--rose)">\u00b7 '+bdays.length+' av '+BDAY_MAX+'</span></div></div>';
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBursdager()">\u2039</button></div>'
+    +'<div class="view-title">Bursdagsliste <span style="font-size:12px;font-weight:400;color:var(--rose)">\u00b7 '+bdays.length+' av '+BDAY_MAX+'</span></div>';
   if(bdays.length<BDAY_MAX)h+='<button class="add-btn" onclick="openBdayModal()">+ Ny bursdag</button>';
   if(bdays.length){
     h+='<div class="card" style="padding:6px 0">';
@@ -888,6 +881,9 @@ function bursdagslisteViewHTML(){
 }
 function openGiftModal(person){
   modal={step:'gift',form:{id:'',person:person||'',kind:'bursdag',year:curYear,what:'',idea:false,note:''}};render();
+}
+function openGiftIdeaModal(person){
+  modal={step:'gift',form:{id:'',person:person||'',kind:'bursdag',year:curYear,what:'',idea:true,note:''}};render();
 }
 function openEditGift(id){
   var g=gifts.find(function(x){return x.id===id;});if(!g)return;
@@ -1610,10 +1606,21 @@ function gavePersonViewHTML(){
   var backTo=view._from==='gaver'?'goGaver()':'goBursdagsliste()';
   var h='<div style="padding:12px 12px 0"><button class="icon-btn" onclick="'+backTo+'">\u2039</button></div>'
     +'<div style="display:flex;align-items:flex-start;gap:8px;padding:2px 12px 0">'
-    +'<div class="view-title" style="padding:0;flex:1">'+titleName+'</div>'
-    +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="openGiftModal(\''+q(pn)+'\')">+ Ny gave</button>'
+    +'<div class="view-title" style="padding:0;flex:1;min-width:0">'+titleName+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">'
+    +'<button class="icon-btn" style="font-size:11px" onclick="openGiftIdeaModal(\''+q(pn)+'\')">+ Ny gaveid\u00e9</button>'
+    +'<button class="icon-btn" style="font-size:11px" onclick="openGiftModal(\''+q(pn)+'\')">+ Ny gave</button>'
     +'</div>'
-    +(bd?'<div style="padding:6px 12px 0"><button class="chip" style="font-size:11px" onclick="openPersonTags(\''+q(pn)+'\')">Tilknytt hashtagg</button></div>':'');
+    +'</div>';
+  if(bd){
+    var pTags=personTagsFor(pn);
+    h+='<div style="padding:6px 12px 0">'
+      +(pTags.length?'<div class="chips" style="margin-bottom:4px">'+pTags.map(function(t){
+          return'<span class="chip" style="cursor:default">#'+esc(t)+'</span>';
+        }).join('')+'</div>':'')
+      +'<button class="chip" style="font-size:11px" onclick="openPersonTags(\''+q(pn)+'\')">'+(pTags.length?'Rediger hashtagger':'Tilknytt hashtagger')+'</button>'
+      +'</div>';
+  }
   if(bd){
     var dd=daysToNextBday(bd);var nAge=bdayNextAge(bd);
     h+='<div class="view-sub" style="padding-top:2px">'+(nAge!==null?'Fyller '+nAge+' om '+dd+' dager':(dd===0?'Bursdag i dag':dd===1?'Bursdag i morgen':'Bursdag om '+dd+' dager'))+'</div>';
@@ -1677,9 +1684,8 @@ function goInnstillinger(){view={kind:'innstillinger'};drawerOpen=false;render()
 function goPersonlig(){view={kind:'personlig'};drawerOpen=false;render();}
 function personligViewHTML(){
   var cur=currentBgTone();
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="goInnstillinger()">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">Personlig</div></div>';
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
+    +'<div class="view-title">Personlig</div>';
   // Visuell profil
   var pid=currentProfile();
   h+='<div class="sec-title">Visuell profil</div>'
@@ -2450,7 +2456,7 @@ function modalHTML(){
 
   if(step==='persontags'){
     var suggested=Object.keys(allTags()).filter(function(t){return (f.tags||[]).map(normTag).indexOf(normTag(t))<0;}).sort(function(a,b){return allTags()[b]-allTags()[a]||nbSort(a,b);}).slice(0,10);
-    body='<div class="modal-title">Tilknytt hashtagg</div>'
+    body='<div class="modal-title">'+((f.tags||[]).length?'Rediger hashtagger':'Tilknytt hashtagger')+'</div>'
       +'<div class="hint" style="line-height:1.6">Velg hvilke stikkord som handler om '+esc(f.person)+'. Innlegg i takknemlighetsboka med disse stikkordene vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og folk med samme navn holdes fra hverandre.</div>'
       +((f.tags||[]).length?'<label class="field-lbl">Tilknyttet</label><div class="chips" style="margin-bottom:4px">'+(f.tags||[]).map(function(t){
           return'<button class="chip on" onclick="personTagsRm(\''+q(t)+'\')">#'+esc(t)+' \u00d7</button>';
@@ -3875,10 +3881,10 @@ function ukeViewHTML(){
   var h=kalNavHTML();
   h+='<div style="display:flex;align-items:center;gap:6px;padding:10px 12px 0">'
     +'<button class="icon-btn" onclick="ukeShift(-7)">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1;text-align:center">Uke '+wk+'</div>'
+    +'<div class="view-title" style="padding:0;flex:1">Uke '+wk+'</div>'
     +'<button class="icon-btn" onclick="ukeShift(7)">\u203a</button>'
     +'</div>'
-    +'<div class="view-sub" style="text-align:center">'+range
+    +'<div class="view-sub">'+range
     +(view.ws!==isoDate(mondayOf(today))?' \u00b7 <button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="goUke()">Til denne uka</button>':'')
     +'</div>';
 
@@ -3949,10 +3955,10 @@ function kalenderViewHTML(){
   var h=kalNavHTML();
   h+='<div style="display:flex;align-items:center;gap:6px;padding:10px 12px 0">'
     +'<button class="icon-btn" onclick="goKalender('+(y-1)+')">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1;text-align:center">'+y+'</div>'
+    +'<div class="view-title" style="padding:0;flex:1">'+y+'</div>'
     +'<button class="icon-btn" onclick="goKalender('+(y+1)+')">\u203a</button>'
     +'</div>'
-    +'<div class="view-sub" style="text-align:center">Trykk p\u00e5 en m\u00e5ned for \u00e5 \u00e5pne m\u00e5nedslista</div>';
+    +'<div class="view-sub">Trykk p\u00e5 en m\u00e5ned for \u00e5 \u00e5pne m\u00e5nedslista</div>';
   h+='<div class="kal-grid">';
   for(var m=1;m<=12;m++)h+=miniMonthHTML(m,y);
   h+='</div>';
@@ -4176,7 +4182,7 @@ function rapportViewHTML(){
   var h=rapportNavHTML();
   h+='<div style="display:flex;align-items:center;gap:6px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goRapport('+prevM+','+prevY+')">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1;text-align:center">M\u00e5nedsrapport \u00b7 '+cap(MND_FULL[m-1])+' '+y+'</div>'
+    +'<div class="view-title" style="padding:0;flex:1">M\u00e5nedsrapport \u00b7 '+cap(MND_FULL[m-1])+' '+y+'</div>'
     +'<button class="icon-btn" onclick="goRapport('+nextM+','+nextY+')">\u203a</button>'
     +'</div>';
 
@@ -4314,7 +4320,7 @@ function arsrapportViewHTML(){
   var h=rapportNavHTML();
   h+='<div style="display:flex;align-items:center;gap:6px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goArsrapport('+(y-1)+')">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1;text-align:center">\u00c5rsrapport \u00b7 '+y+(fromM>1?' <span style="font-size:12px;font-weight:400;color:var(--rose)">fra juli</span>':'')+'</div>'
+    +'<div class="view-title" style="padding:0;flex:1">\u00c5rsrapport \u00b7 '+y+(fromM>1?' <span style="font-size:12px;font-weight:400;color:var(--rose)">fra juli</span>':'')+'</div>'
     +'<button class="icon-btn" onclick="goArsrapport('+(y+1)+')">\u203a</button>'
     +'</div>';
 
@@ -4700,8 +4706,8 @@ function inventarViewHTML(){
 
   var isPack=(inv.type||'inventar')==='pakke';
   var isProj=(inv.type||'inventar')==='prosjekt';
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="'+(isProj?'goPlanlegging()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='anskaffelser'?'goOkonomi()':'goLister()')+'">\u2039</button>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+(isProj?'goPlanlegging()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='anskaffelser'?'goOkonomi()':'goLister()')+'">\u2039</button></div>'
+    +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
     +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
     +(isPack?' <span style="font-size:11px;font-weight:400;color:var(--rose)">pakkeliste</span>':isProj?' <span style="font-size:11px;font-weight:400;color:var(--rose)">'+(inv.subtype==='strikk'?'strikkeprosjekt':'prosjekt')+'</span>':'')+'</div>'
@@ -4946,9 +4952,8 @@ function frittTagCloudHTML(){
   return tagCloudSpread(counts);
 }
 function hashtagsViewHTML(){
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="goInnstillinger()">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">Hashtagger</div></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
+    +'<div class="view-title">Hashtagger</div>'
     +'<div class="view-sub">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
   var counts=allTags();
   var tags=Object.keys(counts);
@@ -4987,10 +4992,8 @@ function hashtagsViewHTML(){
   return h;
 }
 function kategorierViewHTML(){
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="goInnstillinger()">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">Kategorier</div>'
-    +'</div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
+    +'<div class="view-title">Kategorier</div>'
     +'<div class="view-sub">Trykk \u270e for \u00e5 endre, velge farge, sl\u00e5 sammen eller slette. Fargen p\u00e5 en hovedkategori arves av underkategoriene.</div>';
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(!mains.length)return h+'<div class="card"><div class="empty">Ingen kategorier enn\u00e5.</div></div>';
@@ -5033,7 +5036,7 @@ function budsjettViewHTML(){
   var qSel=view.q;
   var h='<div style="display:flex;align-items:center;gap:6px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goBudsjett('+(y-1)+',view.q)">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1;text-align:center">Budsjett og regnskap \u00b7 '+y+'</div>'
+    +'<div class="view-title" style="padding:0;flex:1">Budsjett og regnskap \u00b7 '+y+'</div>'
     +'<button class="icon-btn" onclick="goBudsjett('+(y+1)+',view.q)">\u203a</button>'
     +'</div>';
   h+='<div class="chips" style="justify-content:center;padding:8px 12px 0">'
@@ -5398,9 +5401,8 @@ function planleggingViewHTML(){
   return h;
 }
 function ventelisteViewHTML(){
-  var h='<div style="display:flex;align-items:center;gap:8px;padding:14px 12px 0">'
-    +'<button class="icon-btn" onclick="goLister()">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">Venteliste</div></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goLister()">\u2039</button></div>'
+    +'<div class="view-title">Venteliste</div>'
     +'<div class="view-sub">Ting som venter p\u00e5 riktig tidspunkt. Innkj\u00f8p h\u00e5ndteres i innkj\u00f8pslista under \u00d8konomi.</div>';
   h+='<button class="add-btn" onclick="openLaterModal()">+ Sett p\u00e5 vent</button>';
   if(laters.length){
