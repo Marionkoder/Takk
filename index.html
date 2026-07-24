@@ -630,8 +630,9 @@ function listOversiktViewHTML(){
   var rowFor=function(it){
     var v=it.values||{};
     var qty=v.__qty?esc(v.__qty)+(v.__unit?' '+esc(v.__unit):''):'';
+    var dotCol=v.__farge?colorHexById(v.__farge):null;
     return'<div style="display:flex;align-items:baseline;gap:7px;line-height:0.5;padding:5px 14px 5px 0">'
-      +'<span style="flex-shrink:0;color:#000;font-size:9px">\u25cf</span>'
+      +'<span style="flex-shrink:0;color:'+(dotCol||'#000')+';font-size:9px">\u25cf</span>'
       +'<span style="flex:1;font-size:13px;color:var(--ink)">'+esc(it.name)+(qty?' <span style="color:var(--muted);font-size:12px">\u00b7 '+qty+'</span>':'')+'</span>'
       +'</div>';
   };
@@ -640,14 +641,12 @@ function listOversiktViewHTML(){
   } else {
     h+='<div class="card">';
     oversiktSortKeys(t.tree,t.UTEN).forEach(function(p1){
-      var soleLvl=oversiktSortKeys(t.tree[p1],t.UTEN).every(function(p2){return!p2&&Object.keys(t.tree[p1][p2]).every(function(p3){return!p3;});});
-      h+='<div style="padding:10px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)'+(soleLvl?';text-decoration:underline':'')+'">'+esc(p1)+'</div>';
+      h+='<div style="padding:10px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(p1)+'</div>';
       oversiktSortKeys(t.tree[p1],t.UTEN).forEach(function(p2){
-        var soleLvl2=p2&&Object.keys(t.tree[p1][p2]).every(function(p3){return!p3;});
-        if(p2)h+='<div style="padding:4px 14px 0 24px;font-size:13px;font-weight:600;color:var(--ink)'+(soleLvl2?';text-decoration:underline':'')+'">'+esc(p2)+'</div>';
+        if(p2)h+='<div style="padding:4px 14px 0;font-size:13px;font-weight:700;color:var(--ink)">'+esc(p2)+'</div>';
         oversiktSortKeys(t.tree[p1][p2],t.UTEN).forEach(function(p3){
-          if(p3)h+='<div style="padding:2px 14px 0 36px;font-size:12px;color:var(--muted);text-decoration:underline">'+esc(p3)+'</div>';
-          h+='<div style="padding-left:'+(p3?36:p2?24:14)+'px">'+t.tree[p1][p2][p3].slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(rowFor).join('')+'</div>';
+          if(p3)h+='<div style="padding:2px 14px 0;font-size:12px;font-weight:700;color:var(--muted)">'+esc(p3)+'</div>';
+          h+='<div style="padding-left:14px">'+t.tree[p1][p2][p3].slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(rowFor).join('')+'</div>';
         });
       });
     });
@@ -803,7 +802,7 @@ function celebrationViewHTML(){
     if(ms.length){
       body+='<div style="font-size:13px;font-weight:700;color:var(--title,var(--ink));margin:16px auto 6px">Oppn\u00e5dd i perioden</div>';
       ms.forEach(function(m){
-        body+='<div style="font-size:13px;color:var(--ink);margin:3px auto;max-width:380px">\u25c6 '+esc(m.name)+' <span style="color:var(--muted);font-size:11px">\u00b7 '+esc(m.from)+'</span></div>';
+        body+='<div style="font-size:13px;color:var(--ink);margin:3px auto;max-width:380px">'+esc(m.name)+' <span style="color:var(--muted);font-size:11px">\u00b7 '+esc(m.from)+'</span></div>';
       });
     }
   } else {
@@ -1231,7 +1230,7 @@ function milestoneBtnHTML(ms){
   var click=isRes
     ?(editMode?'openEditResult(\''+q(ms.resultId)+'\')':'toggleResultMs(\''+q(ms.resultId)+'\',\''+q(ms.itemId)+'\')')
     :(editMode?'openEditInvItem(\''+q(ms.invId)+'\',\''+q(ms.itemId)+'\')':'toggleInvItem(\''+q(ms.invId)+'\',\''+q(ms.itemId)+'\')');
-  return'<button class="dl-ev'+(ms.done?' done':'')+'" style="background:var(--bg);border:1px dashed var(--sel-line);color:var(--ink);font-weight:400" onclick="'+click+'">'+(editMode?'\u270e ':'')+'\u25c6 '+esc(ms.name)+' <span style="opacity:.6">\u00b7 '+esc(ms.listName)+'</span>'+(ms.done?' \u2713':'')+'</button>';
+  return'<button class="dl-ev'+(ms.done?' done':'')+'" style="background:var(--bg);border:1px dashed var(--sel-line);color:var(--ink);font-weight:400" onclick="'+click+'">'+(editMode?'\u270e ':'')+esc(ms.name)+' <span style="opacity:.6">\u00b7 '+esc(ms.listName)+'</span>'+(ms.done?' \u2713':'')+'</button>';
 }
 function evOccYearOk(e,Y){
   if(!e.repeat)return Number(e.year)===Y;
@@ -2838,6 +2837,14 @@ function modalHTML(){
         +(st?'<div style="font-size:12px;color:'+st.c+';padding-top:4px">'+st.txt+'</div>':'')
         +'<div class="hint">Sett en dato, eller marker at det ikke er relevant.</div>';
     }
+    var fargeInput='<label class="field-lbl">Farge <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<div class="chips" style="gap:8px">'
+      +'<button class="col-sw none'+((f.values||{}).__farge?'':' on')+'" title="Ingen farge" onclick="mf().values=mf().values||{};mf().values.__farge=\'\';render()">\u2715</button>'
+      +CAT_COLORS.map(function(cc){
+        var on=(f.values||{}).__farge===cc.id;
+        return'<button class="col-sw'+(on?' on':'')+'" style="background:'+cc.hex+'" title="'+cc.name+'" onclick="mf().values=mf().values||{};mf().values.__farge=\''+cc.id+'\';render()"></button>';
+      }).join('')
+      +'</div>';
     var detailInputs='';
     if(listHasDetails(invT)){
       var dv=f.values||{};
@@ -2884,6 +2891,7 @@ function modalHTML(){
       +plassInput
       +expInput
       +detailInputs
+      +fargeInput
       +fieldInputs
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'
@@ -3040,12 +3048,16 @@ function modalHTML(){
       +(evChips?'<label class="field-lbl">Kategori(er) <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
         +'<div class="chips">'+evChips+'</div>'
         +'<div class="hint">Innlegg i disse kategoriene vises som evidens for akkurat dette resultatet.</div>':'')
-      +(inventories.length?'<label class="field-lbl">Lister <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
-        +'<div class="chips">'+inventories.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(iv){
-          var on=(f.invIds||[]).includes(iv.id);
-          return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormInvList(\''+q(iv.id)+'\')">'+esc(iv.name)+'</button>';
-        }).join('')+'</div>'
-        +'<div class="hint">Koblede lister vises i rapportene som del av resultatet.</div>':'')
+      +(function(){
+        var linkInvs=inventories.filter(function(iv){return(iv.type||'inventar')!=='prosjekt';});
+        if(!linkInvs.length)return'';
+        return'<label class="field-lbl">Lister <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
+          +'<div class="chips">'+linkInvs.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(iv){
+            var on=(f.invIds||[]).includes(iv.id);
+            return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormInvList(\''+q(iv.id)+'\')">'+esc(iv.name)+'</button>';
+          }).join('')+'</div>'
+          +'<div class="hint">Koblede lister vises i rapportene som del av resultatet.</div>';
+      })()
       +(isEditX&&resultById(f.id)&&resultById(f.id).targetAmount?(function(){
         var deps=deposits.filter(function(d){return d.resultId===f.id;}).sort(function(a,b){return a.date<b.date?1:-1;});
         if(!deps.length)return'<div class="hint">Ingen innbetalinger ennå — registrer dem fra Planlegging eller budsjettvisningen.</div>';
@@ -4800,7 +4812,7 @@ function inventarViewHTML(){
     var twoBtn=listHasDetails(inv);
     return'<div class="entry-row">'
       +(twoBtn?'':'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>')
-      +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj?'':' style="color:var(--amber)"')+'>'+esc(it.name)
+      +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj?'':' style="color:var(--amber)"')+'>'+((it.values||{}).__farge?'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+colorHexById((it.values||{}).__farge)+';margin-right:6px;vertical-align:middle"></span>':'')+esc(it.name)
       +(isProj&&it.date?(function(){
           var ps=it.sectionId?(inv.sections||[]).find(function(x){return x.id===it.sectionId;}):null;
           var outside=ps&&((ps.startDate&&it.date<ps.startDate)||(ps.endDate&&it.date>ps.endDate));
@@ -5215,10 +5227,19 @@ function planleggingViewHTML(){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Planer og hendelser</div>';
           linkedE.forEach(function(e){h+='<div style="font-size:13px;padding:2px 0">'+esc(e.name)+' <span style="color:var(--muted);font-size:11px">· '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert år':' '+e.year)+'</span></div>';});
         }
-        var vInvs=inventories.filter(function(iv){return(iv.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
+        var vInvsAll=inventories.filter(function(iv){return(iv.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
+        var vInvs=vInvsAll.filter(function(iv){return(iv.type||'inventar')!=='prosjekt';});
+        var vProsj=vInvsAll.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});
         if(vInvs.length){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Lister</div>';
           vInvs.forEach(function(iv){
+            var ic=invCounts(iv);
+            h+='<div style="font-size:13px;padding:2px 0"><button class="icon-btn" style="font-size:12px;padding:1px 8px" onclick="event.stopPropagation();goInventar(\''+q(iv.id)+'\')">'+esc(iv.name)+' \u00b7 '+ic.have+'/'+ic.total+' \u203a</button></div>';
+          });
+        }
+        if(vProsj.length){
+          h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Prosjekter</div>';
+          vProsj.forEach(function(iv){
             var ic=invCounts(iv);
             h+='<div style="font-size:13px;padding:2px 0"><button class="icon-btn" style="font-size:12px;padding:1px 8px" onclick="event.stopPropagation();goInventar(\''+q(iv.id)+'\')">'+esc(iv.name)+' \u00b7 '+ic.have+'/'+ic.total+' \u203a</button></div>';
           });
