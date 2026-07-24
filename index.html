@@ -166,7 +166,7 @@ button.freq-pill{cursor:pointer}
 button.freq-pill:hover{color:var(--red);border-color:var(--red)}
 
 /* Oppsummering */
-.cloud{padding:26px 18px;display:flex;flex-wrap:wrap;gap:12px 16px;align-items:baseline;justify-content:center}
+.cloud{padding:18px 14px;display:flex;flex-wrap:wrap;gap:12px 16px;align-items:baseline;justify-content:center}
 .cloud-word{background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
 .cloud-word.lv1{color:#7A2E28;opacity:.75}
 .cloud-word.lv2{color:#9C3D2E}
@@ -324,6 +324,36 @@ function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.
 var DEFAULT_UNITS=['n\u00f8ster','stk','boks','g','kg','ml','dl','liter','kroner'];
 var customUnits=[];
 var places={l1:[],l2:[],l3:[]};
+var achievements=[];
+var achDismissed=[];
+function addAchievement(kind,key,name,goalIds,cats,detail){
+  if(!key||achDismissed.indexOf(key)>=0)return;
+  if(achievements.some(function(a){return a.key===key;}))return;
+  achievements.push({id:'ach'+Date.now()+Math.random().toString(36).slice(2,6),key:key,kind:kind,
+    name:name||'',detail:detail||'',goalIds:(goalIds||[]).filter(Boolean),cats:(cats||[]).filter(Boolean),
+    ts:Date.now(),date:isoDate(today)});
+}
+function achKindLabel(k){
+  return k==='milestone'?'Milepæl':k==='result'?'Resultat':k==='project'?'Prosjekt fullført':k==='routine'?'Rutine':'Oppnådd';
+}
+function catsForResult(r){
+  if(r.subCats&&r.subCats.length)return r.subCats;
+  var g=goalById(r.valueId);
+  return g?(g.cats||[]):[];
+}
+function checkRoutineMilestone(r){
+  var n=(r.log||[]).length;
+  if(n>0&&n%100===0)addAchievement('routine','routine:'+r.id+':'+n,r.name,r.goalIds||[],r.cats||[],n+' ganger');
+}
+function goOppnadd(){view={kind:'oppnadd'};window._achDel=null;drawerOpen=false;render();}
+function askDeleteAch(id){window._achDel=id;render();}
+function cancelDeleteAch(){window._achDel=null;render();}
+function deleteAch(id){
+  var a=achievements.find(function(x){return x.id===id;});
+  if(a&&a.key&&achDismissed.indexOf(a.key)<0)achDismissed=achDismissed.concat([a.key]);
+  achievements=achievements.filter(function(x){return x.id!==id;});
+  window._achDel=null;save();render();
+}
 var BEREDSKAP_SEKSJONER=[
   {id:'bs_betaling',name:'Betaling'},
   {id:'bs_drikke',name:'Drikke'},
@@ -927,6 +957,8 @@ function load(){
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
   try{places=JSON.parse(localStorage.getItem(SK+'_places')||'{"l1":[],"l2":[],"l3":[]}');}catch(e){places={l1:[],l2:[],l3:[]};}
+  try{achievements=JSON.parse(localStorage.getItem(SK+'_ach')||'[]');}catch(e){achievements=[];}
+  try{achDismissed=JSON.parse(localStorage.getItem(SK+'_achdis')||'[]');}catch(e){achDismissed=[];}
   places.l1=places.l1||[];places.l2=places.l2||[];places.l3=places.l3||[];
   try{tb=JSON.parse(localStorage.getItem(SK+'_tb')||'null')||tb;}catch(e){}
   // Defaultkategorier ved første oppstart — kan slettes fritt av brukeren
@@ -1087,6 +1119,8 @@ function save(){
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
   try{localStorage.setItem(SK+'_places',JSON.stringify(places));}catch(e){}
+  try{localStorage.setItem(SK+'_ach',JSON.stringify(achievements));}catch(e){}
+  try{localStorage.setItem(SK+'_achdis',JSON.stringify(achDismissed));}catch(e){}
   try{localStorage.setItem(SK+'_tb',JSON.stringify(tb));}catch(e){}
 }
 
@@ -1145,6 +1179,7 @@ function toggleRoutine(id,ym){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
   r.log=r.log||[];
   r.log=r.log.includes(ym)?r.log.filter(function(l){return l!==ym;}):[].concat(r.log,[ym]);
+  checkRoutineMilestone(r);
   save();render();
 }
 function toggleEvent(id,year){
@@ -1334,7 +1369,11 @@ function rmResultMs(msId){var f=mf();f.milestones=(f.milestones||[]).filter(func
 function toggleResultMsForm(msId){var f=mf();(f.milestones||[]).forEach(function(m){if(m.id===msId)m.done=!m.done;});render();}
 function toggleResultMs(resultId,msId){
   var r=resultById(resultId);if(!r)return;
-  (r.milestones||[]).forEach(function(m){if(m.id===msId)m.done=!m.done;});
+  (r.milestones||[]).forEach(function(m){
+    if(m.id!==msId)return;
+    m.done=!m.done;
+    if(m.done)addAchievement('milestone','ms:'+r.id+':'+m.id,m.name,[r.valueId],catsForResult(r),r.name);
+  });
   save();render();
 }
 function toggleFormInvList(id){
@@ -1368,10 +1407,12 @@ function submitResult(){
 function saveEditResult(){
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId)return;
   var r=resultById(f.id);if(!r)return;
+  var wasAchieved=!!r.achieved;
   r.name=name;r.valueId=f.valueId;r.month=Number(f.month);r.year=Number(f.year);
   r.subCats=f.subCats||[];r.achieved=!!f.achieved;r.targetAmount=parseKr(f.targetAmount);
   r.amountType=f.amountType||'spar';
   r.milestones=f.milestones||[];
+  if(r.achieved&&!wasAchieved)addAchievement('result','res:'+r.id,r.name,[r.valueId],catsForResult(r),'');
   r.forutsetninger=(f.forutsetninger||'').trim();r.risikoer=(f.risikoer||'').trim();
   syncResultRoutines(r.id,f.routineIds);syncResultEvents(r.id,f.eventIds);
   syncResultInvs(r.id,f.invIds);
@@ -1726,6 +1767,7 @@ function toggleInvItem(invId,itemId){
   var inv=invById(invId);if(!inv)return;
   var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
   it.have=!it.have;
+  if(it.have&&(inv.type||'inventar')==='prosjekt')addAchievement('milestone','pms:'+inv.id+':'+it.id,it.name,inv.goalIds||[],inv.catId?[inv.catId]:[],inv.name);
   // «Pakket» på en pakkeliste betyr ikke «har» i inventaret — synk bare mellom inventarlister
   if(it.syncId&&(inv.type||'inventar')!=='pakke'){
     inventories.forEach(function(iv){
@@ -1772,6 +1814,7 @@ function toggleProjectDone(invId){
   var inv=invById(invId);if(!inv)return;
   if(inv.completedDate){delete inv.completedDate;save();render();return;}
   inv.completedDate=isoDate(today);
+  addAchievement('project','proj:'+inv.id,inv.name,inv.goalIds||[],inv.catId?[inv.catId]:[],'');
   save();
   var hasYarn=inv.subtype==='strikk'&&inv.knit&&(inv.knit.yarns||[]).some(function(y){return(y.name||y.color||'').trim();});
   if(hasYarn){
@@ -2010,7 +2053,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -2029,7 +2072,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -2153,18 +2196,23 @@ function tagCountsFor(list){
   (list||[]).forEach(function(e){(e.tags||[]).forEach(function(t){counts[t]=(counts[t]||0)+1;});});
   return counts;
 }
-function cloudHTML(counts,clickable){
-  var words=Object.keys(counts).sort(nbSort);
+function cloudWordsHTML(counts,clickable){
+  // Én felles motor for alle ordskyer — samme størrelser, avstand og utseende
+  var words=Object.keys(counts).filter(function(w){return counts[w]>0;}).sort(nbSort);
   if(!words.length)return'';
   var max=Math.max.apply(null,words.map(function(w){return counts[w];}));
-  return'<div class="card"><div class="cloud">'+words.map(function(w){
+  return'<div class="cloud">'+words.map(function(w){
     var c=counts[w];
     var size=13+Math.round((c/max)*15);
     var lv=Math.min(5,1+Math.floor((c-1)/max*5));
     var cls='cloud-word lv'+lv+(c>10?' hot':'')+(clickable&&selectedTag===w?' sel':'');
-    if(clickable)return'<button class="'+cls+'" style="font-size:'+size+'px" onclick="selectTag(\''+q(w)+'\')">'+esc(w)+'</button>';
-    return'<span class="'+cls+'" style="font-size:'+size+'px;cursor:default">'+esc(w)+'</span>';
-  }).join('')+'</div></div>';
+    if(clickable)return'<button class="'+cls+'" style="font-size:'+size+'px" onclick="selectTag(\''+q(w)+'\')">#'+esc(w)+'</button>';
+    return'<span class="'+cls+'" style="font-size:'+size+'px;cursor:default">#'+esc(w)+'</span>';
+  }).join('')+'</div>';
+}
+function cloudHTML(counts,clickable){
+  var c=cloudWordsHTML(counts,clickable);
+  return c?'<div class="card">'+c+'</div>':'';
 }
 
 function openNewCat(){modal._prevStep=modal.step;modal.step='cat_new';mf()._newMain='';render();}
@@ -3914,10 +3962,44 @@ function catPillsHTML(catIds){
 function rapportNavHTML(){
   var k=view.kind;
   return'<div class="chips" style="justify-content:center;padding:10px 12px 0">'
+    +'<button class="chip'+(k==='oppnadd'?' on':'')+'" onclick="goOppnadd()">Oppn\u00e5dd</button>'
     +'<button class="chip'+(k==='oppsummering'?' on':'')+'" onclick="goOppsummering()">Helhetsbildet</button>'
     +'<button class="chip'+(k==='rapport'?' on':'')+'" onclick="goRapport(curMonth,curYear)">M\u00e5neden</button>'
     +'<button class="chip'+(k==='arsrapport'?' on':'')+'" onclick="goArsrapport(curYear)">\u00c5ret</button>'
     +'</div>';
+}
+function oppnaddViewHTML(){
+  var h=rapportNavHTML();
+  h+='<div class="view-title">Oppn\u00e5dd</div>'
+    +'<div class="view-sub">Milep\u00e6ler du har n\u00e5dd, resultater du har oppn\u00e5dd, prosjekter du har fullf\u00f8rt og rutiner du har holdt lenge.</div>';
+  var list=achievements.slice().sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+  if(!list.length){
+    return h+'<div class="card"><div class="empty">Ingenting her enn\u00e5. N\u00e5r du haker av en milep\u00e6l, fullf\u00f8rer et prosjekt, n\u00e5r et resultat eller runder 100 ganger med en rutine, dukker det opp her.</div></div>';
+  }
+  var now=Date.now();
+  h+='<div class="card">';
+  list.forEach(function(a,i){
+    var fresh=(i===0)&&(now-(a.ts||0)<86400000);
+    var vNames=(a.goalIds||[]).map(function(g){var gg=goalById(g);return gg?gg.name:null;}).filter(Boolean);
+    var asking=window._achDel===a.id;
+    h+='<div class="'+(fresh?'confetti':'')+'" style="position:relative;padding:2px 0'+(fresh?';background:var(--bg)':'')+'">'
+      +(fresh?confettiHTML():'')
+      +'<div class="entry-row" style="position:relative">'
+      +'<div class="entry-body">'
+      +'<div class="entry-text"'+(fresh?' style="font-weight:700"':'')+'>'+esc(a.name)+'</div>'
+      +'<div class="entry-date">'+esc(achKindLabel(a.kind))+(a.detail?' \u00b7 '+esc(a.detail):'')+' \u00b7 '+fmtDate(a.date)+'</div>'
+      +(vNames.length?'<div class="entry-date" style="color:var(--red)">'+esc(vNames.join(' \u00b7 '))+'</div>':'')
+      +catPillsHTML(a.cats||[])
+      +'</div>'
+      +(asking?'':'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="askDeleteAch(\''+q(a.id)+'\')">\u00d7</button>')
+      +'</div>'
+      +(asking?'<div style="padding:0 14px 10px"><div style="font-size:12px;color:var(--red);margin-bottom:6px">Vil du virkelig slette denne anerkjennelsen? Den kommer ikke tilbake.</div>'
+        +'<div class="chips"><button class="chip" onclick="cancelDeleteAch()">Avbryt</button>'
+        +'<button class="chip on" style="background:var(--red);border-color:var(--red);color:#fff" onclick="deleteAch(\''+q(a.id)+'\')">Slett</button></div></div>':'')
+      +'</div>';
+  });
+  h+='</div>';
+  return h;
 }
 function oppsummeringViewHTML(){
   var h=rapportNavHTML();
@@ -4754,18 +4836,7 @@ function catUsage(catId){
   if(n)u.push(n+' innlegg');
   return u;
 }
-function tagCloudSpread(counts){
-  // Ordsky: gradert fargeskala etter hyppighet, alfabetisk rekkefølge (ikke frekvenssortert)
-  var words=Object.keys(counts).filter(function(w){return counts[w]>0;}).sort(nbSort);
-  if(!words.length)return'';
-  var max=Math.max.apply(null,words.map(function(w){return counts[w];}));
-  return'<div class="cloud" style="padding:6px 2px 4px">'+words.map(function(w){
-    var c=counts[w];
-    var size=13+Math.round((c/max)*13);
-    var lv=Math.min(5,1+Math.floor((c-1)/max*5));
-    return'<button class="cloud-word lv'+lv+(c>10?' hot':'')+(selectedTag===w?' sel':'')+'" style="font-size:'+size+'px" onclick="selectTag(\''+q(w)+'\')">#'+esc(w)+'</button>';
-  }).join('')+'</div>';
-}
+function tagCloudSpread(counts){return cloudWordsHTML(counts,true);}
 function catTagCloudHTML(catId){
   var counts={};
   Object.keys(tagCats).forEach(function(t){if(tagCats[t]===catId)counts[t]=0;});
@@ -5300,6 +5371,7 @@ function render(){
   else if(view.kind==='venteliste')content=ventelisteViewHTML();
   else if(view.kind==='gaver')content=gaverViewHTML();
   else if(view.kind==='gaveperson')content=gavePersonViewHTML();
+  else if(view.kind==='oppnadd')content=oppnaddViewHTML();
   else if(view.kind==='oppsummering')content=oppsummeringViewHTML();
   else if(view.kind==='rapport')content=rapportViewHTML();
   else if(view.kind==='arsrapport')content=arsrapportViewHTML();
