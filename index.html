@@ -5043,7 +5043,7 @@ function innstillingerViewHTML(){
     +'<div class="entry-date">velg en bakgrunnstone for appen</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goKategorier()">'
-    +'<div class="entry-body"><div class="entry-text">Administrer kategorier</div>'
+    +'<div class="entry-body"><div class="entry-text">Administrer kategorier og utstyrstyper</div>'
     +'<div class="entry-date">se hva hver kategori er knyttet til, og finn ubrukte</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goPlassering()">'
@@ -5134,31 +5134,34 @@ function hashtagsViewHTML(){
 }
 function kategorierViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
-    +'<div class="view-title">Kategorier</div>'
+    +'<div class="view-title">Kategorier og utstyrstyper</div>'
     +'<div class="view-sub">Trykk \u270e for \u00e5 endre, velge farge, sl\u00e5 sammen eller slette. Fargen p\u00e5 en hovedkategori arves av underkategoriene.</div>';
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
-  if(!mains.length)return h+'<div class="card"><div class="empty">Ingen kategorier enn\u00e5.</div></div>';
-  var line=function(c,indent){
-    var u=catUsage(c.id);
-    var col=catColor(c.id);
-    var dot=!indent?'<span class="cat-dot" style="margin-top:5px;background:'+(col||'transparent')+';'+(col?'':'border:1.5px dashed var(--line)')+'"></span>':'';
-    return'<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 14px'+(indent?' 6px 28px':'')+'">'
-      +dot
-      +'<div style="flex:1"><div style="font-size:13px;'+(indent?'':'font-weight:700')+'">'+esc(c.name)+'</div>'
-      +(u.length
-        ?'<div style="font-size:11px;color:var(--muted)">'+esc(u.join(' \u00b7 '))+'</div>'
-        :'<div style="font-size:11px;color:var(--amber)">\u26a0\ufe0e ikke knyttet til noe</div>')
-      +'</div>'
-      +'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="openEditCat(\''+q(c.id)+'\')">\u270e</button>'
-      +'</div>';
-  };
-  h+='<div class="card">';
-  mains.forEach(function(mc){
-    h+=line(mc,false);
-    cats.filter(function(c){return c.parentId===mc.id;}).sort(function(a,b){return nbSort(a.name,b.name);})
-      .forEach(function(sc){h+=line(sc,true);});
-  });
-  h+='</div>';
+  if(!mains.length){
+    h+='<div class="card"><div class="empty">Ingen kategorier enn\u00e5.</div></div>';
+  } else {
+    var line=function(c,indent){
+      var u=catUsage(c.id);
+      var col=catColor(c.id);
+      var dot=!indent?'<span class="cat-dot" style="margin-top:5px;background:'+(col||'transparent')+';'+(col?'':'border:1.5px dashed var(--line)')+'"></span>':'';
+      return'<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 14px'+(indent?' 6px 28px':'')+'">'
+        +dot
+        +'<div style="flex:1"><div style="font-size:13px;'+(indent?'':'font-weight:700')+'">'+esc(c.name)+'</div>'
+        +(u.length
+          ?'<div style="font-size:11px;color:var(--muted)">'+esc(u.join(' \u00b7 '))+'</div>'
+          :'<div style="font-size:11px;color:var(--amber)">\u26a0\ufe0e ikke knyttet til noe</div>')
+        +'</div>'
+        +'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="openEditCat(\''+q(c.id)+'\')">\u270e</button>'
+        +'</div>';
+    };
+    h+='<div class="card">';
+    mains.forEach(function(mc){
+      h+=line(mc,false);
+      cats.filter(function(c){return c.parentId===mc.id;}).sort(function(a,b){return nbSort(a.name,b.name);})
+        .forEach(function(sc){h+=line(sc,true);});
+    });
+    h+='</div>';
+  }
   // Vanlige kategorier — legg til med ett trykk
   var vanlige=['Kultur','Natur','Mat og drikke','Kreativitet','Kompetanse'];
   var mangler=vanlige.filter(function(n){return!cats.some(function(c){return!c.parentId&&c.name.toLowerCase()===n.toLowerCase();});});
@@ -5169,6 +5172,42 @@ function kategorierViewHTML(){
     }).join('')+'</div>';
   }
   h+='<button class="add-btn" onclick="openNewMainCat()">+ Lag din egen kategori</button>';
+
+  // Utstyrstyper — overskriftene i utstyrslista, forvaltet samlet
+  var utInv=findFixedList('utstyr');
+  h+='<div class="sec-title" style="margin-top:14px">Utstyrstyper</div>'
+    +'<div class="view-sub">Overskriftene i utstyrslista \u2014 de du bruker for \u00e5 dele utstyret inn i typer, som kj\u00f8kkenutstyr eller verkt\u00f8y.</div>';
+  if(utInv){
+    var uSecs=(utInv.sections||[]).slice().sort(function(a,b){return nbSort(a.name,b.name);});
+    var uMains=uSecs.filter(function(s){return!s.parentId;});
+    if(!uMains.length){
+      h+='<div class="card"><div class="empty">Ingen utstyrstyper enn\u00e5.</div></div>';
+    } else {
+      var uCount=function(sc){
+        var direct=(utInv.items||[]).filter(function(it){return it.sectionId===sc.id;}).length;
+        var kids=uSecs.filter(function(x){return x.parentId===sc.id;});
+        return direct+kids.reduce(function(a,k){return a+uCount(k);},0);
+      };
+      var uLine=function(sc,indent){
+        var cnt=uCount(sc);
+        return'<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 14px'+(indent?' 6px 28px':'')+'">'
+          +'<div style="flex:1"><div style="font-size:13px;'+(indent?'':'font-weight:700')+'">'+esc(sc.name)+'</div>'
+          +'<div style="font-size:11px;color:'+(cnt?'var(--muted)':'var(--amber)')+'">'+(cnt?cnt+' oppf\u00f8ring'+(cnt===1?'':'er'):'\u26a0\ufe0e ikke i bruk')+'</div>'
+          +'</div>'
+          +'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="openEditInvSec(\''+q(utInv.id)+'\',\''+q(sc.id)+'\')">\u270e</button>'
+          +'</div>';
+      };
+      h+='<div class="card">';
+      uMains.forEach(function(mc){
+        h+=uLine(mc,false);
+        uSecs.filter(function(s){return s.parentId===mc.id;}).forEach(function(sc){h+=uLine(sc,true);});
+      });
+      h+='</div>';
+    }
+    h+='<button class="add-btn" onclick="openInvSecModal(\''+q(utInv.id)+'\',\'\')">+ Ny utstyrstype</button>';
+  } else {
+    h+='<div class="card"><div class="empty">Fant ikke utstyrslista.</div></div>';
+  }
   return h;
 }
 
