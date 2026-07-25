@@ -1840,7 +1840,7 @@ function resetPackChecks(invId){
   (inv.items||[]).forEach(function(it){it.have=false;});
   save();render();
 }
-function openInvPick(targetId){modal={step:'invpick',form:{targetId:targetId,srcId:''}};render();}
+function openInvPick(targetId,lockedSrcId){modal={step:'invpick',form:{targetId:targetId,srcId:lockedSrcId||'',lockedSrc:!!lockedSrcId}};render();}
 function itemOnList(item,targetInv){
   if(!item.syncId)return null;
   return(targetInv.items||[]).find(function(x){return x.syncId===item.syncId;})||null;
@@ -1858,6 +1858,15 @@ function toggleItemOnList(invId,itemId,targetInvId){
       var srcField=(inv.fields||[]).find(function(sf){return sf.name.toLowerCase()===tf.name.toLowerCase();});
       if(srcField&&(it.values||{})[srcField.id])values[tf.id]=it.values[srcField.id];
     });
+    var srcVals=it.values||{};
+    if(listHasQty(target)&&srcVals.__qty){values.__qty=srcVals.__qty;if(srcVals.__unit)values.__unit=srcVals.__unit;}
+    if(srcVals.__farge)values.__farge=srcVals.__farge;
+    if(listHasDetails(target)){
+      if(srcVals.__merke)values.__merke=srcVals.__merke;
+      if(srcVals.__tilstand)values.__tilstand=srcVals.__tilstand;
+      if(srcVals.__kjopt)values.__kjopt=srcVals.__kjopt;
+    }
+    if(listHasExp(target)&&srcVals.__exp)values.__exp=srcVals.__exp;
     target.items=(target.items||[]).concat([{
       id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),
       sectionId:null,name:it.name,note:it.note||'',values:values,have:(target.type||'inventar')==='pakke'?false:!!it.have,
@@ -2603,10 +2612,9 @@ function modalHTML(){
           +'</div></div>';
       }).join('')||'<div class="hint">Denne lista har ingen punkter.</div>';
     }
-    body='<div class="modal-title">Hent fra inventarlistene</div>'
-      +'<div class="hint">Hak av det som skal med p\u00e5 \u00ab'+esc(target?target.name:'')+'\u00bb. Punktene kopieres og kobles, s\u00e5 du ser p\u00e5 inventarpunktet hvilke pakkelister det er med p\u00e5.</div>'
-      +'<label class="field-lbl">Fra liste</label>'
-      +'<div class="chips">'+srcChips+'</div>'
+    body='<div class="modal-title">'+(f.lockedSrc?'Hent fra utstyrslista':'Hent fra inventarlistene')+'</div>'
+      +'<div class="hint">Hak av det som skal med p\u00e5 \u00ab'+esc(target?target.name:'')+'\u00bb. Punktene kopieres og kobles, s\u00e5 du ser p\u00e5 inventarpunktet hvilke lister det er med p\u00e5.</div>'
+      +(f.lockedSrc?'':'<label class="field-lbl">Fra liste</label><div class="chips">'+srcChips+'</div>')
       +itemsHtml
       +'<button class="save-btn" onclick="closeModal()">Ferdig</button>';
 
@@ -4879,6 +4887,14 @@ function inventarViewHTML(){
       +'<button class="chip" onclick="openInvPick(\''+q(inv.id)+'\')">+ Hent fra inventarlistene</button>'
       +(c.have?confirmBtn('packreset','Nullstill avhaking','resetPackChecks(\''+q(inv.id)+'\')'):'')
       +'</div>';
+  }
+  if(inv.fixed!=='utstyr'){
+    var masterUt=findFixedList('utstyr');
+    if(masterUt&&(masterUt.items||[]).length){
+      h+='<div class="chips" style="padding:6px 12px 0">'
+        +'<button class="chip" onclick="openInvPick(\''+q(inv.id)+'\',\''+q(masterUt.id)+'\')">+ Hent fra utstyrslista</button>'
+        +'</div>';
+    }
   }
 
   var itemRow=function(it){
