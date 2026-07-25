@@ -524,6 +524,7 @@ function addCustomUnit(u){
 function goLister(){view={kind:'lister'};drawerOpen=false;render();}
 function goBeredskap(){view={kind:'beredskap'};drawerOpen=false;render();}
 function goUtstyr(){view={kind:'utstyr'};drawerOpen=false;render();}
+function goForbruksvarer(){view={kind:'forbruksvarer'};drawerOpen=false;render();}
 function goOkonomi(){view={kind:'okonomi'};drawerOpen=false;render();}
 function okonomiHubHTML(){
   var h='<div class="view-title">\u00d8konomi</div>';
@@ -618,7 +619,7 @@ function fixedListHubHTML(key,title,sub){
 }
 function listOversiktViewHTML(){
   var inv=invById(view.invId);
-  var back=inv&&inv.fixed==='utstyr'?'goUtstyr()':'goBeredskap()';
+  var back=inv&&inv.fixed==='utstyr'?'goUtstyr()':inv&&inv.fixed==='forbruksvarer'?'goForbruksvarer()':'goBeredskap()';
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+back+'">\u2039</button></div>'
     +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
     +'<div class="view-title" style="padding:0;flex:1;font-size:17px;line-height:1.2">Oversikt over det som er p\u00e5 plass</div>'
@@ -1060,6 +1061,17 @@ function load(){
         sections:[{id:'us_friluft',name:'Friluftsliv'},{id:'us_hage',name:'Hagearbeid'}],items:[]});
     }
     try{localStorage.setItem(SK+'_utstyr1','1');}catch(e){}
+    save();
+  }
+
+  // Forbruksvareliste — etter samme modell som utstyrslista
+  var fv1=false;try{fv1=!!localStorage.getItem(SK+'_forbruksvarer1');}catch(e){}
+  if(!fv1){
+    if(!inventories.some(function(iv){return iv.fixed==='forbruksvarer';})){
+      inventories.push({id:'fixed_forbruksvarer',name:'Forbruksvarer',type:'inventar',fixed:'forbruksvarer',qty:true,catId:'',fields:[],
+        sections:[{id:'fv_toalett',name:'Toalettartikler'},{id:'fv_rengjoring',name:'Rengj\u00f8ring'}],items:[]});
+    }
+    try{localStorage.setItem(SK+'_forbruksvarer1','1');}catch(e){}
     save();
   }
 
@@ -1861,11 +1873,9 @@ function toggleItemOnList(invId,itemId,targetInvId){
     var srcVals=it.values||{};
     if(listHasQty(target)&&srcVals.__qty){values.__qty=srcVals.__qty;if(srcVals.__unit)values.__unit=srcVals.__unit;}
     if(srcVals.__farge)values.__farge=srcVals.__farge;
-    if(listHasDetails(target)){
-      if(srcVals.__merke)values.__merke=srcVals.__merke;
-      if(srcVals.__tilstand)values.__tilstand=srcVals.__tilstand;
-      if(srcVals.__kjopt)values.__kjopt=srcVals.__kjopt;
-    }
+    if(srcVals.__merke)values.__merke=srcVals.__merke;
+    if(srcVals.__tilstand)values.__tilstand=srcVals.__tilstand;
+    if(listHasDetails(target)&&srcVals.__kjopt)values.__kjopt=srcVals.__kjopt;
     if(listHasExp(target)&&srcVals.__exp)values.__exp=srcVals.__exp;
     target.items=(target.items||[]).concat([{
       id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),
@@ -2908,28 +2918,31 @@ function modalHTML(){
     }
     var fargeInput='<label class="field-lbl">Farge <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc((f.values||{}).__farge||'')+'" placeholder="F.eks. mørkegrønn, rødrutete \u2026" oninput="mf().values=mf().values||{};mf().values.__farge=this.value">';
-    var detailInputs='';
-    if(listHasDetails(invT)){
+    var stdInputs=(function(){
       var dv=f.values||{};
-      detailInputs='<label class="field-lbl">Merke</label>'
-        +'<input class="inp" type="text" value="'+esc(dv.__merke||'')+'" placeholder="F.eks. Primus, Fj\u00e4llr\u00e4ven \u2026" oninput="mf().values.__merke=this.value">'
-        +'<label class="field-lbl">Kj\u00f8pt n\u00e5r og hvor <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-        +'<input class="inp" type="text" value="'+esc(dv.__kjopt||'')+'" placeholder="F.eks. 2021, eller mars 2021 hos XXL" oninput="mf().values.__kjopt=this.value">'
-        +'<label class="field-lbl">Kvittering</label>'
-        +'<div class="chips">'
-          +'<button class="chip'+(dv.__kvitt==='ja'?' on':'')+'" onclick="setItemVal(\'__kvitt\',\'ja\')">Ja</button>'
-          +'<button class="chip'+(dv.__kvitt==='nei'?' on':'')+'" onclick="setItemVal(\'__kvitt\',\'nei\')">Nei</button>'
-        +'</div>'
-        +'<div class="hint">Tips: Samle alle de fysiske kvitteringene dine ett sted. Ta bilde av dem og legg i en mappe sammen med digitale kvitteringer. Print ut viktige digitale kvitteringer.</div>'
-        +'<label class="field-lbl">Tilstand</label>'
+      return'<label class="field-lbl">Merke <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+        +'<input class="inp" type="text" value="'+esc(dv.__merke||'')+'" placeholder="F.eks. Primus, Fj\u00e4llr\u00e4ven \u2026" oninput="mf().values=mf().values||{};mf().values.__merke=this.value">'
+        +'<label class="field-lbl">Tilstand <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
         +'<div class="chips">'+TILSTAND.map(function(t){
-            return'<button class="chip'+(dv.__tilstand===t?' on':'')+'" onclick="setItemVal(\'__tilstand\',\''+q(t)+'\')">'+esc(t)+'</button>';
+            return'<button class="chip'+(dv.__tilstand===t?' on':'')+'" onclick="mf().values=mf().values||{};setItemVal(\'__tilstand\',\''+q(t)+'\')">'+esc(t)+'</button>';
           }).join('')+'<br></div>'
         +(dv.__tilstand==='M\u00e5 erstattes'
           ?(f._erstattSendt
             ?'<div class="hint-box" style="color:var(--red)">Lagt p\u00e5 innkj\u00f8pslista som \u00abErstattes: '+esc((f.name||'').trim())+'\u00bb.</div>'
             :'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" onclick="invItemErstatt()">Send \u00abErstattes: '+esc((f.name||'').trim())+'\u00bb til innkj\u00f8pslista</button>')
           :'');
+    })();
+    var detailInputs='';
+    if(listHasDetails(invT)){
+      var dv=f.values||{};
+      detailInputs='<label class="field-lbl">Kj\u00f8pt n\u00e5r og hvor <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+        +'<input class="inp" type="text" value="'+esc(dv.__kjopt||'')+'" placeholder="F.eks. 2021, eller mars 2021 hos XXL" oninput="mf().values.__kjopt=this.value">'
+        +'<label class="field-lbl">Kvittering</label>'
+        +'<div class="chips">'
+          +'<button class="chip'+(dv.__kvitt==='ja'?' on':'')+'" onclick="setItemVal(\'__kvitt\',\'ja\')">Ja</button>'
+          +'<button class="chip'+(dv.__kvitt==='nei'?' on':'')+'" onclick="setItemVal(\'__kvitt\',\'nei\')">Nei</button>'
+        +'</div>'
+        +'<div class="hint">Tips: Samle alle de fysiske kvitteringene dine ett sted. Ta bilde av dem og legg i en mappe sammen med digitale kvitteringer. Print ut viktige digitale kvitteringer.</div>';
     }
     var fieldInputs=(invT.fields||[]).map(function(fd){
       var kind=fieldNumKind(fd);
@@ -2953,8 +2966,9 @@ function modalHTML(){
       +qtyInput
       +plassInput
       +expInput
-      +detailInputs
       +fargeInput
+      +stdInputs
+      +detailInputs
       +fieldInputs
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'
@@ -3350,6 +3364,7 @@ function sidebarHTML(){
   h+='<div class="side-month'+(view.kind==='beredskap'?'" style="color:var(--red)':'')+'" onclick="goBeredskap()"><span class="s-arrow"></span>Beredskap</div>';
   h+='<div class="side-month'+(view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goBursdager()"><span class="s-arrow"></span>Bursdager</div>';
   h+='<div class="side-month'+(view.kind==='utstyr'?'" style="color:var(--red)':'')+'" onclick="goUtstyr()"><span class="s-arrow"></span>Utstyr</div>';
+  h+='<div class="side-month'+(view.kind==='forbruksvarer'?'" style="color:var(--red)':'')+'" onclick="goForbruksvarer()"><span class="s-arrow"></span>Forbruksvarer</div>';
   h+='<div class="side-month'+(view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goOkonomi()"><span class="s-arrow"></span>\u00d8konomi</div>';
   h+='<div class="side-month'+(view.kind==='lister'?'" style="color:var(--red)':'')+'" onclick="goLister()"><span class="s-arrow"></span>Lister</div>';
   return h;
@@ -4814,7 +4829,7 @@ function inventarViewHTML(){
 
   var isPack=(inv.type||'inventar')==='pakke';
   var isProj=(inv.type||'inventar')==='prosjekt';
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+(isProj?'goPlanleggingProsjekt()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='anskaffelser'?'goOkonomi()':'goLister()')+'">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+(isProj?'goPlanleggingProsjekt()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='forbruksvarer'?'goForbruksvarer()':inv.fixed==='anskaffelser'?'goOkonomi()':'goLister()')+'">\u2039</button></div>'
     +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
     +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
@@ -4908,12 +4923,10 @@ function inventarViewHTML(){
     var plTxt=listHasPlass(inv)?itemPlaceTxt(it):'';
     var expSt=listHasExp(inv)?expStatus((it.values||{}).__exp):null;
     var dRow=[];
-    if(listHasDetails(inv)){
-      var dvv=it.values||{};
-      if(dvv.__merke)dRow.push(esc(dvv.__merke));
-      if(dvv.__tilstand)dRow.push('<span style="color:'+(dvv.__tilstand==='M\u00e5 erstattes'?'var(--red)':dvv.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(dvv.__tilstand)+'</span>');
-      if(dvv.__kjopt)dRow.push('kj\u00f8pt '+esc(dvv.__kjopt));
-    }
+    var dvv=it.values||{};
+    if(dvv.__merke)dRow.push(esc(dvv.__merke));
+    if(dvv.__tilstand)dRow.push('<span style="color:'+(dvv.__tilstand==='M\u00e5 erstattes'?'var(--red)':dvv.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(dvv.__tilstand)+'</span>');
+    if(listHasDetails(inv)&&dvv.__kjopt)dRow.push('kj\u00f8pt '+esc(dvv.__kjopt));
     var twoBtn=listHasDetails(inv);
     return'<div class="entry-row">'
       +(twoBtn?'':'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>')
@@ -4951,7 +4964,7 @@ function inventarViewHTML(){
   else secs.sort(function(a,b){return nbSort(a.name,b.name);});
   var lone=(inv.items||[]).filter(function(it){return!it.sectionId||!secs.some(function(sc){return sc.id===it.sectionId;});});
 
-  if(inv.fixed==='utstyr'){
+  if(inv.fixed==='utstyr'||inv.fixed==='forbruksvarer'){
     var countRec=function(sc){
       var direct=(inv.items||[]).filter(function(it){return it.sectionId===sc.id;}).length;
       var kidsOf=secs.filter(function(x){return x.parentId===sc.id;});
@@ -4961,8 +4974,8 @@ function inventarViewHTML(){
     var curSec=curId?secs.find(function(s){return s.id===curId;}):null;
     var kids=secs.filter(function(sc){return(sc.parentId||'')===(curId||'');}).sort(function(a,b){return nbSort(a.name,b.name);});
     if(curSec){
-      var upName=utstyrDrill.length>1?(secs.find(function(s){return s.id===utstyrDrill[utstyrDrill.length-2];})||{}).name:'Utstyr';
-      h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="utstyrDrillBack()">\u2039 '+esc(upName||'Utstyr')+'</button></div>';
+      var upName=utstyrDrill.length>1?(secs.find(function(s){return s.id===utstyrDrill[utstyrDrill.length-2];})||{}).name:inv.name;
+      h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="utstyrDrillBack()">\u2039 '+esc(upName||inv.name)+'</button></div>';
       h+='<div style="padding:6px 12px 0;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(curSec.name)+'</div>';
     }
     if(kids.length){
@@ -5189,41 +5202,43 @@ function kategorierViewHTML(){
   }
   h+='<button class="add-btn" onclick="openNewMainCat()">+ Lag din egen kategori</button>';
 
-  // Utstyrstyper — overskriftene i utstyrslista, forvaltet samlet
-  var utInv=findFixedList('utstyr');
-  h+='<div class="sec-title" style="margin-top:14px">Utstyrstyper</div>'
-    +'<div class="view-sub">Overskriftene i utstyrslista \u2014 de du bruker for \u00e5 dele utstyret inn i typer, som kj\u00f8kkenutstyr eller verkt\u00f8y.</div>';
-  if(utInv){
-    var uSecs=(utInv.sections||[]).slice().sort(function(a,b){return nbSort(a.name,b.name);});
-    var uMains=uSecs.filter(function(s){return!s.parentId;});
-    if(!uMains.length){
-      h+='<div class="card"><div class="empty">Ingen utstyrstyper enn\u00e5.</div></div>';
+  // Typer — overskriftene i utstyrslista og forbruksvarelista, forvaltet samlet
+  var typeManagerHTML=function(fixedKey,heading,exampleTxt,newLabel,emptyTxt,notFoundTxt){
+    var tInv=findFixedList(fixedKey);
+    var hh='<div class="sec-title" style="margin-top:14px">'+esc(heading)+'</div>'
+      +'<div class="view-sub">'+exampleTxt+'</div>';
+    if(!tInv)return hh+'<div class="card"><div class="empty">'+esc(notFoundTxt)+'</div></div>';
+    var tSecs=(tInv.sections||[]).slice().sort(function(a,b){return nbSort(a.name,b.name);});
+    var tMains=tSecs.filter(function(s){return!s.parentId;});
+    if(!tMains.length){
+      hh+='<div class="card"><div class="empty">'+esc(emptyTxt)+'</div></div>';
     } else {
-      var uCount=function(sc){
-        var direct=(utInv.items||[]).filter(function(it){return it.sectionId===sc.id;}).length;
-        var kids=uSecs.filter(function(x){return x.parentId===sc.id;});
-        return direct+kids.reduce(function(a,k){return a+uCount(k);},0);
+      var tCount=function(sc){
+        var direct=(tInv.items||[]).filter(function(it){return it.sectionId===sc.id;}).length;
+        var kids=tSecs.filter(function(x){return x.parentId===sc.id;});
+        return direct+kids.reduce(function(a,k){return a+tCount(k);},0);
       };
-      var uLine=function(sc,indent){
-        var cnt=uCount(sc);
+      var tLine=function(sc,indent){
+        var cnt=tCount(sc);
         return'<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 14px'+(indent?' 6px 28px':'')+'">'
           +'<div style="flex:1"><div style="font-size:13px;'+(indent?'':'font-weight:700')+'">'+esc(sc.name)+'</div>'
           +'<div style="font-size:11px;color:'+(cnt?'var(--muted)':'var(--amber)')+'">'+(cnt?cnt+' oppf\u00f8ring'+(cnt===1?'':'er'):'\u26a0\ufe0e ikke i bruk')+'</div>'
           +'</div>'
-          +'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="openEditInvSec(\''+q(utInv.id)+'\',\''+q(sc.id)+'\')">\u270e</button>'
+          +'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="openEditInvSec(\''+q(tInv.id)+'\',\''+q(sc.id)+'\')">\u270e</button>'
           +'</div>';
       };
-      h+='<div class="card">';
-      uMains.forEach(function(mc){
-        h+=uLine(mc,false);
-        uSecs.filter(function(s){return s.parentId===mc.id;}).forEach(function(sc){h+=uLine(sc,true);});
+      hh+='<div class="card">';
+      tMains.forEach(function(mc){
+        hh+=tLine(mc,false);
+        tSecs.filter(function(s){return s.parentId===mc.id;}).forEach(function(sc){hh+=tLine(sc,true);});
       });
-      h+='</div>';
+      hh+='</div>';
     }
-    h+='<button class="add-btn" onclick="openInvSecModal(\''+q(utInv.id)+'\',\'\')">+ Ny utstyrstype</button>';
-  } else {
-    h+='<div class="card"><div class="empty">Fant ikke utstyrslista.</div></div>';
-  }
+    hh+='<button class="add-btn" onclick="openInvSecModal(\''+q(tInv.id)+'\',\'\')">'+esc(newLabel)+'</button>';
+    return hh;
+  };
+  h+=typeManagerHTML('utstyr','Utstyrstyper','Overskriftene i utstyrslista \u2014 de du bruker for \u00e5 dele utstyret inn i typer, som kj\u00f8kkenutstyr eller verkt\u00f8y.','+ Ny utstyrstype','Ingen utstyrstyper enn\u00e5.','Fant ikke utstyrslista.');
+  h+=typeManagerHTML('forbruksvarer','Forbruksvaretyper','Overskriftene i forbruksvarelista \u2014 de du bruker for \u00e5 dele forbruksvarene inn i typer, som toalettartikler eller rengj\u00f8ring.','+ Ny forbruksvaretype','Ingen forbruksvaretyper enn\u00e5.','Fant ikke forbruksvarelista.');
   return h;
 }
 
@@ -5642,6 +5657,7 @@ function render(){
   else if(view.kind==='lister')content=listerViewHTML();
   else if(view.kind==='beredskap')content=fixedListHubHTML('beredskap','Beredskap','Det du trenger for \u00e5 klare deg selv en uke.');
   else if(view.kind==='utstyr')content=fixedListHubHTML('utstyr','Utstyr','Ting du eier, ordnet etter bruk og plassering.');
+  else if(view.kind==='forbruksvarer')content=fixedListHubHTML('forbruksvarer','Forbruksvarer','Ting som brukes opp og m\u00e5 fylles p\u00e5, ordnet etter type og plassering.');
   else if(view.kind==='okonomi')content=okonomiHubHTML();
   else if(view.kind==='listoversikt')content=listOversiktViewHTML();
   else if(view.kind==='venteliste')content=ventelisteViewHTML();
