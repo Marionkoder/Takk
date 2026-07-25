@@ -378,6 +378,12 @@ var BEREDSKAP_SEKSJONER=[
   {id:'bs_transport',name:'Transport'},
   {id:'bs_dokumenter',name:'Viktige dokumenter'}
 ];
+var PAKKE_DEFAULT_SEKSJONER=[
+  {id:'pk_klaer',name:'Klær'},
+  {id:'pk_sko',name:'Sko'},
+  {id:'pk_toalett',name:'Toalettsaker'},
+  {id:'pk_lesestoff',name:'Lesestoff'}
+];
 var BEREDSKAP_NYE3=['bs_betaling','bs_kommunikasjon','bs_lys','bs_dokumenter'];
 var BEREDSKAP_FORSLAG={
   bs_drikke:[{n:'Drikkevann',u:'liter'},{n:'Kaffe'}],
@@ -1075,6 +1081,19 @@ function load(){
     save();
   }
 
+  // Standard-overskrifter på alle pakkelister (nye og eksisterende)
+  var pk1=false;try{pk1=!!localStorage.getItem(SK+'_pakkedefault1');}catch(e){}
+  if(!pk1){
+    inventories.filter(function(iv){return(iv.type||'inventar')==='pakke';}).forEach(function(iv){
+      iv.sections=iv.sections||[];
+      PAKKE_DEFAULT_SEKSJONER.forEach(function(x){
+        if(!iv.sections.some(function(sc){return sc.id===x.id;}))iv.sections.push({id:x.id,name:x.name});
+      });
+    });
+    try{localStorage.setItem(SK+'_pakkedefault1','1');}catch(e){}
+    save();
+  }
+
   // Utemøbler med underkategorier
   var uts2=false;try{uts2=!!localStorage.getItem(SK+'_utstyr2');}catch(e){}
   if(!uts2){
@@ -1288,6 +1307,22 @@ function evFreqTxt(e){
   return iv===1?'hvert \u00e5r':'hvert '+iv+'. \u00e5r';
 }
 function evDone(e,year){return e.repeat?(e.log||[]).includes(Number(year)):!!e.done;}
+function eventIsPast(e){
+  if(e.repeat)return false;
+  var y=Number(e.year),m=Number(e.month),d=e.day?Number(e.day):null;
+  var end;
+  if(d){
+    if(e.toDay){
+      var wraps=(e.toMonth<m)||(e.toMonth===m&&e.toDay<d);
+      end=new Date(y+(wraps?1:0),e.toMonth-1,e.toDay,23,59,59);
+    } else {
+      end=new Date(y,m-1,d,23,59,59);
+    }
+  } else {
+    end=new Date(y,m,0,23,59,59);
+  }
+  return end.getTime()<today.getTime();
+}
 function evYears(e,y){var s=Number(e.sinceYear);return s>0&&y-s>0?y-s:null;}
 function evYearsTag(e,y,light){
   var n=evYears(e,y);if(n===null)return'';
@@ -1852,7 +1887,9 @@ function resetPackChecks(invId){
   (inv.items||[]).forEach(function(it){it.have=false;});
   save();render();
 }
-function openInvPick(targetId,lockedSrcId){modal={step:'invpick',form:{targetId:targetId,srcId:lockedSrcId||'',lockedSrc:!!lockedSrcId}};render();}
+function openInvPick(targetId,lockedSrcId){modal={step:'invpick',form:{targetId:targetId,srcId:lockedSrcId||'',lockedSrc:!!lockedSrcId,_pickDrill:[]}};render();}
+function invPickDrillInto(id){var f=mf();f._pickDrill=(f._pickDrill||[]).concat([id]);render();}
+function invPickDrillBack(){var f=mf();f._pickDrill=(f._pickDrill||[]);f._pickDrill.pop();render();}
 function itemOnList(item,targetInv){
   if(!item.syncId)return null;
   return(targetInv.items||[]).find(function(x){return x.syncId===item.syncId;})||null;
@@ -1982,7 +2019,7 @@ function syncProjectResult(inv,f){
 function submitInv(){
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var catIds=f.type==='prosjekt'?(f.catIds||[]):[];
-  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.type==='prosjekt'?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:[],items:[]};
+  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.type==='prosjekt'?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:f.type==='pakke'?JSON.parse(JSON.stringify(PAKKE_DEFAULT_SEKSJONER)):[],items:[]};
   syncProjectResult(inv,f);
   inventories.push(inv);save();closeModal();goInventar(inv.id);
 }
@@ -2607,20 +2644,58 @@ function modalHTML(){
     var sources=inventories.filter(function(iv){return(iv.type||'inventar')==='inventar'&&iv.id!==f.targetId;})
       .sort(function(a,b){return nbSort(a.name,b.name);});
     var srcChips=sources.map(function(iv){
-      return'<button class="chip'+(f.srcId===iv.id?' on':'')+'" onclick="mf().srcId=\''+q(iv.id)+'\';render()">'+esc(iv.name)+'</button>';
+      return'<button class="chip'+(f.srcId===iv.id?' on':'')+'" onclick="mf().srcId=\''+q(iv.id)+'\';mf()._pickDrill=[];render()">'+esc(iv.name)+'</button>';
     }).join('')||'<div class="hint">Ingen inventarlister enn\u00e5.</div>';
     var itemsHtml='';
     if(f.srcId){
       var src=invById(f.srcId);
-      var srcItems=(src&&src.items||[]).slice().sort(function(a,b){return nbSort(a.name,b.name);});
-      itemsHtml=srcItems.map(function(it){
-        var on=!!(it.syncId&&itemOnList(it,target));
-        return'<div class="entry-row">'
-          +'<button class="chk'+(on?' done':'')+'" onclick="toggleItemOnList(\''+q(f.srcId)+'\',\''+q(it.id)+'\',\''+q(f.targetId)+'\')">'+(on?'\u2713':'')+'</button>'
-          +'<div class="entry-body"><div class="entry-text">'+esc(it.name)+'</div>'
-          +(it.note?'<div class="entry-date">'+esc(it.note)+'</div>':'')
-          +'</div></div>';
-      }).join('')||'<div class="hint">Denne lista har ingen punkter.</div>';
+      if(src){
+        var pinOrder=['Kl\u00e6r','Sko'];
+        var sortTop=function(a,b){
+          var ia=pinOrder.indexOf(a.name),ib=pinOrder.indexOf(b.name);
+          if(ia<0)ia=99;if(ib<0)ib=99;
+          if(ia!==ib)return ia-ib;
+          return nbSort(a.name,b.name);
+        };
+        var pSecs=(src.sections||[]).slice();
+        var pDrill=f._pickDrill||[];
+        var pCurId=pDrill.length?pDrill[pDrill.length-1]:null;
+        var pCurSec=pCurId?pSecs.find(function(s){return s.id===pCurId;}):null;
+        var pKids=pSecs.filter(function(sc){return(sc.parentId||'')===(pCurId||'');});
+        pKids.sort(pCurId?function(a,b){return nbSort(a.name,b.name);}:sortTop);
+        var pCountRec=function(sc){
+          var direct=(src.items||[]).filter(function(it){return it.sectionId===sc.id;}).length;
+          var kk=pSecs.filter(function(x){return x.parentId===sc.id;});
+          return direct+kk.reduce(function(a,k){return a+pCountRec(k);},0);
+        };
+        if(pCurSec){
+          var pUp=pDrill.length>1?(pSecs.find(function(s){return s.id===pDrill[pDrill.length-2];})||{}).name:src.name;
+          itemsHtml+='<button class="icon-btn" style="font-size:11px;margin-bottom:6px" onclick="invPickDrillBack()">\u2039 '+esc(pUp||src.name)+'</button>';
+        }
+        if(pKids.length){
+          itemsHtml+=pKids.map(function(sc){
+            var cnt=pCountRec(sc);
+            return'<div class="entry-row" style="cursor:pointer" onclick="invPickDrillInto(\''+q(sc.id)+'\')">'
+              +'<div class="entry-body"><div class="entry-text" style="font-weight:700">'+esc(sc.name)+'</div>'
+              +'<div class="entry-date">'+cnt+' oppf\u00f8ring'+(cnt===1?'':'er')+'</div></div>'
+              +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
+              +'</div>';
+          }).join('');
+        }
+        var pLoneItems=(pCurSec?(src.items||[]).filter(function(it){return it.sectionId===pCurSec.id;}):(src.items||[]).filter(function(it){return!it.sectionId||!pSecs.some(function(sc){return sc.id===it.sectionId;});})).slice().sort(function(a,b){return nbSort(a.name,b.name);});
+        if(pLoneItems.length){
+          itemsHtml+=pLoneItems.map(function(it){
+            var on=!!(it.syncId&&itemOnList(it,target));
+            return'<div class="entry-row">'
+              +'<button class="chk'+(on?' done':'')+'" onclick="toggleItemOnList(\''+q(f.srcId)+'\',\''+q(it.id)+'\',\''+q(f.targetId)+'\')">'+(on?'\u2713':'')+'</button>'
+              +'<div class="entry-body"><div class="entry-text">'+esc(it.name)+'</div>'
+              +(it.note?'<div class="entry-date">'+esc(it.note)+'</div>':'')
+              +'</div></div>';
+          }).join('');
+        } else if(!pKids.length){
+          itemsHtml+='<div class="hint">Ingen punkter her.</div>';
+        }
+      }
     }
     body='<div class="modal-title">'+(f.lockedSrc?'Hent fra utstyrslista':'Hent fra inventarlistene')+'</div>'
       +'<div class="hint">Hak av det som skal med p\u00e5 \u00ab'+esc(target?target.name:'')+'\u00bb. Punktene kopieres og kobles, s\u00e5 du ser p\u00e5 inventarpunktet hvilke lister det er med p\u00e5.</div>'
@@ -2825,10 +2900,10 @@ function modalHTML(){
         :f.type==='pakke'
         ?(f.pakkeFast?''
           :'<label class="field-lbl">Hendelse <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 minst \u00e9n</span></label>'
-           +'<div class="chips">'+(events.filter(function(e){return!e.bday;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
+           +'<div class="chips">'+(events.filter(function(e){return!e.bday&&(!eventIsPast(e)||(f.eventIds||[]).includes(e.id));}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
               var on=(f.eventIds||[]).includes(e.id);
               return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormEventId(\''+q(e.id)+'\')">'+esc(e.name)+'</button>';
-            }).join('')||'<div class="hint">Ingen hendelser enn\u00e5 \u2014 legg inn turen eller anledningen under Hendelser f\u00f8rst.</div>')+'</div>'
+            }).join('')||'<div class="hint">Ingen kommende hendelser enn\u00e5 \u2014 legg inn turen eller anledningen under Hendelser f\u00f8rst.</div>')+'</div>'
            +((f.eventIds||[]).length?'':'<div class="hint" style="color:var(--amber)">En pakkeliste m\u00e5 knyttes til hendelsen den pakkes for.</div>'))
         :'<label class="field-lbl">Hovedkategori</label>'
          +'<div class="chips">'+cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(c){
