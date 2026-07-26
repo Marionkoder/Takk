@@ -3493,6 +3493,33 @@ function evShort(e){
   if(!e.month)return '';
   return (e.day?e.day+'. ':'')+MND_FULL[e.month-1].slice(0,3);
 }
+function routineDoneNow(r){
+  var log=r.log||[];
+  var months=r.months||[];
+  if(months.length&&!months.includes(curMonth))return null; // ikke satt opp denne måneden
+  if(r.freq==='daily'){
+    return log.includes('d'+isoDate(today));
+  }
+  if(r.freq==='yearly'){
+    return log.includes('y'+curYear);
+  }
+  if(isWeekly(r)){
+    var wk=weekNum(today);
+    if(r.freq==='odd'&&wk%2===0)return null;
+    if(r.freq==='even'&&wk%2===1)return null;
+    var wKey='w'+weekYear(today)+'-'+pad(wk);
+    var n=Number(r.perWeek)||1;
+    if(n<=1)return log.includes(wKey);
+    for(var gi=1;gi<=n;gi++){if(!log.includes(wKey+'#'+gi))return false;}
+    return true;
+  }
+  return log.includes(curYear+'-'+pad(curMonth));
+}
+function routineStatusStyle(r){
+  var d=routineDoneNow(r);
+  if(d===null)return'';
+  return d?'background:#E1F1DE':'background:#FDF3C7';
+}
 function resultStatus(r){
   if(!r)return null;
   if(r.achieved)return'maintained';
@@ -3558,7 +3585,7 @@ function oversiktViewHTML(){
         +(r.res?esc(r.res.name)+'<div style="font-size:10px;color:var(--muted)">'+(r.res.startMonth&&r.res.startYear?MND_FULL[r.res.startMonth-1].slice(0,3)+' '+r.res.startYear+' \u2013 ':'')+MND_FULL[r.res.month-1].slice(0,3)+' '+r.res.year+((r.res.milestones||[]).length?' \u00b7 '+(r.res.milestones||[]).filter(function(m){return m.done;}).length+'/'+(r.res.milestones||[]).length+' milepæler':'')+'</div>':'<span style="color:var(--muted)">\u2013</span>')
         +'</td>';
     }
-    var rtSt=(r.rt&&r.resCtx)?resultStatusStyle(resultStatus(r.resCtx)):'';
+    var rtSt=r.rt?routineStatusStyle(r.rt):'';
     t+='<td style="'+cellS+';'+topB+rtSt+';'+(r.rt?'cursor:pointer':'')+'"'+(r.rt?' onclick="openEditRoutine(\''+q(r.rt.id)+'\')"':'')+'>'
       +(r.rt?esc(r.rt.name)+'<div style="font-size:10px;color:var(--muted)">'+esc(freqShort(r.rt))+'</div>':'')+'</td>';
     t+='<td style="'+cellS+';'+topB+(r.ev?'cursor:pointer':'')+'"'+(r.ev?' onclick="openEditEvent(\''+q(r.ev.id)+'\')"':'')+'>'
@@ -3568,9 +3595,10 @@ function oversiktViewHTML(){
   t+='</table></div>';
   h+=t;
   h+='<div style="padding:6px 12px 0;font-size:10.5px;color:var(--muted)">'
-    +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#FDF3C7;margin-right:4px;vertical-align:middle"></span>Aktiv'
-    +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#E1F1DE;margin-right:4px;vertical-align:middle"></span>Vedlikeholdes'
+    +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#FDF3C7;margin-right:4px;vertical-align:middle"></span>Aktiv / ikke hakt av enn\u00e5'
+    +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#E1F1DE;margin-right:4px;vertical-align:middle"></span>Vedlikeholdes / hakt av'
     +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--line);opacity:.5;margin-right:4px;vertical-align:middle"></span>Ikke startet'
+    +'<div style="margin-top:2px">Resultater f\u00e5rger etter startdato og oppn\u00e5dd-status. Rutiner f\u00e5rger etter om de er hakt av for gjeldende dag/uke/m\u00e5ned/\u00e5r, uavhengig av resultatet de er koblet til.</div>'
     +'</div>';
   // Uten kobling
   var freeR=routines.filter(function(x){return !(x.goalIds||[]).length&&!(x.resultIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
