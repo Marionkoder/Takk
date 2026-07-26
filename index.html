@@ -100,16 +100,16 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .col-sw.none{background:transparent;border:1.5px dashed var(--muted);color:var(--muted);font-size:11px}
 .col-sw.none.on{border:2px solid var(--ink);box-shadow:none}
 /* Konfetti på runde bursdager */
-.milestone-glow{background-image:linear-gradient(rgba(242,238,229,.88),rgba(242,238,229,.88)),linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%);background-repeat:no-repeat;background-size:100% 100%;background-attachment:fixed}
+.milestone-glow{background-image:linear-gradient(rgba(242,238,229,.28),rgba(242,238,229,.28)),linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%);background-repeat:no-repeat;background-size:100% 100%;background-attachment:fixed}
 .confetti{position:relative;overflow:hidden}
 .confetti i{position:absolute;top:-10px;width:5px;height:9px;border-radius:1px;opacity:.85;pointer-events:none;animation:cfall 2.8s linear infinite}
 .shimmer{position:relative;overflow:hidden}
 .shimmer::after{content:'';position:absolute;top:0;left:-60%;width:60%;height:100%;pointer-events:none;
   background:linear-gradient(75deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.65) 50%,rgba(255,255,255,0) 70%);
-  animation:shimmersweep 1.7s ease-out 1}
+  animation:shimmersweep 3s ease-out infinite}
 .starshower{position:relative;overflow:hidden}
 .starshower i{position:absolute;top:-14px;font-style:normal;font-size:13px;opacity:0;pointer-events:none;animation:starfall 2.6s ease-in infinite}
-@keyframes shimmersweep{0%{left:-60%}100%{left:120%}}
+@keyframes shimmersweep{0%{left:-60%}35%{left:120%}100%{left:120%}}
 @keyframes starfall{0%{transform:translateY(-14px) rotate(0deg);opacity:0}12%{opacity:1}100%{transform:translateY(150px) rotate(70deg);opacity:0}}
 @keyframes cfall{0%{transform:translateY(-12px) rotate(0deg)}100%{transform:translateY(52px) rotate(340deg)}}
 @media (prefers-reduced-motion:reduce){.confetti i{animation:none;display:none}}
@@ -4028,11 +4028,10 @@ function confettiHTML(){
   return h;
 }
 function starShowerHTML(){
-  var stars=['\u2726','\u2727','\u2605','\u2739'];
-  var cols=['#8C5A74','#CC7F33','#4E7B8C','#A34A5E','#8B7A9E'];
+  var cols=['#E2C878','#D4A017','#CC7F33','#F0C420','#B8860B'];
   var h='';
   for(var i=0;i<9;i++){
-    h+='<i style="left:'+(4+i*10.5)+'%;color:'+cols[i%cols.length]+';animation-delay:'+(i*0.28).toFixed(2)+'s">'+stars[i%stars.length]+'</i>';
+    h+='<i style="left:'+(4+i*10.5)+'%;color:'+cols[i%cols.length]+';animation-delay:'+(i*0.28).toFixed(2)+'s">\u2605</i>';
   }
   return h;
 }
@@ -5446,133 +5445,23 @@ function kategorierViewHTML(){
 
 function budsjettViewHTML(){
   var y=view.year;
-  var qSel=view.q;
-  var h='<div style="display:flex;align-items:center;gap:6px;padding:14px 12px 0">'
+  var scope=view.q==='m'?'m':'\u00e5r'; // 'm' = måned, ellers år
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goOkonomi()">\u2039</button></div>'
+    +'<div class="view-title">Budsjett og regnskap</div>'
+    +'<div class="view-sub">Nytt oppsett under arbeid: m\u00e5neds- og \u00e5rsregnskap for prioriterte resultater, prosjekter og rutiner.</div>';
+  h+='<div style="display:flex;align-items:center;gap:6px;padding:10px 12px 0">'
     +'<button class="icon-btn" onclick="goBudsjett('+(y-1)+',view.q)">\u2039</button>'
-    +'<div class="view-title" style="padding:0;flex:1">Budsjett og regnskap \u00b7 '+y+'</div>'
+    +'<div style="flex:1;text-align:left;font-size:15px;font-weight:700">'+y+'</div>'
     +'<button class="icon-btn" onclick="goBudsjett('+(y+1)+',view.q)">\u203a</button>'
     +'</div>';
-  h+='<div class="chips" style="justify-content:center;padding:8px 12px 0">'
-    +[1,2,3,4].map(function(qn){
-      return'<button class="chip'+(qSel===qn?' on':'')+'" onclick="goBudsjett('+y+','+qn+')">'+KVARTAL[qn-1]+'</button>';
-    }).join('')
-    +'<button class="chip'+(qSel==='\u00e5r'?' on':'')+'" onclick="goBudsjett('+y+',\'\u00e5r\')">\u00c5ret</button>'
+  h+='<div class="chips" style="padding:8px 12px 0">'
+    +'<button class="chip'+(scope==='m'?' on':'')+'" onclick="goBudsjett('+y+',\'m\')">M\u00e5ned</button>'
+    +'<button class="chip'+(scope==='\u00e5r'?' on':'')+'" onclick="goBudsjett('+y+',\'\u00e5r\')">\u00c5r</button>'
     +'</div>';
-
-  var yearRows=budgetRows.filter(function(b){return b.year===y;});
-  var sumField=function(row,field){return row[field].reduce(function(a,v){return a+(v===null?0:v);},0);};
-  var pOf=function(row){return qSel==='\u00e5r'?sumField(row,'plan'):(row.plan[qSel-1]||0);};
-  var aOf=function(row){return qSel==='\u00e5r'?sumField(row,'actual'):(row.actual[qSel-1]||0);};
-
-  var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
-
-  // avvik: positivt = bedre enn plan (inntekt: faktisk-plan, utgift: plan-faktisk)
-  var renderSection=function(type,label){
-    var rows=yearRows.filter(function(b){return(b.type==='in'?'in':'ut')===type;});
-    if(!rows.length)return{html:'',p:0,a:0,any:false};
-    var secP=0,secA=0;
-    var hh='<div style="padding:8px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+label+'</div>'
-      +'<div style="display:flex;gap:8px;padding:0 14px 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'
-      +'<span style="flex:1"></span><span style="width:76px;text-align:right">Plan</span><span style="width:76px;text-align:right">Faktisk</span><span style="width:60px;text-align:right">Avvik</span></div>';
-
-    var sign=type==='ut'?'\u2212':'';
-    var rowLine=function(row,name,indent,computed,col){
-      var p=computed?row.p:pOf(row);
-      var a=computed?row.a:aOf(row);
-      var hasA=computed?(row.hasA||false):(qSel==='\u00e5r'?row.actual.some(function(v){return v!==null;}):row.actual[qSel-1]!==null);
-      var diff=type==='in'?(a-p):(p-a);
-      var pCell,aCell;
-      if(computed||qSel==='\u00e5r'){
-        pCell='<span style="width:76px;text-align:right;font-size:13px">'+(p?sign:'')+fmtKr(p)+'</span>';
-        aCell='<span style="width:76px;text-align:right;font-size:13px">'+(hasA?(a?sign:'')+fmtKr(a):'\u2013')+'</span>';
-      } else {
-        pCell=budgetCellHTML(row,qSel-1,'plan');
-        aCell=budgetCellHTML(row,qSel-1,'actual');
-      }
-      var dTxt=hasA?'<span style="width:60px;text-align:right;font-size:12px;color:'+(diff<0?'var(--amber)':'var(--muted)')+'">'+(diff>0?'+':'')+fmtKr(diff)+'</span>':'<span style="width:60px"></span>';
-      var noteHtml='';
-      if(!computed){
-        var noteFor=function(qi){
-          var pn=(row.planNote||[])[qi],an=(row.actualNote||[])[qi];
-          if(!pn&&!an)return'';
-          var pre=qSel==='\u00e5r'?'Q'+(qi+1)+': ':'';
-          return'<div style="font-size:10px;line-height:1.4;color:var(--muted);font-style:italic;padding:0 14px 2px '+(indent?'28px':'14px')+'">'
-            +pre+(pn?esc(pn):'')+(pn&&an?' \u00b7 ':'')+(an?'regnskap: '+esc(an):'')+'</div>';
-        };
-        noteHtml=qSel==='\u00e5r'?[0,1,2,3].map(noteFor).join(''):noteFor(qSel-1);
-      }
-      return'<div style="display:flex;align-items:center;gap:8px;padding:4px 14px">'
-        +'<span style="width:3px;border-radius:2px;align-self:stretch;flex-shrink:0;background:'+(col||'transparent')+'"></span>'
-        +'<span style="flex:1;font-size:13px;'+(indent?'padding-left:14px;color:var(--muted)':'font-weight:700')+'">'+esc(name)
-        +(!computed?' <button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="openEditBudgetRow(\''+q(row.id)+'\')">\u270e</button>':'')
-        +'</span>'+pCell+aCell+dTxt+'</div>'+noteHtml;
-    };
-
-    mains.forEach(function(mc){
-      var mainRow=rows.find(function(b){return b.catId===mc.id;});
-      var subRows=rows.filter(function(b){var c=catById(b.catId);return c&&c.parentId===mc.id;})
-        .sort(function(a,b){return nbSort((catById(a.catId)||{}).name||'',(catById(b.catId)||{}).name||'');});
-      if(!mainRow&&!subRows.length)return;
-      var mCol=catColor(mc.id);
-      if(subRows.length){
-        var hasAOf=function(r){return qSel==='\u00e5r'?r.actual.some(function(v){return v!==null;}):r.actual[qSel-1]!==null;};
-        var agg={p:0,a:0,hasA:false};
-        subRows.forEach(function(r){agg.p+=pOf(r);agg.a+=aOf(r);if(hasAOf(r))agg.hasA=true;});
-        if(mainRow){agg.p+=pOf(mainRow);agg.a+=aOf(mainRow);if(hasAOf(mainRow))agg.hasA=true;}
-        hh+=rowLine(agg,mc.name,false,true,mCol);
-        if(mainRow)hh+=rowLine(mainRow,'(direkte p\u00e5 '+mc.name+')',true,false,mCol);
-        subRows.forEach(function(r){hh+=rowLine(r,(catById(r.catId)||{}).name||'?',true,false,mCol);});
-        secP+=agg.p;secA+=agg.a;
-      } else {
-        hh+=rowLine(mainRow,mc.name,false,false,mCol);
-        secP+=pOf(mainRow);secA+=aOf(mainRow);
-      }
-    });
-
-    var secHasA=rows.some(function(r){return qSel==='\u00e5r'?r.actual.some(function(v){return v!==null;}):r.actual[qSel-1]!==null;});
-    var sDiff=type==='in'?(secA-secP):(secP-secA);
-    hh+='<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-top:1px solid var(--line);border-bottom:3px double var(--muted)">'
-      +'<span style="width:3px;flex-shrink:0"></span>'
-      +'<span style="flex:1;font-size:13px;font-weight:700">Sum '+label.toLowerCase()+'</span>'
-      +'<span style="width:76px;text-align:right;font-size:13px;font-weight:700">'+(secP?sign:'')+fmtKr(secP)+'</span>'
-      +'<span style="width:76px;text-align:right;font-size:13px;font-weight:700">'+(secHasA?(secA?sign:'')+fmtKr(secA):'\u2013')+'</span>'
-      +(secHasA?'<span style="width:60px;text-align:right;font-size:12px;font-weight:700;color:'+(sDiff<0?'var(--amber)':'var(--muted)')+'">'+(sDiff>0?'+':'')+fmtKr(sDiff)+'</span>':'<span style="width:60px"></span>')+'</div>';
-    return{html:hh,p:secP,a:secA,hasA:secHasA,any:true};
-  };
-
-  var inn=renderSection('in','Inntekter');
-  var ut=renderSection('ut','Utgifter');
-
-  h+='<div class="card" style="margin-top:10px">';
-  if(!inn.any&&!ut.any){
-    h+='<div class="empty">Ingen budsjettlinjer for '+y+' enn\u00e5.</div>';
-  } else {
-    h+=inn.html+ut.html;
-    var balP=inn.p-ut.p,balA=inn.a-ut.a,balD=balA-balP;
-    var balHasA=(inn.hasA||false)||(ut.hasA||false);
-    h+='<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--bg);border-bottom:7px double var(--red)">'
-      +'<span style="width:3px;flex-shrink:0"></span>'
-      +'<span style="flex:1;font-size:13px;font-weight:700;color:var(--red)">Balanse</span>'
-      +'<span style="width:76px;text-align:right;font-size:13px;font-weight:700;color:'+(balP<0?'var(--amber)':'var(--red)')+'">'+fmtKr(balP)+'</span>'
-      +'<span style="width:76px;text-align:right;font-size:13px;font-weight:700;color:'+(balA<0?'var(--amber)':'var(--red)')+'">'+(balHasA?fmtKr(balA):'\u2013')+'</span>'
-      +(balHasA?'<span style="width:60px;text-align:right;font-size:12px;font-weight:700;color:'+(balD<0?'var(--amber)':'var(--muted)')+'">'+(balD>0?'+':'')+fmtKr(balD)+'</span>':'<span style="width:60px"></span>')+'</div>';
-  }
-  h+='</div>';
-  h+='<button class="add-btn" onclick="openBudgetLineModal()">+ Ny budsjettlinje</button>'
-    +'<button class="add-btn" onclick="openPostingModal()">+ Registrer bel\u00f8p</button>';
-
-  var saveGoals=results.filter(function(r){return r.targetAmount&&(r.amountType||'spar')==='spar';}).sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month);});
-  if(saveGoals.length){
-    h+='<div class="sec-title">Sparem\u00e5l</div><div class="card">';
-    saveGoals.forEach(function(r){
-      h+='<div class="entry-row"><div class="entry-body">'
-        +'<div class="entry-text"'+(r.achieved?' style="opacity:.55"':'')+'>'+esc(r.name)+resultDeadlineHTML(r)+'</div>'
-        +'</div>'
-        +'<button class="icon-btn" style="font-size:11px;padding:2px 8px;align-self:center" onclick="openDepositModal(\''+q(r.id)+'\')">+ innbetaling</button>'
-        +'</div>';
-    });
-    h+='</div>';
-  }
+  ['Prioriterte resultater','Prosjekter','Rutiner'].forEach(function(label){
+    h+='<div class="sec-title">'+label+'</div>'
+      +'<div class="card"><div class="empty">Ikke satt opp enn\u00e5.</div></div>';
+  });
   return h;
 }
 
