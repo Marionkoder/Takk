@@ -347,6 +347,7 @@ function giftGivers(){
 function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.name||'').trim()===(person||'').trim();});}
 var DEFAULT_UNITS=['bokser','dl','g','kg','kroner','liter','ml','n\u00f8ster','stk'];
 var customUnits=[];
+var weeklyAvailableHours=0;
 var places={l1:[],l2:[],l3:[]};
 var achievements=[];
 var achDismissed=[];
@@ -996,6 +997,7 @@ function load(){
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
+  try{weeklyAvailableHours=Number(localStorage.getItem(SK+'_availhours'))||0;}catch(e){weeklyAvailableHours=0;}
   try{places=JSON.parse(localStorage.getItem(SK+'_places')||'{"l1":[],"l2":[],"l3":[]}');}catch(e){places={l1:[],l2:[],l3:[]};}
   try{achievements=JSON.parse(localStorage.getItem(SK+'_ach')||'[]');}catch(e){achievements=[];}
   try{achDismissed=JSON.parse(localStorage.getItem(SK+'_achdis')||'[]');}catch(e){achDismissed=[];}
@@ -1209,6 +1211,7 @@ function save(){
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
+  try{localStorage.setItem(SK+'_availhours',String(weeklyAvailableHours));}catch(e){}
   try{localStorage.setItem(SK+'_places',JSON.stringify(places));}catch(e){}
   try{localStorage.setItem(SK+'_ach',JSON.stringify(achievements));}catch(e){}
   try{localStorage.setItem(SK+'_achdis',JSON.stringify(achDismissed));}catch(e){}
@@ -5755,7 +5758,7 @@ function budsjettViewHTML(){
   // men summeres sammen til én total for hvor mye tid som faktisk går med denne perioden.
   var routineItems2=routineTimeItems();
   h+='<div class="sec-title">Tid</div>';
-  var totalBrukt=0;
+  var totalBrukt=0,totalBudget=0,budgetSkipped=0;
   if(!timeItems2.length&&!routineItems2.length){
     h+='<div class="card"><div class="empty">Ingen prosjekter, resultater eller rutiner med timef\u00f8ring p\u00e5 enn\u00e5.</div></div>';
   } else {
@@ -5769,6 +5772,11 @@ function budsjettViewHTML(){
         totalBrukt+=brukt;
         var isMonthly=it.hoursMode==='monthly';
         var pace=(scope==='m'&&!isMonthly)?recommendedPaceHours(it):null;
+        if(scope==='m'){
+          if(isMonthly)totalBudget+=Number(it.hoursTotal)||0;
+          else if(pace!=null)totalBudget+=pace;
+          else if(it.hoursTotal)budgetSkipped++;
+        }
         h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 14px">'
           +'<span style="flex:1;font-size:13px">'+esc(it.name)
           +(pace!=null?'<div style="font-size:10.5px;color:var(--muted)">anbefalt \u2248'+String(pace).replace('.',',')+' t denne m\u00e5neden for \u00e5 n\u00e5 fristen</div>':'')
@@ -5790,6 +5798,7 @@ function budsjettViewHTML(){
         var forv=routineExpectedHours(r,y,m,scope);
         var brukt=hoursFor('routine',r.id,y,m,scope);
         totalBrukt+=brukt;
+        if(scope==='m')totalBudget+=forv;
         h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 14px">'
           +'<span style="flex:1;font-size:13px">'+esc(r.name)+'</span>'
           +'<span style="width:70px;text-align:right;font-size:13px">'+(forv?String(forv).replace('.',',')+' t':'<span style="color:var(--muted)">\u2013</span>')+'</span>'
@@ -5798,6 +5807,22 @@ function budsjettViewHTML(){
       });
       h+='</div>'
         +'<div style="padding:4px 12px 0;font-size:11px;color:var(--muted)">Forventet er et grovt anslag ut fra frekvensen til rutinen \u2014 ikke en fasit.</div>';
+    }
+    if(scope==='m'){
+      var avail=weeklyAvailableHours*4.345;
+      var diff=avail-totalBudget;
+      h+='<div class="card" style="margin-top:8px;padding:8px 14px">'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="flex:1;font-size:13px;font-weight:700">Timebudsjett denne m\u00e5neden</span>'
+        +'<span style="font-size:15px;font-weight:800">'+String(Math.round(totalBudget*10)/10).replace('.',',')+' t</span>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-top:4px">'
+        +'<span style="flex:1;font-size:12px;color:var(--muted)">Tilgjengelig tid \u2013 <input class="inp" type="text" inputmode="decimal" style="width:52px;text-align:right;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(weeklyAvailableHours||'')+'" placeholder="0" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\')" onchange="weeklyAvailableHours=numVal(this.value);save();render()"> t/uke \u00d7 4,35 uker</span>'
+        +(weeklyAvailableHours?'<span style="font-size:13px;font-weight:700;color:'+(diff<0?'var(--red)':'var(--muted)')+'">'+(diff<0?'\u2212':'+')+String(Math.abs(Math.round(diff*10)/10)).replace('.',',')+' t</span>':'')
+        +'</div>'
+        +(weeklyAvailableHours&&diff<0?'<div style="font-size:11.5px;color:var(--red);margin-top:4px">Du har lagt inn mer enn du har tid til denne m\u00e5neden \u2014 noe m\u00e5 vike, eller flyttes ut i tid.</div>':'')
+        +(budgetSkipped?'<div style="font-size:11px;color:var(--muted);margin-top:4px">'+budgetSkipped+' element'+(budgetSkipped>1?'er':'')+' uten frist er ikke med i budsjettet, siden det ikke finnes noe \u00e5 regne m\u00e5nedstempoet ut fra.</div>':'')
+        +'</div>';
     }
     h+='<div class="card" style="margin-top:8px;padding:8px 14px;display:flex;align-items:center;gap:8px">'
       +'<span style="flex:1;font-size:13px;font-weight:700">Totalt brukt '+(scope==='m'?'denne m\u00e5neden':'dette \u00e5ret')+'</span>'
