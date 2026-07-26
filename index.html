@@ -546,8 +546,8 @@ function goOkonomi(){view={kind:'okonomi'};drawerOpen=false;render();}
 function okonomiHubHTML(){
   var h='<div class="view-title">\u00d8konomi</div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBudsjett(curYear)">'
-    +'<div class="entry-body"><div class="entry-text">Budsjett og regnskap</div>'
-    +'<div class="entry-date">planlagt og faktisk, kvartal for kvartal</div></div>'
+    +'<div class="entry-body"><div class="entry-text">Tid og penger</div>'
+    +'<div class="entry-date">det som er disponibelt til p\u00e5g\u00e5ende prosjekter og resultater</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   var ansk=findFixedList('anskaffelser');
   if(ansk){
@@ -656,7 +656,7 @@ function listOversiktViewHTML(){
     var needsMaint=v.__tilstand==='M\u00e5 repareres eller vedlikeholdes';
     return'<div style="display:flex;align-items:baseline;gap:7px;line-height:0.5;padding:5px 14px 5px 6px;margin:1px 8px'+(needsMaint?';background:#FDF3C7;border-radius:5px':'')+'">'
       +'<span style="flex-shrink:0;color:#000;font-size:9px">\u25cf</span>'
-      +'<span style="flex:1;font-size:13px;color:var(--ink)">'+esc(it.name)+(qty?' <span style="color:var(--muted);font-size:12px">\u00b7 '+qty+'</span>':'')+'</span>'
+      +'<span style="flex:1;font-size:12px;color:var(--ink)">'+esc(it.name)+(qty?' <span style="color:var(--muted);font-size:11px">\u00b7 '+qty+'</span>':'')+'</span>'
       +'</div>';
   };
   if(!paaPlass.length){
@@ -1395,11 +1395,11 @@ function resultCatMatch(r,entryCats){
     return!!(c&&c.parentId&&sc.includes(c.parentId));
   });
 }
-function openResultModal(){modal={step:'result',form:{name:'',valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'spar',invIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
+function openResultModal(){modal={step:'result',form:{name:'',valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'spar',hoursTotal:'',invIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
 function openEditResult(id){
   var r=resultById(id);if(!r)return;
   var linkedInvs=inventories.filter(function(iv){return(iv.resultIds||[]).includes(id);}).map(function(iv){return iv.id;});
-  modal={step:'result_edit',form:{id:id,name:r.name,valueId:r.valueId,month:r.month,year:r.year,startMonth:r.startMonth||'',startYear:r.startYear||'',subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'spar',invIds:linkedInvs,budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
+  modal={step:'result_edit',form:{id:id,name:r.name,valueId:r.valueId,month:r.month,year:r.year,startMonth:r.startMonth||'',startYear:r.startYear||'',subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'spar',hoursTotal:r.hoursTotal||'',invIds:linkedInvs,budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
     forutsetninger:r.forutsetninger||'',risikoer:r.risikoer||'',
     routineIds:routines.filter(function(x){return (x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;}),
     eventIds:events.filter(function(x){return !x.bday&&(x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;})}};render();
@@ -1490,7 +1490,7 @@ function placeResultFormInBudget(){
 function submitResult(){
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId)return;
   var newId='x'+Date.now()+Math.random().toString(36).slice(2,6);
-  results.push({id:newId,name:name,valueId:f.valueId,month:Number(f.month),year:Number(f.year),startMonth:f.startMonth?Number(f.startMonth):null,startYear:f.startYear?Number(f.startYear):null,subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'spar',milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
+  results.push({id:newId,name:name,valueId:f.valueId,month:Number(f.month),year:Number(f.year),startMonth:f.startMonth?Number(f.startMonth):null,startYear:f.startYear?Number(f.startYear):null,subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'spar',hoursTotal:numVal(f.hoursTotal)||'',milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
   syncResultRoutines(newId,f.routineIds);syncResultEvents(newId,f.eventIds);
   syncResultInvs(newId,f.invIds);
   (function(){var r=resultById(newId);(r.milestones||[]).forEach(function(m){if(m.done)addAchievement('milestone','ms:'+r.id+':'+m.id,m.name,[r.valueId],catsForResult(r),r.name);});})();
@@ -1504,6 +1504,7 @@ function saveEditResult(){
   r.startMonth=f.startMonth?Number(f.startMonth):null;r.startYear=f.startYear?Number(f.startYear):null;
   r.subCats=f.subCats||[];r.achieved=!!f.achieved;r.targetAmount=parseKr(f.targetAmount);
   r.amountType=f.amountType||'spar';
+  r.hoursTotal=numVal(f.hoursTotal)||'';
   r.milestones=f.milestones||[];
   (r.milestones||[]).forEach(function(m){if(m.done)addAchievement('milestone','ms:'+r.id+':'+m.id,m.name,[r.valueId],catsForResult(r),r.name);});
   if(r.achieved&&!wasAchieved)addAchievement('result','res:'+r.id,r.name,[r.valueId],catsForResult(r),'');
@@ -1851,7 +1852,7 @@ function turnPinOff(){
   if(f.cur!==pd.pin){f._err2='Feil PIN.';render();return;}
   pinClear();closeModal();
 }
-function goBudsjett(y,q){view={kind:'budsjett',year:y,q:q||'\u00e5r'};drawerOpen=false;render();}
+function goBudsjett(y,q,m){view={kind:'budsjett',year:y,q:q||'\u00e5r',month:m||curMonth};drawerOpen=false;render();}
 function addBudgetLine(catId){
   var row=budgetRowFor(catId,view.year,true);
   row.type=(mf()&&mf().type)==='in'?'in':'ut';
@@ -3200,22 +3201,8 @@ function modalHTML(){
         +'<button class="chip'+(f.amountType==='spar'||!f.amountType?' on':'')+'" onclick="mf().amountType=\'spar\';render()">Sparemål</button>'
         +'<button class="chip'+(f.amountType==='in'?' on':'')+'" onclick="mf().amountType=\'in\';render()">Inntekt</button>'
         +'<button class="chip'+(f.amountType==='ut'?' on':'')+'" onclick="mf().amountType=\'ut\';render()">Utgift</button>'
-        +'</div>';
-      if(f.amountType==='in'||f.amountType==='ut'){
-        var budCats=(vGoal&&(vGoal.cats||[]).length?vGoal.cats.map(function(cid){return catById(cid);}).filter(Boolean):cats.filter(function(c){return!c.parentId;}))
-          .sort(function(a,b){return nbSort(a.name,b.name);});
-        var budChips=budCats.map(function(c){
-          return'<button class="chip'+(f.budgetCat===c.id?' on':'')+'" onclick="mf().budgetCat=\''+q(c.id)+'\';render()">'+esc(c.name)+'</button>';
-        }).join('')||'<div class="hint">Ingen hovedkategorier ennå.</div>';
-        typeSection+='<label class="field-lbl">Budsjettkategori</label>'
-          +'<div class="chips">'+budChips+'</div>'
-          +(f._budgetPlaced
-            ?'<div class="hint" style="color:var(--red)">✓ '+fmtKr(amt)+' kr er lagt inn i budsjettet for '+f._budgetPlaced+' ('+KVARTAL[Math.floor((Number(f.month)-1)/3)]+').</div>'
-            :'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" '+(f.budgetCat?'':'disabled')+' onclick="placeResultFormInBudget()">Legg '+fmtKr(amt)+' kr inn i budsjettet for '+esc(String(f.year))+'</button>'
-             +'<div class="hint">Ingenting havner i budsjettet av seg selv — beløpet legges først inn når du trykker på knappen. Det legges som plan i fristens kvartal.</div>');
-      } else {
-        typeSection+='<div class="hint">Sparemål følges opp med innbetalinger, og vises i sparemålslisten i budsjettvisningen.</div>';
-      }
+        +'</div>'
+        +'<div class="hint">F\u00f8lges opp med registreringer i Tid og penger'+(isEditX?' \u2014 trykk «+ registrer bel\u00f8p» der':'; lagre resultatet f\u00f8rst')+'.</div>';
     }
     body='<div class="modal-title">'+(isEditX?'Rediger resultat':'Nytt resultat')+'</div>'
       +'<label class="field-lbl">Hva skal være oppnådd?</label>'
@@ -3242,6 +3229,8 @@ function modalHTML(){
       +'<label class="field-lbl">Beløp i kr <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
       +'<input class="inp" type="text" inputmode="numeric" style="width:140px" value="'+esc(String(f.targetAmount||''))+'" placeholder="f.eks. 60 000" oninput="mf().targetAmount=this.value;updateSaveBtn()" onchange="render()">'
       +typeSection
+      +'<label class="field-lbl">Timer estimert <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt, totalt tidsforbruk</span></label>'
+      +'<input class="inp" type="text" inputmode="decimal" style="width:120px" value="'+esc(String(f.hoursTotal||''))+'" placeholder="f.eks. 20" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\');mf().hoursTotal=this.value">'
       +(evChips?'<label class="field-lbl">Kategori(er) <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
         +'<div class="chips">'+evChips+'</div>'
         +'<div class="hint">Innlegg i disse kategoriene vises som evidens for akkurat dette resultatet.</div>':'')
@@ -5445,23 +5434,96 @@ function kategorierViewHTML(){
 
 function budsjettViewHTML(){
   var y=view.year;
-  var scope=view.q==='m'?'m':'\u00e5r'; // 'm' = måned, ellers år
+  var scope=view.q==='m'?'m':'\u00e5r';
+  var m=scope==='m'?(view.month||curMonth):null;
+  var periodLabel=scope==='m'?(MND_FULL[m-1]+' '+y):String(y);
+
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goOkonomi()">\u2039</button></div>'
-    +'<div class="view-title">Budsjett og regnskap</div>'
-    +'<div class="view-sub">Nytt oppsett under arbeid: m\u00e5neds- og \u00e5rsregnskap for prioriterte resultater, prosjekter og rutiner.</div>';
-  h+='<div style="display:flex;align-items:center;gap:6px;padding:10px 12px 0">'
-    +'<button class="icon-btn" onclick="goBudsjett('+(y-1)+',view.q)">\u2039</button>'
-    +'<div style="flex:1;text-align:left;font-size:15px;font-weight:700">'+y+'</div>'
-    +'<button class="icon-btn" onclick="goBudsjett('+(y+1)+',view.q)">\u203a</button>'
-    +'</div>';
+    +'<div class="view-title">Tid og penger</div>'
+    +'<div class="view-sub">Det som er disponibelt av tid og penger til p\u00e5g\u00e5ende prosjekter og resultater \u2014 ikke hele privat\u00f8konomien.</div>';
+
   h+='<div class="chips" style="padding:8px 12px 0">'
-    +'<button class="chip'+(scope==='m'?' on':'')+'" onclick="goBudsjett('+y+',\'m\')">M\u00e5ned</button>'
+    +'<button class="chip'+(scope==='m'?' on':'')+'" onclick="goBudsjett('+y+',\'m\','+curMonth+')">M\u00e5ned</button>'
     +'<button class="chip'+(scope==='\u00e5r'?' on':'')+'" onclick="goBudsjett('+y+',\'\u00e5r\')">\u00c5r</button>'
     +'</div>';
-  ['Prioriterte resultater','Prosjekter','Rutiner'].forEach(function(label){
-    h+='<div class="sec-title">'+label+'</div>'
-      +'<div class="card"><div class="empty">Ikke satt opp enn\u00e5.</div></div>';
-  });
+
+  h+='<div style="display:flex;align-items:center;gap:6px;padding:6px 12px 0">';
+  if(scope==='m'){
+    var pm=m-1,py=y,nm=m+1,ny=y;
+    if(pm<1){pm=12;py=y-1;}
+    if(nm>12){nm=1;ny=y+1;}
+    h+='<button class="icon-btn" onclick="goBudsjett('+py+',\'m\','+pm+')">\u2039</button>'
+      +'<div style="flex:1;text-align:left;font-size:15px;font-weight:700">'+periodLabel+'</div>'
+      +'<button class="icon-btn" onclick="goBudsjett('+ny+',\'m\','+nm+')">\u203a</button>';
+  } else {
+    h+='<button class="icon-btn" onclick="goBudsjett('+(y-1)+',\'\u00e5r\')">\u2039</button>'
+      +'<div style="flex:1;text-align:left;font-size:15px;font-weight:700">'+periodLabel+'</div>'
+      +'<button class="icon-btn" onclick="goBudsjett('+(y+1)+',\'\u00e5r\')">\u203a</button>';
+  }
+  h+='</div>';
+
+  // Rader: aktive/vedlikeholdte prosjekter (kortnavn) + frittstående resultater (ikke i kø, ikke eid av et prosjekt)
+  var projRows=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&!iv.completedDate;});
+  var projResultIds={};
+  projRows.forEach(function(iv){(iv.resultIds||[]).forEach(function(rid){projResultIds[rid]=true;});});
+  var standaloneResults=results.filter(function(r){return!projResultIds[r.id]&&resultStatus(r)!=='queued';});
+
+  var items=projRows.map(function(iv){
+    var r=(iv.resultIds&&iv.resultIds[0])?resultById(iv.resultIds[0]):null;
+    return{name:dispName(iv),hoursTotal:iv.hoursTotal,moneyRes:r};
+  }).concat(standaloneResults.map(function(r){
+    return{name:r.name,hoursTotal:r.hoursTotal,moneyRes:r};
+  })).sort(function(a,b){return nbSort(a.name,b.name);});
+
+  // Tid
+  h+='<div class="sec-title">Tid</div>';
+  if(!items.length){
+    h+='<div class="card"><div class="empty">Ingen prioriterte prosjekter eller resultater enn\u00e5.</div></div>';
+  } else {
+    h+='<div class="card" style="padding:4px 0">'
+      +'<div style="display:flex;gap:8px;padding:4px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'
+      +'<span style="flex:1"></span><span style="width:70px;text-align:right">Estimert</span><span style="width:70px;text-align:right">Brukt</span></div>';
+    items.forEach(function(it){
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 14px">'
+        +'<span style="flex:1;font-size:13px">'+esc(it.name)+'</span>'
+        +'<span style="width:70px;text-align:right;font-size:13px">'+(it.hoursTotal?String(it.hoursTotal).replace('.',',')+' t':'\u2013')+'</span>'
+        +'<span style="width:70px;text-align:right;font-size:13px;color:var(--muted)">\u2013</span>'
+        +'</div>';
+    });
+    h+='</div>'
+      +'<div style="padding:4px 12px 0;font-size:11px;color:var(--muted)">Timeregistrering er ikke bygget enn\u00e5 \u2014 \u00abBrukt\u00bb viser bare strek s\u00e5 langt.</div>';
+  }
+
+  // Penger
+  h+='<div class="sec-title">Penger</div>';
+  if(!items.length){
+    h+='<div class="card"><div class="empty">Ingen prioriterte prosjekter eller resultater enn\u00e5.</div></div>';
+  } else {
+    var typeLbl={spar:'Sparem\u00e5l',in:'Inntekt',ut:'Utgift'};
+    h+='<div class="card" style="padding:4px 0">'
+      +'<div style="display:flex;gap:8px;padding:4px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'
+      +'<span style="flex:1"></span><span style="width:64px;text-align:right">M\u00e5l</span><span style="width:76px;text-align:right">'+(scope==='m'?'Denne m\u00e5neden':'Dette \u00e5ret')+'</span><span style="width:22px"></span></div>';
+    items.forEach(function(it){
+      var r=it.moneyRes;
+      var hasMoney=!!(r&&r.targetAmount);
+      var actual=0;
+      if(r){
+        actual=deposits.filter(function(d){
+          if(d.resultId!==r.id)return false;
+          var dy=Number((d.date||'').slice(0,4)),dm=Number((d.date||'').slice(5,7));
+          if(dy!==y)return false;
+          return scope==='m'?dm===m:true;
+        }).reduce(function(a,d){return a+(Number(d.amount)||0);},0);
+      }
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 14px">'
+        +'<span style="flex:1;font-size:13px">'+esc(it.name)+(hasMoney?' <span style="font-size:10px;color:var(--muted)">\u00b7 '+typeLbl[r.amountType||'spar']+'</span>':'')+'</span>'
+        +'<span style="width:64px;text-align:right;font-size:13px">'+(hasMoney?fmtKr(r.targetAmount):'\u2013')+'</span>'
+        +'<span style="width:76px;text-align:right;font-size:13px">'+(hasMoney?fmtKr(actual):'\u2013')+'</span>'
+        +'<span style="width:22px;text-align:right">'+(r?'<button class="icon-btn" style="font-size:10px;padding:1px 5px" onclick="openDepositModal(\''+q(r.id)+'\')">+</button>':'')+'</span>'
+        +'</div>';
+    });
+    h+='</div>';
+  }
   return h;
 }
 
