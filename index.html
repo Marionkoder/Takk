@@ -328,7 +328,9 @@ var gifts=[];
 var tagCats={};
 function tagColor(tag){var cid=tagCats[tag];if(!cid)return null;var col=catColor(cid);return col?lightHex(col,0.62):null;}
 function setTagCat(tag,catId){if(catId)tagCats[tag]=catId;else delete tagCats[tag];save();render();}
-function goHashtags(){view={kind:'hashtags'};drawerOpen=false;render();}
+var administrerTab='kategorier';
+function goAdministrer(tab){view={kind:'administrer'};if(tab)administrerTab=tab;drawerOpen=false;render();}
+function goHashtags(){goAdministrer('hashtagger');}
 // gift: {id, person, bdayId(valgfri), kind:'bursdag'|'jul'|'annet', year, what, idea:bool, received:bool, greeting:bool(bursdagshilsen), card:bool(julekort), note}
 function giftPeople(){
   var names={};
@@ -504,11 +506,9 @@ function rmPlace(lv,name){
   places[key]=(places[key]||[]).filter(function(x){return x!==name;});
   save();render();
 }
-function goPlassering(){view={kind:'plassering'};drawerOpen=false;render();}
+function goPlassering(){goAdministrer('plassering');}
 function plasseringViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
-    +'<div class="view-title">Plassering</div>'
-    +'<div class="view-sub">Tre niv\u00e5er du kan velge mellom n\u00e5r du legger inn ting i inventarlistene. Niv\u00e5 1 er p\u00e5krevd, de to neste er frivillige.</div>';
+  var h='<div class="view-sub" style="padding-top:8px">Tre niv\u00e5er du kan velge mellom n\u00e5r du legger inn ting i inventarlistene. Niv\u00e5 1 er p\u00e5krevd, de to neste er frivillige.</div>';
   var lvl=[[1,'Niv\u00e5 1','F.eks. Hus, Hytte, Garasje'],[2,'Niv\u00e5 2','F.eks. Kj\u00f8kkenet, Kjelleren, Loftet'],[3,'Niv\u00e5 3','F.eks. \u00d8verste hylle, Skuff 2']];
   lvl.forEach(function(L){
     var lv=L[0];var list=placesFor(lv);
@@ -527,6 +527,18 @@ function plasseringViewHTML(){
       +'</div>';
   });
   h+='<div class="hint-box">Niv\u00e5 2 og 3 er felles for alle steder \u2014 \u00abKj\u00f8kkenet\u00bb kan brukes b\u00e5de under Hus og Hytte. Endrer du niv\u00e5 1 p\u00e5 en ting, nullstilles niv\u00e5ene under.</div>';
+  return h;
+}
+function administrerHubViewHTML(){
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
+    +'<div class="view-title">Administrer</div>';
+  h+='<div class="chips" style="padding:8px 12px 0">'
+    +[['kategorier','Kategorier og utstyrstyper'],['plassering','Plassering'],['hashtagger','Hashtagger']].map(function(t){
+      return'<button class="chip'+(administrerTab===t[0]?' on':'')+'" onclick="administrerTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
+    }).join('')+'</div>';
+  if(administrerTab==='plassering')h+=plasseringViewHTML();
+  else if(administrerTab==='hashtagger')h+=hashtagsViewHTML();
+  else h+=kategorierViewHTML();
   return h;
 }
 function commitPlace(lv){
@@ -1840,7 +1852,7 @@ function personligViewHTML(){
     +'</div>';
   return h;
 }
-function goKategorier(){view={kind:'kategorier'};drawerOpen=false;render();}
+function goKategorier(){goAdministrer('kategorier');}
 function openPinSetup(){
   var pd=pinData();
   modal={step:'pinsetup',form:{has:!!pd,pin:'',pin2:'',q:pd?pd.q:'',a:'',cur:'',showOff:false}};render();
@@ -3619,7 +3631,7 @@ function entryRowHTML(e){
 function sidebarHTML(){
   var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow"></span>Dagbok</div>';
   h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
-  h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='kategorier'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
+  h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='administrer'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
   h+='<div class="side-month'+(view.kind==='beredskap'?'" style="color:var(--red)':'')+'" onclick="goBeredskap()"><span class="s-arrow"></span>Beredskap</div>';
   h+='<div class="side-month'+(view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goBursdager()"><span class="s-arrow"></span>Bursdager</div>';
   h+='<div class="side-month'+(view.kind==='utstyr'?'" style="color:var(--red)':'')+'" onclick="goUtstyr()"><span class="s-arrow"></span>Utstyr</div>';
@@ -3984,7 +3996,7 @@ function hjemViewHTML(){
       h+='<div class="card'+(fx?' '+fx:'')+'" style="position:relative;overflow:hidden;padding:14px 16px;margin-top:8px'+(edgeCol?';border-left:4px solid '+edgeCol:'')+'">'
         +achFxHTML(a.kind)
         +'<div style="position:relative">'
-        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+(isResult?'\ud83c\udfc6 Resultat n\u00e5dd':a.kind==='project'?'\ud83c\udfc1 Prosjekt fullf\u00f8rt':a.kind==='routine'?'\ud83d\udd01 Rutine \u00b7 '+esc(a.detail||''):'\u2726 Milep\u00e6l haket av')+'</div>'
+        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+(isResult?'\ud83c\udfc6 Resultat n\u00e5dd':a.kind==='project'?'\ud83c\udfc1 Prosjekt fullf\u00f8rt':a.kind==='routine'?'\ud83d\udd01 Rutine \u00b7 '+esc(a.detail||''):'\u2713 Milep\u00e6l haket av')+'</div>'
         +'<div style="font-size:15px;font-weight:800;margin-top:3px">'+esc(a.name)+'</div>'
         +(a.detail&&a.kind!=='routine'?'<div style="font-size:12px;color:var(--muted);margin-top:5px">'+esc(a.detail)+'</div>':'')
         +'</div></div>';
@@ -5453,17 +5465,9 @@ function innstillingerViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Personlig</div>'
     +'<div class="entry-date">velg en bakgrunnstone for appen</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goKategorier()">'
-    +'<div class="entry-body"><div class="entry-text">Administrer kategorier og utstyrstyper</div>'
-    +'<div class="entry-date">se hva hver kategori er knyttet til, og finn ubrukte</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goPlassering()">'
-    +'<div class="entry-body"><div class="entry-text">Administrer plassering</div>'
-    +'<div class="entry-date">hvor ting befinner seg \u2014 tre niv\u00e5er</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goHashtags()">'
-    +'<div class="entry-body"><div class="entry-text">Administrer hashtagger</div>'
-    +'<div class="entry-date">knytt stikkord til en kategori og gi dem farge</div></div>'
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goAdministrer()">'
+    +'<div class="entry-body"><div class="entry-text">Administrer</div>'
+    +'<div class="entry-date">kategorier og utstyrstyper, plassering, hashtagger</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   var hasPin=!!pinData();
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="openPinSetup()">'
@@ -5504,9 +5508,7 @@ function frittTagCloudHTML(){
   return tagCloudSpread(counts);
 }
 function hashtagsViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
-    +'<div class="view-title">Hashtagger</div>'
-    +'<div class="view-sub">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
+  var h='<div class="view-sub" style="padding-top:8px">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
   var counts=allTags();
   var tags=Object.keys(counts);
   if(!tags.length)return h+'<div class="card"><div class="empty">Ingen stikkord enn\u00e5. Legg til stikkord n\u00e5r du skriver innlegg.</div></div>';
@@ -5544,9 +5546,7 @@ function hashtagsViewHTML(){
   return h;
 }
 function kategorierViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
-    +'<div class="view-title">Kategorier og utstyrstyper</div>'
-    +'<div class="view-sub">Trykk \u270e for \u00e5 endre, velge farge, sl\u00e5 sammen eller slette. Fargen p\u00e5 en hovedkategori arves av underkategoriene.</div>';
+  var h='<div class="view-sub" style="padding-top:8px">Trykk \u270e for \u00e5 endre, velge farge, sl\u00e5 sammen eller slette. Fargen p\u00e5 en hovedkategori arves av underkategoriene.</div>';
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(!mains.length){
     h+='<div class="card"><div class="empty">Ingen kategorier enn\u00e5.</div></div>';
@@ -6035,9 +6035,7 @@ function render(){
   else if(view.kind==='budsjett')content=budsjettViewHTML();
   else if(view.kind==='innstillinger')content=innstillingerViewHTML();
   else if(view.kind==='personlig')content=personligViewHTML();
-  else if(view.kind==='plassering')content=plasseringViewHTML();
-  else if(view.kind==='hashtags')content=hashtagsViewHTML();
-  else if(view.kind==='kategorier')content=kategorierViewHTML();
+  else if(view.kind==='administrer')content=administrerHubViewHTML();
   else if(view.kind==='planlegging')content=planleggingViewHTML();
 
   var freshMilestoneToday=view.kind==='hjem'&&achievements.some(function(a){return a.kind==='milestone'&&(Date.now()-(a.ts||0))<86400000;});
