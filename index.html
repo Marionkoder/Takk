@@ -345,7 +345,7 @@ function giftGivers(){
   return Object.keys(names).sort(function(a,b){return nbSort(a,b);});
 }
 function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.name||'').trim()===(person||'').trim();});}
-var DEFAULT_UNITS=['n\u00f8ster','stk','boks','g','kg','ml','dl','liter','kroner'];
+var DEFAULT_UNITS=['bokser','dl','g','kg','kroner','liter','ml','n\u00f8ster','stk'];
 var customUnits=[];
 var places={l1:[],l2:[],l3:[]};
 var achievements=[];
@@ -545,7 +545,7 @@ function commitPlace(lv){
   var el=document.getElementById('pl-inp-'+lv);if(!el)return;
   addPlace(lv,el.value);render();
 }
-function allUnits(){return DEFAULT_UNITS.concat(customUnits.filter(function(u){return DEFAULT_UNITS.indexOf(u)<0;}));}
+function allUnits(){return DEFAULT_UNITS.concat(customUnits.filter(function(u){return DEFAULT_UNITS.indexOf(u)<0;})).sort(function(a,b){return nbSort(a,b);});}
 function addCustomUnit(u){
   u=(u||'').trim();
   if(!u)return;
@@ -1131,6 +1131,19 @@ function load(){
       });
     });
     try{localStorage.setItem(SK+'_pakkedefault1','1');}catch(e){}
+    save();
+  }
+
+  // Rett opp gammel enhet «boks» (entall) til «bokser», etter ny stil på måleenheter
+  var un1=false;try{un1=!!localStorage.getItem(SK+'_unitfix1');}catch(e){}
+  if(!un1){
+    inventories.forEach(function(iv){
+      (iv.items||[]).forEach(function(it){
+        if(it.values&&it.values.__unit==='boks')it.values.__unit='bokser';
+      });
+    });
+    customUnits=customUnits.map(function(u){return u==='boks'?'bokser':u;});
+    try{localStorage.setItem(SK+'_unitfix1','1');}catch(e){}
     save();
   }
 
@@ -2038,6 +2051,28 @@ function prioritizedTimeItems(){
   }));
   return items.sort(function(a,b){return nbSort(a.name,b.name);});
 }
+function itemDeadlineYM(it){
+  if(it.kind==='proj'){
+    var iv=invById(it.refId);
+    if(iv&&iv.endDate)return{year:Number(iv.endDate.slice(0,4)),month:Number(iv.endDate.slice(5,7))};
+    return null;
+  }
+  var r=resultById(it.refId);
+  return r?{year:r.year,month:r.month}:null;
+}
+// Dynamisk anbefaling: gjenstående timer fordelt på månedene som er igjen til fristen, regnet fra i dag —
+// erstatter et fast «forventet denne måneden»-tall som uansett ville vært en gjetning.
+function recommendedPaceHours(it){
+  if(!it.hoursTotal)return null;
+  var dl=itemDeadlineYM(it);if(!dl)return null;
+  var todayYM=today.getFullYear()*12+today.getMonth();
+  var dlYM=dl.year*12+(dl.month-1);
+  var monthsLeft=Math.max(1,dlYM-todayYM+1);
+  var used=hoursFor(it.kind,it.refId,null,null,'\u00e5r');
+  var remaining=Number(it.hoursTotal)-used;
+  if(remaining<=0)return 0;
+  return Math.round(remaining/monthsLeft*10)/10;
+}
 function timeTrackedItems(){return prioritizedTimeItems().filter(function(it){return it.trackHours;});}
 function moneyTrackedItems(){return prioritizedTimeItems().filter(function(it){return it.moneyRes&&it.moneyRes.amountType;});}
 // Forventet tidsbruk for en rutine i en gitt periode — grovt anslag ut fra frekvens, ikke et fasitsvar
@@ -2079,6 +2114,13 @@ function logTime(kind,refId,hours){
   save();render();
 }
 function deleteTimeLog(id){timeLogs=timeLogs.filter(function(t){return t.id!==id;});save();render();}
+function openTimeLogList(kind,refId,name){modal={step:'timelog',form:{kind:kind,refId:refId,name:name}};render();}
+function updateTimeLog(id,val){
+  var t=timeLogs.find(function(x){return x.id===id;});if(!t)return;
+  var h=numVal(val);
+  if(!h){deleteTimeLog(id);return;}
+  t.hours=h;save();render();
+}
 function hoursFor(kind,refId,y,m,scope){
   return timeLogs.filter(function(t){
     if(t.kind!==kind||t.refId!==refId)return false;
@@ -3228,6 +3270,19 @@ function modalHTML(){
       +'<input class="inp" type="text" value="'+esc(f.note||'')+'" oninput="mf().note=this.value">'
       +'<button class="save-btn" onclick="submitDeposit()" '+(parseKr(f.amount)?'':'disabled')+'>Registrer</button>';
 
+  } else if(step==='timelog'){
+    var tlogs=timeLogs.filter(function(t){return t.kind===f.kind&&t.refId===f.refId;})
+      .sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;});
+    body='<div class="modal-title">Timer \u00b7 '+esc(f.name||'')+'</div>'
+      +'<div class="hint">Endre et tall, eller sett det til 0 for \u00e5 slette en feilf\u00f8rt registrering.</div>'
+      +(tlogs.length?tlogs.map(function(t){
+          return'<div class="entry-row"><div class="entry-body"><div class="entry-text">'+fmtDate(t.date)+'</div></div>'
+            +'<input class="inp" type="text" inputmode="decimal" style="width:64px;text-align:right;flex-shrink:0;margin:0" value="'+esc(String(t.hours).replace('.',','))+'" onchange="updateTimeLog(\''+q(t.id)+'\',this.value)">'
+            +'<button class="del-btn" onclick="deleteTimeLog(\''+q(t.id)+'\')">\u2715</button>'
+            +'</div>';
+        }).join(''):'<div class="card"><div class="empty">Ingen timer logget enn\u00e5.</div></div>')
+      +'<button class="save-btn" onclick="closeModal()">Ferdig</button>';
+
   } else if(step==='posting'){
     var pRows=budgetRows.filter(function(b){return b.year===view.year;});
     var rowChips=['in','ut'].map(function(t){
@@ -3340,6 +3395,7 @@ function modalHTML(){
               +'<span style="font-size:11px;color:var(--muted)">'+(tToday?String(tToday).replace('.',',')+' t logget i dag':'Logg timer i dag')+'</span>'
               +'<input id="'+tlid+'" class="inp" type="text" inputmode="decimal" style="width:52px;text-align:right" placeholder="t" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\')">'
               +'<button class="icon-btn" style="font-size:11px" onclick="logTime(\'result\',\''+q(f.id)+'\',document.getElementById(\''+tlid+'\').value)">+ Logg</button>'
+              +'<button class="icon-btn" style="font-size:11px" onclick="openTimeLogList(\'result\',\''+q(f.id)+'\',\''+q(f.name||'')+'\')">Vis logg</button>'
               +'</div>';
           })():'')
         :'');
@@ -3511,6 +3567,7 @@ function modalHTML(){
               +'<span style="font-size:11px;color:var(--muted)">'+(tToday?String(tToday).replace('.',',')+' t logget i dag':'Logg timer i dag')+'</span>'
               +'<input id="'+tlid+'" class="inp" type="text" inputmode="decimal" style="width:52px;text-align:right" placeholder="t" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\')">'
               +'<button class="icon-btn" style="font-size:11px" onclick="logTime(\'routine\',\''+q(f.id)+'\',document.getElementById(\''+tlid+'\').value)">+ Logg</button>'
+              +'<button class="icon-btn" style="font-size:11px" onclick="openTimeLogList(\'routine\',\''+q(f.id)+'\',\''+q(f.name||'')+'\')">Vis logg</button>'
               +'</div>';
           })():''))
         :'')
@@ -3980,6 +4037,7 @@ function hjemViewHTML(){
         +'</div>'
         +'<input id="'+tid+'" class="inp" type="text" inputmode="decimal" style="width:52px;text-align:right;flex-shrink:0;align-self:center" placeholder="t" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\')">'
         +'<button class="icon-btn" style="font-size:11px;flex-shrink:0;align-self:center" onclick="logTime(\''+it.kind+'\',\''+q(it.refId)+'\',document.getElementById(\''+tid+'\').value)">+ Logg</button>'
+        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0;align-self:center" onclick="openTimeLogList(\''+it.kind+'\',\''+q(it.refId)+'\',\''+q(it.name)+'\')">Vis logg</button>'
         +'</div>';
     });
     h+='</div>';
@@ -5289,6 +5347,7 @@ function inventarViewHTML(){
       +'<span style="font-size:11px;color:var(--muted)">'+(tToday?String(tToday).replace('.',',')+' t logget i dag':'Logg timer i dag')+'</span>'
       +'<input id="'+tlid+'" class="inp" type="text" inputmode="decimal" style="width:52px;text-align:right" placeholder="t" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\')">'
       +'<button class="icon-btn" style="font-size:11px" onclick="logTime(\'proj\',\''+q(inv.id)+'\',document.getElementById(\''+tlid+'\').value)">+ Logg</button>'
+      +'<button class="icon-btn" style="font-size:11px" onclick="openTimeLogList(\'proj\',\''+q(inv.id)+'\',\''+q(dispName(inv))+'\')">Vis logg</button>'
       +'</div>';
   }
   if(isPack){
@@ -5671,18 +5730,21 @@ function budsjettViewHTML(){
       h+='<div style="padding:6px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">Prosjekter og resultater</div>';
       h+='<div class="card" style="padding:4px 0">'
         +'<div style="display:flex;gap:8px;padding:4px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'
-        +'<span style="flex:1"></span><span style="width:70px;text-align:right">Estimert</span><span style="width:70px;text-align:right">Brukt</span></div>';
+        +'<span style="flex:1"></span><span style="width:70px;text-align:right">Totalt</span><span style="width:70px;text-align:right">Brukt</span></div>';
       timeItems2.forEach(function(it){
         var brukt=hoursFor(it.kind,it.refId,y,m,scope);
         totalBrukt+=brukt;
+        var pace=scope==='m'?recommendedPaceHours(it):null;
         h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 14px">'
-          +'<span style="flex:1;font-size:13px">'+esc(it.name)+'</span>'
+          +'<span style="flex:1;font-size:13px">'+esc(it.name)
+          +(pace!=null?'<div style="font-size:10.5px;color:var(--muted)">anbefalt \u2248'+String(pace).replace('.',',')+' t denne m\u00e5neden for \u00e5 n\u00e5 fristen</div>':'')
+          +'</span>'
           +'<span style="width:70px;text-align:right;font-size:13px">'+(it.hoursTotal?String(it.hoursTotal).replace('.',',')+' t':'\u2013')+'</span>'
-          +'<span style="width:70px;text-align:right;font-size:13px">'+(brukt?String(brukt).replace('.',',')+' t':'<span style="color:var(--muted)">\u2013</span>')+'</span>'
+          +'<span style="width:70px;text-align:right;font-size:13px'+(brukt?';text-decoration:underline;cursor:pointer':'')+'"'+(brukt?' onclick="openTimeLogList(\''+it.kind+'\',\''+q(it.refId)+'\',\''+q(it.name)+'\')"':'')+'>'+(brukt?String(brukt).replace('.',',')+' t':'<span style="color:var(--muted)">\u2013</span>')+'</span>'
           +'</div>';
       });
       h+='</div>'
-        +'<div style="padding:4px 12px 0;font-size:11px;color:var(--muted)">Estimert er ett samlet anslag for hele prosjektet/resultatet. Brukt summerer timer logget p\u00e5 forsida for valgt '+(scope==='m'?'m\u00e5ned':'\u00e5r')+'.</div>';
+        +'<div style="padding:4px 12px 0;font-size:11px;color:var(--muted)">Totalt er ett samlet anslag for hele prosjektet/resultatet. Brukt summerer timer logget p\u00e5 forsida for valgt '+(scope==='m'?'m\u00e5ned':'\u00e5r')+' \u2014 trykk p\u00e5 tallet for \u00e5 rette en feilf\u00f8ring.'+(scope==='m'?' «Anbefalt» regnes ut fra gjenst\u00e5ende timer delt p\u00e5 m\u00e5nedene som er igjen til fristen, sett fra i dag.':'')+'</div>';
     }
     if(routineItems2.length){
       h+='<div style="padding:10px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">Rutiner</div>';
@@ -5696,7 +5758,7 @@ function budsjettViewHTML(){
         h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 14px">'
           +'<span style="flex:1;font-size:13px">'+esc(r.name)+'</span>'
           +'<span style="width:70px;text-align:right;font-size:13px">'+(forv?String(forv).replace('.',',')+' t':'<span style="color:var(--muted)">\u2013</span>')+'</span>'
-          +'<span style="width:70px;text-align:right;font-size:13px">'+(brukt?String(brukt).replace('.',',')+' t':'<span style="color:var(--muted)">\u2013</span>')+'</span>'
+          +'<span style="width:70px;text-align:right;font-size:13px'+(brukt?';text-decoration:underline;cursor:pointer':'')+'"'+(brukt?' onclick="openTimeLogList(\'routine\',\''+q(r.id)+'\',\''+q(r.name)+'\')"':'')+'>'+(brukt?String(brukt).replace('.',',')+' t':'<span style="color:var(--muted)">\u2013</span>')+'</span>'
           +'</div>';
       });
       h+='</div>'
