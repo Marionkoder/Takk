@@ -100,10 +100,21 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .col-sw.none{background:transparent;border:1.5px dashed var(--muted);color:var(--muted);font-size:11px}
 .col-sw.none.on{border:2px solid var(--ink);box-shadow:none}
 /* Konfetti på runde bursdager */
+.milestone-glow{background-image:linear-gradient(rgba(242,238,229,.88),rgba(242,238,229,.88)),linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%);background-repeat:no-repeat;background-size:100% 100%;background-attachment:fixed}
 .confetti{position:relative;overflow:hidden}
 .confetti i{position:absolute;top:-10px;width:5px;height:9px;border-radius:1px;opacity:.85;pointer-events:none;animation:cfall 2.8s linear infinite}
+.shimmer{position:relative;overflow:hidden}
+.shimmer::after{content:'';position:absolute;top:0;left:-60%;width:60%;height:100%;pointer-events:none;
+  background:linear-gradient(75deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.65) 50%,rgba(255,255,255,0) 70%);
+  animation:shimmersweep 1.7s ease-out 1}
+.starshower{position:relative;overflow:hidden}
+.starshower i{position:absolute;top:-14px;font-style:normal;font-size:13px;opacity:0;pointer-events:none;animation:starfall 2.6s ease-in infinite}
+@keyframes shimmersweep{0%{left:-60%}100%{left:120%}}
+@keyframes starfall{0%{transform:translateY(-14px) rotate(0deg);opacity:0}12%{opacity:1}100%{transform:translateY(150px) rotate(70deg);opacity:0}}
 @keyframes cfall{0%{transform:translateY(-12px) rotate(0deg)}100%{transform:translateY(52px) rotate(340deg)}}
 @media (prefers-reduced-motion:reduce){.confetti i{animation:none;display:none}}
+@media (prefers-reduced-motion:reduce){.shimmer::after{animation:none;display:none}}
+@media (prefers-reduced-motion:reduce){.starshower i{animation:none;display:none}}
 .celeb{position:fixed;inset:0;z-index:3000;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
 .celeb-full{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .celeb-full i{position:absolute;top:-16px;width:8px;height:14px;border-radius:2px;opacity:.9;animation:cfallfull linear infinite}
@@ -3595,10 +3606,10 @@ function oversiktViewHTML(){
   t+='</table></div>';
   h+=t;
   h+='<div style="padding:6px 12px 0;font-size:10.5px;color:var(--muted)">'
-    +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#FDF3C7;margin-right:4px;vertical-align:middle"></span>Aktiv / ikke hakt av enn\u00e5'
-    +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#E1F1DE;margin-right:4px;vertical-align:middle"></span>Vedlikeholdes / hakt av'
+    +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#FDF3C7;margin-right:4px;vertical-align:middle"></span>Aktiv / ikke haket av enn\u00e5'
+    +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#E1F1DE;margin-right:4px;vertical-align:middle"></span>Vedlikeholdes / haket av'
     +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--line);opacity:.5;margin-right:4px;vertical-align:middle"></span>Ikke startet'
-    +'<div style="margin-top:2px">Resultater f\u00e5rger etter startdato og oppn\u00e5dd-status. Rutiner f\u00e5rger etter om de er hakt av for gjeldende dag/uke/m\u00e5ned/\u00e5r, uavhengig av resultatet de er koblet til.</div>'
+    +'<div style="margin-top:2px">Resultater f\u00e5rger etter startdato og oppn\u00e5dd-status. Rutiner f\u00e5rger etter om de er haket av for gjeldende dag/uke/m\u00e5ned/\u00e5r, uavhengig av resultatet de er koblet til.</div>'
     +'</div>';
   // Uten kobling
   var freeR=routines.filter(function(x){return !(x.goalIds||[]).length&&!(x.resultIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
@@ -3790,6 +3801,23 @@ function hjemViewHTML(){
 
   // Hurtiglogging — det første som møter deg
   h+=quickLogHTML();
+
+  // Ferske anerkjennelser (siste 24 timer) — milepæler og resultater
+  var freshAch=achievements.filter(function(a){return(Date.now()-(a.ts||0))<86400000;}).sort(function(a,b){return(b.ts||0)-(a.ts||0);});
+  if(freshAch.length){
+    h+='<div class="sec-title">Feiring</div>';
+    freshAch.forEach(function(a){
+      var isResult=a.kind==='result';
+      var fx=achFxClass(a.kind);
+      h+='<div class="card'+(fx?' '+fx:'')+'" style="position:relative;overflow:hidden;padding:14px 16px;margin-top:8px'+(isResult?';background:#F5F0FA;border-color:#C9BBD6':'')+'">'
+        +achFxHTML(a.kind)
+        +'<div style="position:relative">'
+        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:'+(isResult?'#6B4FA0':'var(--rose)')+'">'+(isResult?'\ud83c\udfc6 Resultat n\u00e5dd':a.kind==='project'?'\ud83c\udfc1 Prosjekt fullf\u00f8rt':a.kind==='routine'?'\ud83d\udd01 Rutine \u00b7 '+esc(a.detail||''):'\u2726 Milep\u00e6l haket av')+'</div>'
+        +'<div style="font-size:15px;font-weight:800;margin-top:3px'+(isResult?';background:#E4D6F0;color:#4A3872;padding:6px 10px;border-radius:8px;display:inline-block':'')+'">'+esc(a.name)+'</div>'
+        +(a.detail&&a.kind!=='routine'?'<div style="font-size:12px;color:'+(isResult?'#6B4FA0':'var(--muted)')+';margin-top:5px">'+esc(a.detail)+'</div>':'')
+        +'</div></div>';
+    });
+  }
 
   // Dagens innlegg
   var todaysEntries=entries.filter(function(e){return e.date===todayIso;});
@@ -3999,6 +4027,19 @@ function confettiHTML(){
   }
   return h;
 }
+function starShowerHTML(){
+  var stars=['\u2726','\u2727','\u2605','\u2739'];
+  var cols=['#8C5A74','#CC7F33','#4E7B8C','#A34A5E','#8B7A9E'];
+  var h='';
+  for(var i=0;i<9;i++){
+    h+='<i style="left:'+(4+i*10.5)+'%;color:'+cols[i%cols.length]+';animation-delay:'+(i*0.28).toFixed(2)+'s">'+stars[i%stars.length]+'</i>';
+  }
+  return h;
+}
+// Hvilken feiringseffekt en anerkjennelse skal ha: milepæler skimrer, resultater og
+// fullførte prosjekter drysser stjerner, rutiner (byggeklosser i det daglige) får ingen effekt.
+function achFxClass(kind){return kind==='milestone'?'shimmer':(kind==='result'||kind==='project')?'starshower':'';}
+function achFxHTML(kind){return kind==='result'||kind==='project'?starShowerHTML():'';}
 
 function weekNum(date){
   var d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
@@ -4291,10 +4332,11 @@ function oppnaddViewHTML(){
   h+='<div class="card" style="background:var(--ach-bg);border-color:var(--ach-line)">';
   list.forEach(function(a,i){
     var fresh=(now-(a.ts||0))<86400000;
+    var fx=fresh?achFxClass(a.kind):'';
     var vNames=(a.goalIds||[]).map(function(g){var gg=goalById(g);return gg?gg.name:null;}).filter(Boolean);
     var asking=window._achDel===a.id;
-    h+='<div class="'+(fresh?'confetti':'')+'" style="position:relative;padding:2px 0">'
-      +(fresh?confettiHTML():'')
+    h+='<div class="'+fx+'" style="position:relative;padding:2px 0">'
+      +(fresh?achFxHTML(a.kind):'')
       +'<div class="entry-row" style="position:relative">'
       +'<div class="entry-body">'
       +'<div class="entry-text"'+(fresh?' style="font-weight:700"':'')+'>'+esc(a.name)+'</div>'
@@ -5836,10 +5878,11 @@ function render(){
   else if(view.kind==='kategorier')content=kategorierViewHTML();
   else if(view.kind==='planlegging')content=planleggingViewHTML();
 
+  var freshMilestoneToday=view.kind==='hjem'&&achievements.some(function(a){return a.kind==='milestone'&&(Date.now()-(a.ts||0))<86400000;});
   var html='<div class="sidebar-overlay'+(drawerOpen?' show':'')+'" onclick="toggleDrawer()"></div>'
     +'<div class="layout">'
     +'<nav class="sidebar'+(drawerOpen?' open':'')+'">'+sidebarHTML()+'</nav>'
-    +'<div class="main">'+topbar+content+'</div>'
+    +'<div class="main'+(freshMilestoneToday?' milestone-glow':'')+'">'+topbar+content+'</div>'
     +'</div>'
     +modalHTML();
 
