@@ -1070,14 +1070,27 @@ function load(){
     save();
   }
 
-  // Forbruksvareliste — etter samme modell som utstyrslista
+  // Forbruksvareliste — etter samme modell som utstyrslista, uten forhåndsutfylte kategorier
   var fv1=false;try{fv1=!!localStorage.getItem(SK+'_forbruksvarer1');}catch(e){}
   if(!fv1){
     if(!inventories.some(function(iv){return iv.fixed==='forbruksvarer';})){
       inventories.push({id:'fixed_forbruksvarer',name:'Forbruksvarer',type:'inventar',fixed:'forbruksvarer',qty:true,catId:'',fields:[],
-        sections:[{id:'fv_toalett',name:'Toalettartikler'},{id:'fv_rengjoring',name:'Rengj\u00f8ring'}],items:[]});
+        sections:[],items:[]});
     }
     try{localStorage.setItem(SK+'_forbruksvarer1','1');}catch(e){}
+    save();
+  }
+  // Rydd bort eksempelkategoriene fra en tidligere versjon, hvis de ikke er tatt i bruk
+  var fvClean1=false;try{fvClean1=!!localStorage.getItem(SK+'_forbruksvarer_clean1');}catch(e){}
+  if(!fvClean1){
+    var fvInv=inventories.find(function(iv){return iv.fixed==='forbruksvarer';});
+    if(fvInv){
+      ['fv_toalett','fv_rengjoring'].forEach(function(sid){
+        var used=(fvInv.items||[]).some(function(it){return it.sectionId===sid;});
+        if(!used)fvInv.sections=(fvInv.sections||[]).filter(function(sc){return sc.id!==sid;});
+      });
+    }
+    try{localStorage.setItem(SK+'_forbruksvarer_clean1','1');}catch(e){}
     save();
   }
 
@@ -1351,8 +1364,14 @@ function resultDeadlineHTML(r){
     }
   }
   if(r.achieved)return' <span style="font-size:11px;color:var(--red);font-weight:700">\u2713 oppn\u00e5dd'+saveTxt+'</span>';
+  var startTxt='';
+  if(r.startMonth&&r.startYear){
+    var todayYM=today.getFullYear()*12+today.getMonth();
+    var startYM=Number(r.startYear)*12+(Number(r.startMonth)-1);
+    startTxt=(startYM>todayYM?'starter ':'startet ')+MND_FULL[r.startMonth-1]+' '+r.startYear+' \u00b7 ';
+  }
   var ml=monthsLeft(r);
-  var txt='frist '+MND_FULL[r.month-1]+' '+r.year;
+  var txt=startTxt+'frist '+MND_FULL[r.month-1]+' '+r.year;
   if(ml<0)return' <span style="font-size:11px;color:var(--muted);font-weight:400">'+txt+' \u00b7 passert'+saveTxt+'</span>';
   return' <span style="font-size:11px;color:var(--rose);font-weight:400">'+txt+' \u00b7 '+(ml===0?'denne m\u00e5neden':ml+' mnd igjen')+saveTxt+'</span>';
 }
@@ -1365,11 +1384,11 @@ function resultCatMatch(r,entryCats){
     return!!(c&&c.parentId&&sc.includes(c.parentId));
   });
 }
-function openResultModal(){modal={step:'result',form:{name:'',valueId:'',month:curMonth,year:curYear+1,subCats:[],achieved:false,targetAmount:'',amountType:'spar',invIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
+function openResultModal(){modal={step:'result',form:{name:'',valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'spar',invIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
 function openEditResult(id){
   var r=resultById(id);if(!r)return;
   var linkedInvs=inventories.filter(function(iv){return(iv.resultIds||[]).includes(id);}).map(function(iv){return iv.id;});
-  modal={step:'result_edit',form:{id:id,name:r.name,valueId:r.valueId,month:r.month,year:r.year,subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'spar',invIds:linkedInvs,budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
+  modal={step:'result_edit',form:{id:id,name:r.name,valueId:r.valueId,month:r.month,year:r.year,startMonth:r.startMonth||'',startYear:r.startYear||'',subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'spar',invIds:linkedInvs,budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
     forutsetninger:r.forutsetninger||'',risikoer:r.risikoer||'',
     routineIds:routines.filter(function(x){return (x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;}),
     eventIds:events.filter(function(x){return !x.bday&&(x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;})}};render();
@@ -1460,9 +1479,10 @@ function placeResultFormInBudget(){
 function submitResult(){
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId)return;
   var newId='x'+Date.now()+Math.random().toString(36).slice(2,6);
-  results.push({id:newId,name:name,valueId:f.valueId,month:Number(f.month),year:Number(f.year),subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'spar',milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
+  results.push({id:newId,name:name,valueId:f.valueId,month:Number(f.month),year:Number(f.year),startMonth:f.startMonth?Number(f.startMonth):null,startYear:f.startYear?Number(f.startYear):null,subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'spar',milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
   syncResultRoutines(newId,f.routineIds);syncResultEvents(newId,f.eventIds);
   syncResultInvs(newId,f.invIds);
+  (function(){var r=resultById(newId);(r.milestones||[]).forEach(function(m){if(m.done)addAchievement('milestone','ms:'+r.id+':'+m.id,m.name,[r.valueId],catsForResult(r),r.name);});})();
   save();closeModal();
 }
 function saveEditResult(){
@@ -1470,9 +1490,11 @@ function saveEditResult(){
   var r=resultById(f.id);if(!r)return;
   var wasAchieved=!!r.achieved;
   r.name=name;r.valueId=f.valueId;r.month=Number(f.month);r.year=Number(f.year);
+  r.startMonth=f.startMonth?Number(f.startMonth):null;r.startYear=f.startYear?Number(f.startYear):null;
   r.subCats=f.subCats||[];r.achieved=!!f.achieved;r.targetAmount=parseKr(f.targetAmount);
   r.amountType=f.amountType||'spar';
   r.milestones=f.milestones||[];
+  (r.milestones||[]).forEach(function(m){if(m.done)addAchievement('milestone','ms:'+r.id+':'+m.id,m.name,[r.valueId],catsForResult(r),r.name);});
   if(r.achieved&&!wasAchieved)addAchievement('result','res:'+r.id,r.name,[r.valueId],catsForResult(r),'');
   r.forutsetninger=(f.forutsetninger||'').trim();r.risikoer=(f.risikoer||'').trim();
   syncResultRoutines(r.id,f.routineIds);syncResultEvents(r.id,f.eventIds);
@@ -3194,6 +3216,18 @@ function modalHTML(){
       +'<select class="inp" style="width:auto" oninput="mf().month=this.value">'+mOptsX+'</select>'
       +'<select class="inp" style="width:auto" oninput="mf().year=this.value">'+yOptsX+'</select>'
       +'</div>'
+      +'<label class="field-lbl">Startdato <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt, n\u00e5r begynner du?</span></label>'
+      +'<div style="display:flex;gap:8px;align-items:center">'
+      +'<select class="inp" style="width:auto" oninput="mf().startMonth=this.value;if(this.value&&!mf().startYear)mf().startYear=curYear;render()">'
+        +'<option value=""'+(f.startMonth?'':' selected')+'>Ikke satt</option>'
+        +MND_FULL.map(function(m,i){return'<option value="'+(i+1)+'"'+(Number(f.startMonth)===i+1?' selected':'')+'>'+m+'</option>';}).join('')
+      +'</select>'
+      +(f.startMonth?('<select class="inp" style="width:auto" oninput="mf().startYear=this.value">'
+        +(function(){var o='';for(var yy=curYear-1;yy<=curYear+10;yy++){o+='<option value="'+yy+'"'+(Number(f.startYear)===yy?' selected':'')+'>'+yy+'</option>';}return o;})()
+        +'</select>'
+        +'<button class="icon-btn" style="font-size:11px" onclick="mf().startMonth=\'\';mf().startYear=\'\';render()">Fjern</button>')
+        :'')
+      +'</div>'
       +'<label class="field-lbl">Beløp i kr <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
       +'<input class="inp" type="text" inputmode="numeric" style="width:140px" value="'+esc(String(f.targetAmount||''))+'" placeholder="f.eks. 60 000" oninput="mf().targetAmount=this.value;updateSaveBtn()" onchange="render()">'
       +typeSection
@@ -3459,6 +3493,22 @@ function evShort(e){
   if(!e.month)return '';
   return (e.day?e.day+'. ':'')+MND_FULL[e.month-1].slice(0,3);
 }
+function resultStatus(r){
+  if(!r)return null;
+  if(r.achieved)return'maintained';
+  if(r.startMonth&&r.startYear){
+    var todayYM=today.getFullYear()*12+today.getMonth();
+    var startYM=Number(r.startYear)*12+(Number(r.startMonth)-1);
+    if(startYM>todayYM)return'queued';
+  }
+  return'active';
+}
+function resultStatusStyle(status){
+  if(status==='maintained')return'background:#E1F1DE';
+  if(status==='active')return'background:#FDF3C7';
+  if(status==='queued')return'opacity:.5';
+  return'';
+}
 function oversiktViewHTML(){
   var h='<div class="sec-title">Tabell med sammenhenger</div>'
     +'<div class="view-sub">Hvordan verdiene henger sammen med resultater, rutiner og hendelser.</div>';
@@ -3475,7 +3525,7 @@ function oversiktViewHTML(){
       var rts=routines.filter(function(x){return (x.resultIds||[]).indexOf(r.id)>=0;}).sort(function(a,b){return nbSort(a.name,b.name);});
       var evs=events.filter(function(x){return !x.bday&&(x.resultIds||[]).indexOf(r.id)>=0;}).sort(function(a,b){return nbSort(a.name,b.name);});
       var n=Math.max(rts.length,evs.length,1);
-      for(var i=0;i<n;i++)vRows.push({res:i===0?r:null,resSpan:n,resRender:i===0,rt:rts[i]||null,ev:evs[i]||null});
+      for(var i=0;i<n;i++)vRows.push({res:i===0?r:null,resSpan:n,resRender:i===0,rt:rts[i]||null,ev:evs[i]||null,resCtx:r});
     });
     var dRts=routines.filter(function(x){return (x.goalIds||[]).indexOf(v.id)>=0&&!linkedToRes(x);}).sort(function(a,b){return nbSort(a.name,b.name);});
     var dEvs=events.filter(function(x){return !x.bday&&(x.goalIds||[]).indexOf(v.id)>=0&&!linkedToRes(x);}).sort(function(a,b){return nbSort(a.name,b.name);});
@@ -3503,11 +3553,13 @@ function oversiktViewHTML(){
         +esc(r.val.name)+'</td>';
     }
     if(r.resRender){
-      t+='<td rowspan="'+r.resSpan+'" style="'+cellS+';'+topB+(r.res?'cursor:pointer':'')+'"'+(r.res?' onclick="openEditResult(\''+q(r.res.id)+'\')"':'')+'>'
-        +(r.res?esc(r.res.name)+'<div style="font-size:10px;color:var(--muted)">'+MND_FULL[r.res.month-1].slice(0,3)+' '+r.res.year+((r.res.milestones||[]).length?' \u00b7 '+(r.res.milestones||[]).filter(function(m){return m.done;}).length+'/'+(r.res.milestones||[]).length+' milepæler':'')+'</div>':'<span style="color:var(--muted)">\u2013</span>')
+      var resSt=r.res?resultStatusStyle(resultStatus(r.res)):'';
+      t+='<td rowspan="'+r.resSpan+'" style="'+cellS+';'+topB+resSt+';'+(r.res?'cursor:pointer':'')+'"'+(r.res?' onclick="openEditResult(\''+q(r.res.id)+'\')"':'')+'>'
+        +(r.res?esc(r.res.name)+'<div style="font-size:10px;color:var(--muted)">'+(r.res.startMonth&&r.res.startYear?MND_FULL[r.res.startMonth-1].slice(0,3)+' '+r.res.startYear+' \u2013 ':'')+MND_FULL[r.res.month-1].slice(0,3)+' '+r.res.year+((r.res.milestones||[]).length?' \u00b7 '+(r.res.milestones||[]).filter(function(m){return m.done;}).length+'/'+(r.res.milestones||[]).length+' milepæler':'')+'</div>':'<span style="color:var(--muted)">\u2013</span>')
         +'</td>';
     }
-    t+='<td style="'+cellS+';'+topB+(r.rt?'cursor:pointer':'')+'"'+(r.rt?' onclick="openEditRoutine(\''+q(r.rt.id)+'\')"':'')+'>'
+    var rtSt=(r.rt&&r.resCtx)?resultStatusStyle(resultStatus(r.resCtx)):'';
+    t+='<td style="'+cellS+';'+topB+rtSt+';'+(r.rt?'cursor:pointer':'')+'"'+(r.rt?' onclick="openEditRoutine(\''+q(r.rt.id)+'\')"':'')+'>'
       +(r.rt?esc(r.rt.name)+'<div style="font-size:10px;color:var(--muted)">'+esc(freqShort(r.rt))+'</div>':'')+'</td>';
     t+='<td style="'+cellS+';'+topB+(r.ev?'cursor:pointer':'')+'"'+(r.ev?' onclick="openEditEvent(\''+q(r.ev.id)+'\')"':'')+'>'
       +(r.ev?esc(r.ev.name)+'<div style="font-size:10px;color:var(--muted)">'+esc(evShort(r.ev))+'</div>':'')+'</td>';
@@ -3515,6 +3567,11 @@ function oversiktViewHTML(){
   });
   t+='</table></div>';
   h+=t;
+  h+='<div style="padding:6px 12px 0;font-size:10.5px;color:var(--muted)">'
+    +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#FDF3C7;margin-right:4px;vertical-align:middle"></span>Aktiv'
+    +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#E1F1DE;margin-right:4px;vertical-align:middle"></span>Vedlikeholdes'
+    +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--line);opacity:.5;margin-right:4px;vertical-align:middle"></span>Ikke startet'
+    +'</div>';
   // Uten kobling
   var freeR=routines.filter(function(x){return !(x.goalIds||[]).length&&!(x.resultIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
   var freeE=events.filter(function(x){return !x.bday&&!(x.goalIds||[]).length&&!(x.resultIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
@@ -4978,7 +5035,7 @@ function inventarViewHTML(){
       +(c.have?confirmBtn('packreset','Nullstill avhaking','resetPackChecks(\''+q(inv.id)+'\')'):'')
       +'</div>';
   }
-  if(inv.fixed!=='utstyr'){
+  if(inv.fixed!=='utstyr'&&inv.fixed!=='forbruksvarer'){
     var masterUt=findFixedList('utstyr');
     if(masterUt&&(masterUt.items||[]).length){
       h+='<div class="chips" style="padding:6px 12px 0">'
@@ -5313,7 +5370,7 @@ function kategorierViewHTML(){
     return hh;
   };
   h+=typeManagerHTML('utstyr','Utstyrstyper','Overskriftene i utstyrslista \u2014 de du bruker for \u00e5 dele utstyret inn i typer, som kj\u00f8kkenutstyr eller verkt\u00f8y.','+ Ny utstyrstype','Ingen utstyrstyper enn\u00e5.','Fant ikke utstyrslista.');
-  h+=typeManagerHTML('forbruksvarer','Forbruksvaretyper','Overskriftene i forbruksvarelista \u2014 de du bruker for \u00e5 dele forbruksvarene inn i typer, som toalettartikler eller rengj\u00f8ring.','+ Ny forbruksvaretype','Ingen forbruksvaretyper enn\u00e5.','Fant ikke forbruksvarelista.');
+  h+=typeManagerHTML('forbruksvarer','Forbruksvaretyper','Overskriftene i forbruksvarelista \u2014 de du bruker for \u00e5 dele forbruksvarene inn i typer.','+ Ny forbruksvaretype','Ingen forbruksvaretyper enn\u00e5.','Fant ikke forbruksvarelista.');
   return h;
 }
 
