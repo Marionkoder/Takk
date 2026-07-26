@@ -3861,12 +3861,13 @@ function hjemViewHTML(){
     freshAch.forEach(function(a){
       var isResult=a.kind==='result';
       var fx=achFxClass(a.kind);
-      h+='<div class="card'+(fx?' '+fx:'')+'" style="position:relative;overflow:hidden;padding:14px 16px;margin-top:8px'+(isResult?';background:#F5F0FA;border-color:#C9BBD6':'')+'">'
+      var edgeCol=isResult?(catColor((a.cats||[])[0])||'var(--rose)'):null;
+      h+='<div class="card'+(fx?' '+fx:'')+'" style="position:relative;overflow:hidden;padding:14px 16px;margin-top:8px'+(edgeCol?';border-left:4px solid '+edgeCol:'')+'">'
         +achFxHTML(a.kind)
         +'<div style="position:relative">'
-        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:'+(isResult?'#6B4FA0':'var(--rose)')+'">'+(isResult?'\ud83c\udfc6 Resultat n\u00e5dd':a.kind==='project'?'\ud83c\udfc1 Prosjekt fullf\u00f8rt':a.kind==='routine'?'\ud83d\udd01 Rutine \u00b7 '+esc(a.detail||''):'\u2726 Milep\u00e6l haket av')+'</div>'
-        +'<div style="font-size:15px;font-weight:800;margin-top:3px'+(isResult?';background:#E4D6F0;color:#4A3872;padding:6px 10px;border-radius:8px;display:inline-block':'')+'">'+esc(a.name)+'</div>'
-        +(a.detail&&a.kind!=='routine'?'<div style="font-size:12px;color:'+(isResult?'#6B4FA0':'var(--muted)')+';margin-top:5px">'+esc(a.detail)+'</div>':'')
+        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+(isResult?'\ud83c\udfc6 Resultat n\u00e5dd':a.kind==='project'?'\ud83c\udfc1 Prosjekt fullf\u00f8rt':a.kind==='routine'?'\ud83d\udd01 Rutine \u00b7 '+esc(a.detail||''):'\u2726 Milep\u00e6l haket av')+'</div>'
+        +'<div style="font-size:15px;font-weight:800;margin-top:3px">'+esc(a.name)+'</div>'
+        +(a.detail&&a.kind!=='routine'?'<div style="font-size:12px;color:var(--muted);margin-top:5px">'+esc(a.detail)+'</div>':'')
         +'</div></div>';
     });
   }
@@ -4089,8 +4090,8 @@ function starShowerHTML(){
 }
 // Hvilken feiringseffekt en anerkjennelse skal ha: milepæler skimrer, resultater og
 // fullførte prosjekter drysser stjerner, rutiner (byggeklosser i det daglige) får ingen effekt.
-function achFxClass(kind){return kind==='milestone'?'shimmer':(kind==='result'||kind==='project')?'starshower':'';}
-function achFxHTML(kind){return kind==='result'||kind==='project'?starShowerHTML():'';}
+function achFxClass(kind){return(kind==='milestone'||kind==='result')?'shimmer':kind==='project'?'starshower':'';}
+function achFxHTML(kind){return kind==='project'?starShowerHTML():'';}
 
 function weekNum(date){
   var d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
