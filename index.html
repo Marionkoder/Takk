@@ -2057,6 +2057,10 @@ function routineExpectedHours(r,y,m,scope){
 function routineTimeItems(){
   return routines.filter(function(r){return r.trackHours;}).sort(function(a,b){return nbSort(a.name,b.name);});
 }
+function activeRoutinesNow(){
+  return routines.filter(function(r){return!(r.months&&r.months.length)||r.months.indexOf(curMonth)>=0;})
+    .sort(function(a,b){return nbSort(a.name,b.name);});
+}
 function logTime(kind,refId,hours){
   var h=numVal(hours);if(!h)return;
   timeLogs.push({id:'tl'+Date.now()+Math.random().toString(36).slice(2,6),kind:kind,refId:refId,date:isoDate(today),hours:h});
@@ -2377,12 +2381,12 @@ function exportTekst(){
 
 /* ── Modal ── */
 function openEntryModal(){
-  modal={step:'entry',form:{text:'',cats:[],tags:[],_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'entry',form:{text:'',cats:[],tags:[],routineIds:[],_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openEditEntry(id){
   var e=entries.find(function(x){return x.id===id;});if(!e)return;
-  modal={step:'entry_edit',form:{id:id,text:e.text,cats:[].concat(e.cats),tags:[].concat(e.tags||[]),date:e.date,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'entry_edit',form:{id:id,text:e.text,cats:[].concat(e.cats),tags:[].concat(e.tags||[]),routineIds:[].concat(e.routineIds||[]),date:e.date,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openRoutineModal(){
@@ -2558,12 +2562,17 @@ function flushTags(f){
       .forEach(function(v){if(!f.tags.includes(v))f.tags=[].concat(f.tags,[v]);});
   }
 }
+function toggleFormRoutine(id){
+  var a=mf().routineIds||[];
+  mf().routineIds=a.includes(id)?a.filter(function(x){return x!==id;}):a.concat([id]);
+  render();
+}
 function entryValid(){var f=mf();return(f.text||'').trim().length>0&&f.cats.length>0;}
 function submitEntry(){
   var f=mf();flushTags(f);
   var text=(f.text||'').trim();if(!text)return;
   if(!f.cats.length)return;
-  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:f.cats,tags:f.tags||[],date:isoDate(today)});
+  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:f.cats,tags:f.tags||[],routineIds:f.routineIds||[],date:isoDate(today)});
   save();closeModal();
 }
 function saveEditEntry(){
@@ -2571,7 +2580,7 @@ function saveEditEntry(){
   var text=(f.text||'').trim();if(!text)return;
   if(!f.cats.length)return;
   var e=entries.find(function(x){return x.id===f.id;});if(!e)return;
-  e.text=text;e.cats=f.cats;e.tags=f.tags;
+  e.text=text;e.cats=f.cats;e.tags=f.tags;e.routineIds=f.routineIds||[];
   if(f.date)e.date=f.date;
   save();closeModal();
 }
@@ -3563,6 +3572,15 @@ function modalHTML(){
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +'<label class="field-lbl">Stikkord (valgfritt)</label>'
       +tagSectionHTML(f)
+      +(function(){
+        var ar=activeRoutinesNow();
+        if(!ar.length)return'';
+        return'<label class="field-lbl">Rutine(r) dette h\u00f8rer til <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+          +'<div class="chips">'+ar.map(function(r){
+            var on=(f.routineIds||[]).includes(r.id);
+            return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormRoutine(\''+q(r.id)+'\')">'+esc(r.name)+'</button>';
+          }).join('')+'</div>';
+      })()
       +(isEdit?'<button class="del-full-btn" onclick="deleteEntry(\''+q(f.id)+'\');closeModal()">Slett innlegg</button>':'')
       +'<button class="save-btn" onclick="'+(isEdit?'saveEditEntry()':'submitEntry()')+'" '+(entryValid()?'':'disabled')+'>'+(isEdit?'Lagre endringer':'Lagre')+'</button>';
   }
@@ -3580,6 +3598,9 @@ function entryRowHTML(e){
   }).join('')+(e.tags||[]).map(function(t){
     var tc=tagColor(t);
     return'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>';
+  }).join('')+(e.routineIds||[]).map(function(rid){
+    var r=routines.find(function(x){return x.id===rid;});if(!r)return'';
+    return'<span class="tag-pill">\ud83d\udd01 '+esc(r.name)+'</span>';
   }).join('');
   var pills=pillItems?'<div class="entry-cats">'+pillItems+'</div>':'';
   return'<div class="entry-row">'
@@ -3851,7 +3872,7 @@ function periodTodoItems(scope){
 }
 
 /* ── Visninger ── */
-var quickForm={text:'',cats:[],tags:'',step:1};
+var quickForm={text:'',cats:[],tags:'',routineIds:[],step:1};
 var recentDone={};
 function boxToggleRoutine(rid,key){
   var k='r_'+rid+'_'+key;
@@ -3877,13 +3898,18 @@ function quickToStep2(){
   render();
 }
 function quickBackToText(){quickForm.step=1;render();}
+function toggleQuickRoutine(id){
+  var a=quickForm.routineIds||[];
+  quickForm.routineIds=a.includes(id)?a.filter(function(x){return x!==id;}):a.concat([id]);
+  render();
+}
 function submitQuick(){
   var text=(quickForm.text||'').trim();
   if(!text||!quickForm.cats.length)return;
   var tags=(quickForm.tags||'').split(',').map(function(v){return v.trim().toLowerCase();}).filter(Boolean)
     .filter(function(v,i,a){return a.indexOf(v)===i;});
-  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:quickForm.cats,tags:tags,date:isoDate(today)});
-  quickForm={text:'',cats:[],tags:'',step:1};
+  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:quickForm.cats,tags:tags,routineIds:quickForm.routineIds||[],date:isoDate(today)});
+  quickForm={text:'',cats:[],tags:'',routineIds:[],step:1};
   save();render();
 }
 function quickLogHTML(){
@@ -3907,6 +3933,15 @@ function quickLogHTML(){
       +'<div style="font-size:13px;font-weight:700;margin:10px 0 6px">Hvilken kategori h\u00f8rer dette hjemme i? <span style="font-weight:400">Du kan velge mer enn \u00e9n.</span></div>'
       +'<div class="chips">'+chips+'</div>'
       +'<input id="quick-tags" class="inp" type="text" style="margin-top:8px;font-size:13px" placeholder="Stikkord, adskilt med komma (valgfritt)" value="'+esc(quickForm.tags||'')+'" oninput="quickForm.tags=this.value">'
+      +(function(){
+        var ar=activeRoutinesNow();
+        if(!ar.length)return'';
+        return'<label class="field-lbl" style="margin-top:8px">Rutine(r) dette h\u00f8rer til <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+          +'<div class="chips">'+ar.map(function(r){
+            var on=(quickForm.routineIds||[]).includes(r.id);
+            return'<button class="chip'+(on?' on':'')+'" onclick="toggleQuickRoutine(\''+q(r.id)+'\')">'+esc(r.name)+'</button>';
+          }).join('')+'</div>';
+      })()
       +'<button id="quick-btn" class="save-btn" style="margin-top:10px" onclick="submitQuick()" '+(quickForm.cats.length?'':'disabled')+'>Lagre innlegget</button>';
   }
   h+='</div>';
