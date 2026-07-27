@@ -1328,7 +1328,8 @@ function toggleEvent(id,year){
   if(e.repeat){
     year=Number(year)||curYear;
     e.log=e.log||[];
-    e.log=e.log.includes(year)?e.log.filter(function(y){return y!==year;}):[].concat(e.log,[year]);
+    var wasOn=e.log.includes(year);
+    e.log=wasOn?e.log.filter(function(y){return y!==year;}):[].concat(e.log,[year]);
     // Bursdag: hold bursdagshilsen i takt med Gratulert
     if(e.bday){
       var greeted=evDone(e,year);
@@ -1336,8 +1337,10 @@ function toggleEvent(id,year){
       if(greeted&&!hasGreet)toggleGreet(e.name,year,'bursdag');
       else if(!greeted&&hasGreet)toggleGreet(e.name,year,'bursdag');
     }
+    if(!wasOn&&(e.equipmentIds||[]).length)markEquipmentUsed(e.equipmentIds,e.name+' '+MND_FULL[e.month-1]+' '+year);
   } else {
     e.done=!e.done;
+    if(e.done&&(e.equipmentIds||[]).length)markEquipmentUsed(e.equipmentIds,e.name+' '+MND_FULL[e.month-1]+' '+e.year);
   }
   save();render();
 }
@@ -1475,11 +1478,11 @@ function resultCatMatch(r,entryCats){
     return!!(c&&c.parentId&&sc.includes(c.parentId));
   });
 }
-function openResultModal(){modal={step:'result',form:{name:'',shortTitle:'',subtype:'',valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'',hoursTotal:'',hoursMode:'total',trackHours:true,invIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
+function openResultModal(){modal={step:'result',form:{name:'',shortTitle:'',subtype:'',valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'',hoursTotal:'',hoursMode:'total',trackHours:true,invIds:[],equipmentIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
 function openEditResult(id){
   var r=resultById(id);if(!r)return;
   var linkedInvs=inventories.filter(function(iv){return(iv.resultIds||[]).includes(id);}).map(function(iv){return iv.id;});
-  modal={step:'result_edit',form:{id:id,name:r.name,shortTitle:r.shortTitle||'',subtype:r.subtype||'',valueId:r.valueId,month:r.month,year:r.year,startMonth:r.startMonth||'',startYear:r.startYear||'',subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'',hoursTotal:r.hoursTotal||'',hoursMode:r.hoursMode||'total',trackHours:r.trackHours!==false,invIds:linkedInvs,budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
+  modal={step:'result_edit',form:{id:id,name:r.name,shortTitle:r.shortTitle||'',subtype:r.subtype||'',valueId:r.valueId,month:r.month,year:r.year,startMonth:r.startMonth||'',startYear:r.startYear||'',subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'',hoursTotal:r.hoursTotal||'',hoursMode:r.hoursMode||'total',trackHours:r.trackHours!==false,invIds:linkedInvs,equipmentIds:[].concat(r.equipmentIds||[]),budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
     forutsetninger:r.forutsetninger||'',risikoer:r.risikoer||'',
     routineIds:routines.filter(function(x){return (x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;}),
     eventIds:events.filter(function(x){return !x.bday&&(x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;})}};render();
@@ -1596,7 +1599,8 @@ function placeResultFormInBudget(){
 function submitResult(){
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId||!f.subtype)return;
   var newId='x'+Date.now()+Math.random().toString(36).slice(2,6);
-  results.push({id:newId,name:name,shortTitle:(f.shortTitle||'').trim(),subtype:f.subtype,valueId:f.valueId,month:Number(f.month),year:Number(f.year),startMonth:f.startMonth?Number(f.startMonth):null,startYear:f.startYear?Number(f.startYear):null,subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'',hoursTotal:numVal(f.hoursTotal)||'',hoursMode:f.hoursMode==='monthly'?'monthly':'total',trackHours:f.trackHours!==false,milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
+  results.push({id:newId,name:name,shortTitle:(f.shortTitle||'').trim(),subtype:f.subtype,valueId:f.valueId,month:Number(f.month),year:Number(f.year),startMonth:f.startMonth?Number(f.startMonth):null,startYear:f.startYear?Number(f.startYear):null,subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'',hoursTotal:numVal(f.hoursTotal)||'',hoursMode:f.hoursMode==='monthly'?'monthly':'total',trackHours:f.trackHours!==false,equipmentIds:f.equipmentIds||[],milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
+  if(f.achieved&&(f.equipmentIds||[]).length)markEquipmentUsed(f.equipmentIds,name+' '+MND_FULL[Number(f.month)-1]+' '+f.year);
   syncResultRoutines(newId,f.routineIds);syncResultEvents(newId,f.eventIds);
   syncResultInvs(newId,f.invIds);
   (function(){var r=resultById(newId);(r.milestones||[]).forEach(function(m){if(m.done)addAchievement('milestone','ms:'+r.id+':'+m.id,m.name,[r.valueId],catsForResult(r),r.name);});})();
@@ -1615,8 +1619,12 @@ function saveEditResult(){
   r.hoursMode=f.hoursMode==='monthly'?'monthly':'total';
   r.trackHours=f.trackHours!==false;
   r.milestones=f.milestones||[];
+  r.equipmentIds=f.equipmentIds||[];
   (r.milestones||[]).forEach(function(m){if(m.done)addAchievement('milestone','ms:'+r.id+':'+m.id,m.name,[r.valueId],catsForResult(r),r.name);});
-  if(r.achieved&&!wasAchieved)addAchievement('result','res:'+r.id,r.name,[r.valueId],catsForResult(r),'');
+  if(r.achieved&&!wasAchieved){
+    addAchievement('result','res:'+r.id,r.name,[r.valueId],catsForResult(r),'');
+    if((r.equipmentIds||[]).length)markEquipmentUsed(r.equipmentIds,r.name+' '+MND_FULL[r.month-1]+' '+r.year);
+  }
   r.forutsetninger=(f.forutsetninger||'').trim();r.risikoer=(f.risikoer||'').trim();
   syncResultRoutines(r.id,f.routineIds);syncResultEvents(r.id,f.eventIds);
   syncResultInvs(r.id,f.invIds);
@@ -2065,11 +2073,28 @@ function toggleItemOnList(invId,itemId,targetInvId){
   }
   save();render();
 }
+function projectLongLabel(inv){
+  var r=(inv.resultIds&&inv.resultIds[0])?resultById(inv.resultIds[0]):null;
+  var desc=r?r.name:inv.name;
+  var d=inv.completedDate?new Date(inv.completedDate):today;
+  return desc+' '+MND_FULL[d.getMonth()]+' '+d.getFullYear();
+}
+function markEquipmentUsed(ids,label){
+  var ut=findFixedList('utstyr');if(!ut||!ids||!ids.length)return;
+  (ut.items||[]).forEach(function(it){
+    if(ids.indexOf(it.id)>=0)it.note=(it.note?it.note+' \u00b7 ':'')+'Brukt til \u00ab'+label+'\u00bb';
+  });
+}
 function toggleProjectDone(invId){
   var inv=invById(invId);if(!inv)return;
   if(inv.completedDate){delete inv.completedDate;save();render();return;}
   inv.completedDate=isoDate(today);
   addAchievement('project','proj:'+inv.id,inv.name,inv.goalIds||[],inv.catId?[inv.catId]:[],'');
+  var ut=findFixedList('utstyr');
+  if(ut){
+    var usedIds=(inv.items||[]).map(function(x){return x.syncId;}).filter(function(sid){return sid&&(ut.items||[]).some(function(m){return m.id===sid;});});
+    if(usedIds.length)markEquipmentUsed(usedIds,projectLongLabel(inv));
+  }
   save();
   var hasYarn=inv.subtype==='strikk'&&inv.knit&&(inv.knit.yarns||[]).some(function(y){return(y.name||y.color||'').trim();});
   var hasFabric=inv.subtype==='sy'&&inv.sew&&(inv.sew.fabrics||[]).some(function(y){return(y.name||y.color||'').trim();});
@@ -2622,12 +2647,12 @@ function openBdayModal(){
   render();
 }
 function openEventModal(){
-  modal={step:'event',form:{name:'',cats:[],month:curMonth,year:curYear,day:'',repeat:false,bday:false,interval:1,sinceYear:'',goalIds:[],resultIds:[],ease:'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'event',form:{name:'',cats:[],month:curMonth,year:curYear,day:'',repeat:false,bday:false,interval:1,sinceYear:'',goalIds:[],resultIds:[],equipmentIds:[],ease:'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openEditEvent(id){
   var e=events.find(function(x){return x.id===id;});if(!e)return;
-  modal={step:'event_edit',form:{id:id,name:e.name,cats:[].concat(e.cats||[]),month:e.month,year:e.year,day:e.day||'',toMonth:e.toMonth||'',toDay:e.toDay||'',repeat:!!e.repeat,bday:!!e.bday,interval:Number(e.interval)||1,sinceYear:e.sinceYear||'',goalIds:[].concat(e.goalIds||[]),resultIds:[].concat(e.resultIds||[]),ease:e.ease||'',personTags:[].concat(e.personTags||[]),_ptInput:'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'event_edit',form:{id:id,name:e.name,cats:[].concat(e.cats||[]),month:e.month,year:e.year,day:e.day||'',toMonth:e.toMonth||'',toDay:e.toDay||'',repeat:!!e.repeat,bday:!!e.bday,interval:Number(e.interval)||1,sinceYear:e.sinceYear||'',goalIds:[].concat(e.goalIds||[]),resultIds:[].concat(e.resultIds||[]),equipmentIds:[].concat(e.equipmentIds||[]),ease:e.ease||'',personTags:[].concat(e.personTags||[]),_ptInput:'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 var confirmArm=null;
@@ -2818,7 +2843,7 @@ function saveEditRoutine(){
 function submitEvent(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   if(f.bday&&bdayCount()>=BDAY_MAX)return;
-  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,repeat:!!f.repeat,bday:!!f.bday,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),ease:(f.ease||'').trim(),personTags:f.bday?(f.personTags||[]):[],done:false,log:[]});
+  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,repeat:!!f.repeat,bday:!!f.bday,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.bday?(f.personTags||[]):[],done:false,log:[]});
   if(f._fromLater)laters=laters.filter(function(l){return l.id!==f._fromLater;});
   save();closeModal();
 }
@@ -2828,7 +2853,7 @@ function saveEditEvent(){
   e.name=name;e.cats=f.cats;e.month=Number(f.month);e.year=Number(f.year);
   e.day=f.day?Number(f.day):null;e.toMonth=(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null;e.toDay=(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null;e.repeat=!!f.repeat;e.bday=!!f.bday;e.interval=Number(f.interval)||1;
   e.sinceYear=f.sinceYear?Number(f.sinceYear):null;
-  e.goalIds=f.bday?[]:(f.goalIds||[]);e.resultIds=f.bday?[]:(f.resultIds||[]);e.ease=(f.ease||'').trim();
+  e.goalIds=f.bday?[]:(f.goalIds||[]);e.resultIds=f.bday?[]:(f.resultIds||[]);e.equipmentIds=f.bday?[]:(f.equipmentIds||[]);e.ease=(f.ease||'').trim();
   e.personTags=f.bday?(f.personTags||[]):[];
   if(e.repeat&&!e.log)e.log=[];
   save();closeModal();
@@ -2973,7 +2998,7 @@ function modalHTML(){
       +'<input class="inp" type="text" inputmode="numeric" style="width:100px" value="'+esc(String(f.year||curYear))+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').slice(0,4);mf().year=this.value">'
       +(f.received?'':'<div class="chips" style="margin-top:8px"><button class="chip'+(f.idea?' on':'')+'" onclick="mf().idea=!mf().idea;render()">'+(f.idea?'\u2713 Dette er en id\u00e9':'Merk som id\u00e9 (ikke gitt enn\u00e5)')+'</button></div>')
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-      +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. hvor kj\u00f8pt, st\u00f8rrelse \u2026" oninput="mf().note=this.value">'
+      +'<textarea class="inp" rows="2" placeholder="F.eks. hvor kj\u00f8pt, st\u00f8rrelse \u2026" oninput="mf().note=this.value">'+esc(f.note||'')+'</textarea>'
       +(isEditG?confirmBtn('gift','Slett','deleteGift(\''+q(f.id)+'\')'):'')
       +'<button class="save-btn" onclick="submitGift()" '+(((f.person||'').trim()&&(f.what||'').trim())?'':'disabled')+'>'+(isEditG?'Lagre':'Legg til')+'</button>';
 
@@ -3485,7 +3510,7 @@ function modalHTML(){
       +detailInputs
       +fieldInputs
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-      +'<input class="inp" type="text" value="'+esc(f.note||'')+'" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'
+      +'<textarea class="inp" rows="2" placeholder="F.eks. str. 41, gjerne Gore-Tex \u2026" oninput="mf().note=this.value">'+esc(f.note||'')+'</textarea>'
       +(isEditT&&!isProj&&inventories.length>1?(function(){
         var curInv=invById(f.invId);
         var curItem=curInv?(curInv.items||[]).find(function(x){return x.id===f.id;}):null;
@@ -3511,7 +3536,7 @@ function modalHTML(){
       +'<label class="field-lbl">Dato</label>'
       +'<input class="inp" type="date" style="width:auto" value="'+esc(f.date||'')+'" oninput="mf().date=this.value">'
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-      +'<input class="inp" type="text" value="'+esc(f.note||'')+'" oninput="mf().note=this.value">'
+      +'<textarea class="inp" rows="2" oninput="mf().note=this.value">'+esc(f.note||'')+'</textarea>'
       +'<button class="save-btn" onclick="submitDeposit()" '+(parseKr(f.amount)?'':'disabled')+'>Registrer</button>';
 
   } else if(step==='timelog'){
@@ -3547,7 +3572,7 @@ function modalHTML(){
         return'<button class="chip'+(Number(f.qi)===qi?' on':'')+'" onclick="mf().qi='+qi+';render()">'+KVARTAL[qi]+'</button>';
       }).join('')+'</div>'
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt, legges i regnskapskommentaren</span></label>'
-      +'<input class="inp" type="text" value="'+esc(f.note||'')+'" oninput="mf().note=this.value">'
+      +'<textarea class="inp" rows="2" oninput="mf().note=this.value">'+esc(f.note||'')+'</textarea>'
       +'<div class="hint">Bel\u00f8pet legges til p\u00e5 linjens faktisk-tall for kvartalet.</div>'
       +'<button class="save-btn" onclick="submitPosting()" '+((parseKr(f.amount)&&f.rowId)?'':'disabled')+'>Registrer</button>';
 
@@ -3682,6 +3707,16 @@ function modalHTML(){
       +'</div>'
       +moneySection
       +timeSection
+      +(function(){
+        var ut=findFixedList('utstyr');
+        if(!ut||!(ut.items||[]).length)return'';
+        return'<label class="field-lbl">Utstyr brukt <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+          +'<div class="chips">'+ut.items.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(it){
+            var on=(f.equipmentIds||[]).includes(it.id);
+            return'<button class="chip'+(on?' on':'')+'" onclick="var a=mf().equipmentIds||[];mf().equipmentIds=a.includes(\''+q(it.id)+'\')?a.filter(function(x){return x!==\''+q(it.id)+'\';}):a.concat([\''+q(it.id)+'\']);render()">'+esc(it.name)+'</button>';
+          }).join('')+'</div>'
+          +'<div class="hint">Merkes automatisk p\u00e5 utstyret med \u00abbrukt til\u00bb n\u00e5r prosjektet markeres oppn\u00e5dd.</div>';
+      })()
       +(evChips?'<label class="field-lbl">Kategori(er) <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
         +'<div class="chips">'+evChips+'</div>'
         +'<div class="hint">Innlegg i disse kategoriene vises som evidens for akkurat dette prosjektet.</div>':'')
@@ -3903,6 +3938,16 @@ function modalHTML(){
         +'<div class="hint">Innlegg i takknemlighetsboka som bruker disse stikkordene, vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og de tre Jenny-ene holdes fra hverandre.</div>':'')
       +(!f.bday?'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt, valgfritt</span></label>'
       +'<div class="chips">'+linkChipSection(f)+'</div>':'')
+      +(!f.bday?(function(){
+          var ut=findFixedList('utstyr');
+          if(!ut||!(ut.items||[]).length)return'';
+          return'<label class="field-lbl">Utstyr brukt <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+            +'<div class="chips">'+ut.items.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(it){
+              var on=(f.equipmentIds||[]).includes(it.id);
+              return'<button class="chip'+(on?' on':'')+'" onclick="var a=mf().equipmentIds||[];mf().equipmentIds=a.includes(\''+q(it.id)+'\')?a.filter(function(x){return x!==\''+q(it.id)+'\';}):a.concat([\''+q(it.id)+'\']);render()">'+esc(it.name)+'</button>';
+            }).join('')+'</div>'
+            +'<div class="hint">Merkes automatisk p\u00e5 utstyret med \u00abbrukt til\u00bb n\u00e5r hendelsen markeres gjennomf\u00f8rt.</div>';
+        })():'')
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +(isEditE?'<button class="del-full-btn" onclick="deleteEvent(\''+q(f.id)+'\')">Slett hendelse</button>':'')
@@ -6487,6 +6532,10 @@ function render(){
   var wasSearch=false,wasQuick=false;
   var wasQTags=false;
   try{wasSearch=document.activeElement&&document.activeElement.id==='search-inp';wasQuick=document.activeElement&&document.activeElement.id==='quick-inp';wasQTags=document.activeElement&&document.activeElement.id==='quick-tags';}catch(e){}
+  var prevMain=document.querySelector('.main');
+  var scrollPos=prevMain?prevMain.scrollTop:0;
+  var sameView=window._lastRenderViewKind===(view?view.kind:null);
+  window._lastRenderViewKind=view?view.kind:null;
 
   var topbar='<div class="topbar">'
     +'<div class="topbar-row">'
@@ -6545,6 +6594,10 @@ function render(){
     +modalHTML();
 
   document.getElementById('app').innerHTML=html;
+  if(sameView){
+    var newMain=document.querySelector('.main');
+    if(newMain)newMain.scrollTop=scrollPos;
+  }
 
   var si=document.getElementById('search-inp');
   if(si){si.value=searchQuery;if(wasSearch)si.focus();}
