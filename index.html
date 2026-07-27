@@ -1016,7 +1016,7 @@ function load(){
   } else if(!seeded){
     try{localStorage.setItem(SK+'_seeded','1');}catch(e){}
   }
-  // Punktkoblinger til verdier/resultater/rutiner/hendelser ble flyttet til listenivå — rens gamle rester
+  // Punktkoblinger til grunnverdier/resultater/rutiner/hendelser ble flyttet til listenivå — rens gamle rester
   inventories.forEach(function(iv){
     (iv.items||[]).forEach(function(it){
       delete it.goalIds;delete it.resultIds;delete it.routineIds;delete it.eventIds;
@@ -1254,6 +1254,8 @@ function goUke(iso){recentDone={};
   var d=iso?new Date(iso):mondayOf(today);
   view={kind:'uke',ws:isoDate(mondayOf(d))};drawerOpen=false;render();
 }
+function goDag(iso){recentDone={};view={kind:'dag',d:iso||isoDate(today)};drawerOpen=false;render();}
+function dagShift(days){recentDone={};var d=new Date(view.d+'T00:00:00');d.setDate(d.getDate()+days);view.d=isoDate(d);render();}
 function ukeShift(days){recentDone={};
   var d=new Date(view.ws);d.setDate(d.getDate()+days);
   view.ws=isoDate(d);render();
@@ -2757,14 +2759,14 @@ function updateSaveBtn(){
 function catById(id){return cats.find(function(c){return c.id===id;});}
 
 function goalChipSection(f){
-  if(!goals.length)return'<div class="hint">Ingen verdier ennå — legg til under Planlegging.</div>';
+  if(!goals.length)return'<div class="hint">Ingen grunnverdier ennå — legg til under Planlegging.</div>';
   return goals.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(g){
     var on=(f.goalIds||[]).includes(g.id);
     return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormGoal(\''+q(g.id)+'\')">'+esc(g.name)+'</button>';
   }).join('');
 }
 function linkChipSection(f){
-  if(!goals.length)return'<div class="hint">Ingen verdier ennå — legg til under Planlegging.</div>';
+  if(!goals.length)return'<div class="hint">Ingen grunnverdier ennå — legg til under Planlegging.</div>';
   return goals.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(g){
     var on=(f.goalIds||[]).includes(g.id);
     var h='<button class="chip'+(on?' on':'')+'" style="font-weight:700" onclick="toggleFormGoal(\''+q(g.id)+'\')">'+esc(g.name)+'</button>';
@@ -3020,12 +3022,12 @@ function modalHTML(){
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. investere i varmepumpe \u2026" oninput="mf().name=this.value;updateSaveBtn()">'
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<textarea class="inp" rows="3" placeholder="Hva venter det p\u00e5? Hva m\u00e5 v\u00e6re p\u00e5 plass f\u00f8rst?" oninput="mf().note=this.value">'+esc(f.note||'')+'</textarea>'
-      +'<label class="field-lbl">Verdi <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<label class="field-lbl">Grunnverdi <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<div class="chips">'+goalChipSection(f)+'</div>'
       +(isEditL?'<div class="hint" style="margin-top:8px">Gj\u00f8r om til:</div><div class="chips">'
         +'<button class="chip" onclick="laterToInnkjop(\''+q(f.id)+'\')">Prioritert innkj\u00f8p</button>'
         +'<button class="chip" onclick="laterToResult(\''+q(f.id)+'\')">Resultat</button>'
-        +'<button class="chip" onclick="laterToGoal(\''+q(f.id)+'\')">Verdi</button>'
+        +'<button class="chip" onclick="laterToGoal(\''+q(f.id)+'\')">Grunnverdi</button>'
         +'<button class="chip" onclick="laterToEvent(\''+q(f.id)+'\')">Hendelse</button>'
         +'</div>':'')
       +(isEditL?'<button class="del-full-btn" onclick="deleteLater(\''+q(f.id)+'\')">Slett</button>':'')
@@ -3145,14 +3147,14 @@ function modalHTML(){
       +'<input class="inp" type="text" style="flex:1;margin:0" value="'+esc(f._newField||'')+'" placeholder="F.eks. farge, fiber, st\u00f8rrelse \u2026" oninput="mf()._newField=this.value">'
       +'<button class="icon-btn" style="padding:8px 12px" onclick="addInvField()">Legg til</button>'
       +'</div>'
-      +'<div class="hint">'+(isProjM?'Variablene oppsummeres \u00f8verst i prosjektet og gjentas ikke i fasene.':'Trykk p\u00e5 en variabel for \u00e5 fjerne den. Verdiene fylles inn per punkt.')+'</div>'
+      +'<div class="hint">'+(isProjM?'Variablene oppsummeres \u00f8verst i prosjektet og gjentas ikke i fasene.':'Trykk p\u00e5 en variabel for \u00e5 fjerne den. Grunnverdiene fylles inn per punkt.')+'</div>'
       +(isProjM
-        ?'<label class="field-lbl">Verdi</label>'
+        ?'<label class="field-lbl">Grunnverdi</label>'
          +'<div class="chips">'+goals.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(g){
             var on=(f.goalIds||[])[0]===g.id;
             return'<button class="chip'+(on?' on':'')+'" onclick="mf().goalIds=[\''+q(g.id)+'\'];render()">'+esc(g.name)+'</button>';
           }).join('')+'</div>'
-         +((f.goalIds||[]).length?'':'<div class="hint" style="color:var(--amber)">Et prosjekt m\u00e5 kobles til en verdi \u2014 det skal vise hvordan du vil leve.</div>')
+         +((f.goalIds||[]).length?'':'<div class="hint" style="color:var(--amber)">Et prosjekt m\u00e5 kobles til en grunnverdi \u2014 det skal vise hvordan du vil leve.</div>')
          +'<label class="field-lbl">Resultat \u2013 lang tittel <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 brukes i planleggingsoversikten</span></label>'
          +'<input class="inp" type="text" value="'+esc(f.longTitle||'')+'" placeholder="F.eks. Jeg strikker et gr\u00f8nt sjal til Jenny \u2026" oninput="mf().longTitle=this.value;updateSaveBtn()">'
          +(f.longTitle?'':'<div class="hint" style="color:var(--amber)">Prosjektet m\u00e5 ha en lang tittel \u2014 det blir resultatet knyttet til prosjektet.</div>')
@@ -3413,7 +3415,7 @@ function modalHTML(){
     var vChips=goals.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(g){
       var on=f.valueId===g.id;
       return'<button class="chip'+(on?' on':'')+'" onclick="mf().valueId=\''+q(g.id)+'\';render()">'+esc(g.name)+'</button>';
-    }).join('')||'<div class="hint">Opprett en verdi først.</div>';
+    }).join('')||'<div class="hint">Opprett en grunnverdi først.</div>';
     var vGoal=f.valueId?goalById(f.valueId):null;
     var catPool=cats.filter(function(c){
       if(c.parentId)return false;
@@ -3476,7 +3478,7 @@ function modalHTML(){
       +'<input class="inp" type="text" value="'+esc(f.shortTitle||'')+'" placeholder="F.eks. 5 km l\u00f8ping" oninput="mf().shortTitle=this.value">'
       +'<label class="field-lbl">Hva skal være oppnådd?</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. Jeg kan løpe 5 km sammenhengende …" oninput="mf().name=this.value;updateSaveBtn()">'
-      +'<label class="field-lbl">Verdi</label>'
+      +'<label class="field-lbl">Grunnverdi</label>'
       +'<div class="chips">'+vChips+'</div>'
       +'<label class="field-lbl">Frist</label>'
       +'<div style="display:flex;gap:8px">'
@@ -3542,7 +3544,7 @@ function modalHTML(){
         var rList=showAll?allR:allR.filter(function(rt){return matches(rt,f.routineIds);});
         var eList=showAll?allE:allE.filter(function(ev){return matches(ev,f.eventIds);});
         var h='';
-        if(!hasFilter)h+='<div class="hint">Velg verdi eller kategori over for \u00e5 f\u00e5 opp tilh\u00f8rende rutiner og hendelser \u2014 eller trykk \u00abVis alle\u00bb under.</div>';
+        if(!hasFilter)h+='<div class="hint">Velg grunnverdi eller kategori over for \u00e5 f\u00e5 opp tilh\u00f8rende rutiner og hendelser \u2014 eller trykk \u00abVis alle\u00bb under.</div>';
         h+='<div class="chips">'+(rList.length?rList.map(function(rt){
             return'<button class="chip'+((f.routineIds||[]).indexOf(rt.id)>=0?' on':'')+'" onclick="toggleResRoutine(\''+q(rt.id)+'\')">'+esc(rt.name)+'</button>';
           }).join(''):(hasFilter&&!showAll?'<div class="hint">Ingen tilh\u00f8rende rutiner enn\u00e5.</div>':''))+'</div>';
@@ -3592,10 +3594,10 @@ function modalHTML(){
     var isEditG=step==='goal_edit';
     var spanChips='<label class="field-lbl">Tidshorisont</label>'
       +'<div class="chips">'
-      +'<button class="chip'+((f.span||'livet')==='livet'?' on':'')+'" onclick="mf().span=\'livet\';render()">Styringsverdi for resten av livet</button>'
-      +'<button class="chip'+(f.span==='fem'?' on':'')+'" onclick="mf().span=\'fem\';render()">Styringsverdi for de neste fem \u00e5rene</button>'
+      +'<button class="chip'+((f.span||'livet')==='livet'?' on':'')+'" onclick="mf().span=\'livet\';render()">Styringsgrunnverdi for resten av livet</button>'
+      +'<button class="chip'+(f.span==='fem'?' on':'')+'" onclick="mf().span=\'fem\';render()">Styringsgrunnverdi for de neste fem \u00e5rene</button>'
       +'</div>'
-      +(f.span==='fem'?'<div class="hint">Fem\u00e5rige styringsverdier skal ha minst ett resultat knyttet til seg \u2014 du f\u00e5r en p\u00e5minnelse til det er p\u00e5 plass.</div>':'');
+      +(f.span==='fem'?'<div class="hint">Fem\u00e5rige styringsgrunnverdier skal ha minst ett resultat knyttet til seg \u2014 du f\u00e5r en p\u00e5minnelse til det er p\u00e5 plass.</div>':'');
     var mainCats=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
     var mainChips=mainCats.map(function(m){
       var on=(f.cats||[]).includes(m.id);
@@ -3604,7 +3606,7 @@ function modalHTML(){
     var shared=(f.cats||[]).filter(function(cid){
       return goals.some(function(g){return g.id!==f.id&&(g.cats||[]).includes(cid);});
     }).map(function(cid){var c=catById(cid);return c?c.name:null;}).filter(Boolean);
-    body='<div class="modal-title">'+(isEditG?'Rediger verdi':'Ny verdi')+'</div>'
+    body='<div class="modal-title">'+(isEditG?'Rediger grunnverdi':'Ny grunnverdi')+'</div>'
       +'<label class="field-lbl">Navn</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. Jeg tar godt vare på helsa mi …" oninput="mf().name=this.value;updateSaveBtn()">'
       +spanChips
@@ -3612,10 +3614,10 @@ function modalHTML(){
       +'<textarea class="inp" rows="5" placeholder="Hvorfor er dette viktig for deg? Hvem vil du være?" oninput="mf().text=this.value">'+esc(f.text||'')+'</textarea>'
       +'<label class="field-lbl">Hovedkategori(er)</label>'
       +'<div class="chips">'+mainChips+'</div>'
-      +(shared.length?'<div class="hint" style="color:var(--amber)">Merk: '+esc(shared.join(', '))+' er allerede knyttet til en annen verdi. Én verdi per hovedkategori anbefales, men er lov.</div>':'')
-      +'<div class="hint">Takknemlighetsinnlegg i disse kategoriene regnes som tegn på at verdien lever, og vises i rapportene.</div>'
-      +(isEditG?confirmBtn('goal','Slett verdi \u2014 resultatene under f\u00f8lger med','deleteGoal(\''+q(f.id)+'\')'):'')
-      +'<button class="save-btn" onclick="'+(isEditG?'saveEditGoal()':'submitGoal()')+'" '+((f.name||'').trim()?'':'disabled')+'>'+(isEditG?'Lagre endringer':'Lagre verdi')+'</button>';
+      +(shared.length?'<div class="hint" style="color:var(--amber)">Merk: '+esc(shared.join(', '))+' er allerede knyttet til en annen grunnverdi. Én grunnverdi per hovedkategori anbefales, men er lov.</div>':'')
+      +'<div class="hint">Takknemlighetsinnlegg i disse kategoriene regnes som tegn på at grunnverdien lever, og vises i rapportene.</div>'
+      +(isEditG?confirmBtn('goal','Slett grunnverdi \u2014 resultatene under f\u00f8lger med','deleteGoal(\''+q(f.id)+'\')'):'')
+      +'<button class="save-btn" onclick="'+(isEditG?'saveEditGoal()':'submitGoal()')+'" '+((f.name||'').trim()?'':'disabled')+'>'+(isEditG?'Lagre endringer':'Lagre grunnverdi')+'</button>';
 
   } else if(step==='routine'||step==='routine_edit'){
     var isEditR=step==='routine_edit';
@@ -3625,7 +3627,7 @@ function modalHTML(){
     body='<div class="modal-title">'+(isEditR?'Rediger rutine':'Ny rutine')+'</div>'
       +'<label class="field-lbl">Hva skal gjøres?</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="Beskriv rutinen …" oninput="mf().name=this.value;updateSaveBtn()">'
-      +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– verdi eller resultat</span></label>'
+      +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller resultat</span></label>'
       +'<div class="chips">'+linkChipSection(f)+'</div>'
       +'<label class="field-lbl">Hva gjør dette lettere å huske og gjennomføre? <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.ease||'')+'" placeholder="F.eks. joggeskoene står ved døra …" oninput="mf().ease=this.value">'
@@ -3716,7 +3718,7 @@ function modalHTML(){
         +'<input class="inp" type="text" style="flex:1;margin:0" placeholder="F.eks. JennyA" value="'+esc(f._ptInput||'')+'" oninput="mf()._ptInput=this.value" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addPersonTag();}">'
         +'<button class="chip" onclick="addPersonTag()">+ Legg til</button></div>'
         +'<div class="hint">Innlegg i takknemlighetsboka som bruker disse stikkordene, vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og de tre Jenny-ene holdes fra hverandre.</div>':'')
-      +(!f.bday?'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– verdi eller resultat, valgfritt</span></label>'
+      +(!f.bday?'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller resultat, valgfritt</span></label>'
       +'<div class="chips">'+linkChipSection(f)+'</div>':'')
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
@@ -3780,6 +3782,8 @@ function entryRowHTML(e){
 /* ── Sidemeny ── */
 function sidebarHTML(){
   var h='<div class="side-month'+(view.kind==='hjem'||view.kind==='dagbok'?'" style="color:var(--red)':'')+'" onclick="goHjem()"><span class="s-arrow"></span>Dagbok</div>';
+  h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Planlegging</div>';
+  h+='<div class="side-month'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'?'" style="color:var(--red)':'')+'" onclick="goOppsummering()"><span class="s-arrow"></span>Rapportering</div>';
   h+='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
   h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='administrer'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
   h+='<div class="side-month'+(view.kind==='beredskap'?'" style="color:var(--red)':'')+'" onclick="goBeredskap()"><span class="s-arrow"></span>Beredskap</div>';
@@ -3850,9 +3854,9 @@ function resultStatusStyle(status){
 }
 function oversiktViewHTML(){
   var h='<div class="sec-title">Tabell med sammenhenger</div>'
-    +'<div class="view-sub">Hvordan verdiene henger sammen med resultater, rutiner og hendelser.</div>';
+    +'<div class="view-sub">Hvordan grunnverdiene henger sammen med resultater, rutiner og hendelser.</div>';
   var vals=goals.slice().sort(function(a,b){return nbSort(a.name,b.name);});
-  if(!vals.length)return h+'<div class="card"><div class="empty">Ingen verdier ennå. Legg inn en verdi først, så vokser oversikten fram.</div></div>';
+  if(!vals.length)return h+'<div class="card"><div class="empty">Ingen grunnverdier ennå. Legg inn en grunnverdi først, så vokser oversikten fram.</div></div>';
   var rows=[];
   vals.forEach(function(v){
     var res=results.filter(function(r){return r.valueId===v.id;}).sort(function(a,b){
@@ -3878,7 +3882,7 @@ function oversiktViewHTML(){
   var headS='text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);padding:8px;border-bottom:1.5px solid var(--line);white-space:nowrap';
   var t='<div class="card" style="padding:0;overflow-x:auto;-webkit-overflow-scrolling:touch">'
     +'<table style="border-collapse:collapse;min-width:100%;font-size:12px">'
-    +'<tr><th style="position:sticky;left:0;z-index:2;background:var(--card);'+headS+';min-width:104px">Verdi</th>'
+    +'<tr><th style="position:sticky;left:0;z-index:2;background:var(--card);'+headS+';min-width:104px">Grunnverdi</th>'
     +'<th style="'+headS+';min-width:120px">Resultat</th>'
     +'<th style="'+headS+';min-width:120px">Rutine</th>'
     +'<th style="'+headS+';min-width:110px">Hendelse</th></tr>';
@@ -3926,7 +3930,7 @@ function oversiktViewHTML(){
       h+='<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')"><div class="entry-body">'
         +'<div class="entry-text">'+esc(e.name)+'</div><div class="entry-date">hendelse \u00b7 '+esc(evShort(e))+'</div></div></div>';
     });
-    h+='</div><div class="hint-box">Disse er ikke knyttet til en verdi eller et resultat. Det kan v\u00e6re helt greit \u2014 men det er ogs\u00e5 her du ser hva som lever sitt eget liv.</div>';
+    h+='</div><div class="hint-box">Disse er ikke knyttet til en grunnverdi eller et resultat. Det kan v\u00e6re helt greit \u2014 men det er ogs\u00e5 her du ser hva som lever sitt eget liv.</div>';
   }
   return h;
 }
@@ -3934,6 +3938,21 @@ function mainCatOf(catIds){
   var cid=(catIds||[])[0];if(!cid)return null;
   var c=catById(cid);if(!c)return null;
   return c.parentId?(catById(c.parentId)||null):c;
+}
+function routineTimeLogRowsHTML(items){
+  var withHours=(items||[]).filter(function(it){return it.trackHours;});
+  if(!withHours.length)return'';
+  return'<div class="sec-title" style="margin-top:10px">Timef\u00f8ring</div><div class="card">'
+    +withHours.map(function(it){
+      var tid='tlog_routine_'+it.routineId;
+      var tToday=hoursToday('routine',it.routineId);
+      return'<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(it.label)+'</div>'
+        +(tToday?'<div class="entry-date">'+String(tToday).replace('.',',')+' t logget i dag</div>':'')
+        +'</div>'
+        +'<input id="'+tid+'" class="inp" type="text" inputmode="decimal" style="width:52px;text-align:right;flex-shrink:0;align-self:center" placeholder="t" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\')">'
+        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0;align-self:center" onclick="logTime(\'routine\',\''+q(it.routineId)+'\',document.getElementById(\''+tid+'\').value)">+ Logg</button>'
+        +'</div>';
+    }).join('')+'</div>';
 }
 function catBoxesHTML(items){
   if(!items.length)return'';
@@ -3965,18 +3984,20 @@ function catBoxesHTML(items){
   }).join('')+'</div>';
 }
 function periodTodoItems(scope){
-  // scope: {wk, wKey, ym, m, y, includeDatedWeek (kun dagbok), includeUndated (kun uke)}
+  // scope: {wk, wKey, ym, m, y, includeDatedWeek (kun dagbok), includeUndated (kun uke), onlyGroup ('daily'|'weekly'|'monthly'|'yearly')}
   var out=[];var total=0;
   var pushR=function(r,key,sub){
     total++;
     var done=(r.log||[]).includes(key);
     var rk='r_'+r.id+'_'+key;
     if(done&&!recentDone[rk])return;
-    out.push({label:r.name,sub:sub,done:done,cat:mainCatOf(r.cats),click:"boxToggleRoutine('"+q(r.id)+"','"+q(key)+"')"});
+    out.push({label:r.name,sub:sub,done:done,cat:mainCatOf(r.cats),click:"boxToggleRoutine('"+q(r.id)+"','"+q(key)+"')",routineId:r.id,trackHours:!!r.trackHours});
   };
   routines.forEach(function(r){
     var months=r.months||[];
     if(months.length&&!months.includes(scope.m))return;
+    var grp=r.freq==='daily'?'daily':r.freq==='yearly'?'yearly':isWeekly(r)?'weekly':'monthly';
+    if(scope.onlyGroup&&scope.onlyGroup!==grp)return;
     if(r.freq==='daily'){
       // Daglige rutiner vises bare i dagbokboksene, aldri i kalenderen
       if(!scope.daily)return;
@@ -4116,25 +4137,6 @@ function hjemViewHTML(){
 
   // Hurtiglogging — det første som møter deg
   h+=quickLogHTML();
-
-  // Timer i dag — logg tid på prioriterte prosjekter/resultater og rutiner med timeføring på, flere ganger om dagen
-  var timeItems=timeTrackedItems().filter(function(it){return itemStartedByPeriod(it,curYear,curMonth,'m');}).concat(routineTimeItems().map(function(r){return{kind:'routine',refId:r.id,name:r.name};}));
-  if(timeItems.length){
-    h+='<div class="sec-title">Timer i dag</div><div class="card">';
-    timeItems.forEach(function(it){
-      var tid='tlog_'+it.kind+'_'+it.refId;
-      var todaySum=hoursToday(it.kind,it.refId);
-      h+='<div class="entry-row">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(it.name)+'</div>'
-        +(todaySum?'<div class="entry-date">'+String(todaySum).replace('.',',')+' t logget i dag</div>':'')
-        +'</div>'
-        +'<input id="'+tid+'" class="inp" type="text" inputmode="decimal" style="width:52px;text-align:right;flex-shrink:0;align-self:center" placeholder="t" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\')">'
-        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0;align-self:center" onclick="logTime(\''+it.kind+'\',\''+q(it.refId)+'\',document.getElementById(\''+tid+'\').value)">+ Logg</button>'
-        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0;align-self:center" onclick="openTimeLogList(\''+it.kind+'\',\''+q(it.refId)+'\',\''+q(it.name)+'\')">Vis logg</button>'
-        +'</div>';
-    });
-    h+='</div>';
-  }
 
   // Ferske anerkjennelser (siste 24 timer) — milepæler og resultater
   var freshAch=achievements.filter(function(a){return(Date.now()-(a.ts||0))<86400000;}).sort(function(a,b){return(b.ts||0)-(a.ts||0);});
@@ -4490,10 +4492,68 @@ function routineChipsHTML(items){
 
 function kalNavHTML(){
   return'<div class="chips" style="justify-content:center;padding:10px 12px 0">'
+    +'<button class="chip'+(view.kind==='dag'?' on':'')+'" onclick="goDag()">Dagsvisning</button>'
     +'<button class="chip'+(view.kind==='uke'?' on':'')+'" onclick="goUke()">Ukesvisning</button>'
     +'<button class="chip'+(view.kind==='rutiner'?' on':'')+'" onclick="goRutiner('+(view.kind==='rutiner'?view.month:curMonth)+',null'+(view.kind==='kalender'?','+view.year:'')+')">M\u00e5nedsvisning</button>'
     +'<button class="chip'+(view.kind==='kalender'?' on':'')+'" onclick="goKalender('+(view.kind==='rutiner'&&view.year?view.year:'curYear')+')">\u00c5rsvisning</button>'
     +'</div>';
+}
+function dagViewHTML(){
+  var d=new Date(view.d+'T00:00:00');
+  var dy=d.getFullYear(),dm=d.getMonth()+1,dd=d.getDate();
+  var isToday=view.d===isoDate(today);
+  var h=kalNavHTML();
+  h+='<div style="display:flex;align-items:center;gap:6px;padding:10px 12px 0">'
+    +'<button class="icon-btn" onclick="dagShift(-1)">\u2039</button>'
+    +'<div class="view-title" style="padding:0;flex:1">'+cap(UKEDAGER_FULL[dow(d)])+' '+dd+'. '+MND_FULL[dm-1]+'</div>'
+    +'<button class="icon-btn" onclick="dagShift(1)">\u203a</button>'
+    +'</div>'
+    +'<div class="view-sub">'+dy+(!isToday?' \u00b7 <button class="icon-btn" style="font-size:11px;padding:1px 8px" onclick="goDag()">Til i dag</button>':'')+'</div>';
+
+  // Hendelser og milepæler denne dagen
+  var occs=eventsOnDate(dm,dd,dy).sort(function(a,b){return nbSort(a.e.name,b.e.name);});
+  var dayMs=milestonesFor(dm,dy).filter(function(x){return x.day===dd;});
+  h+='<div class="card"><div class="entry-row">'
+    +'<div class="entry-body" style="align-self:center">'
+    +(occs.length?occs.map(function(o){
+        var e=o.e;
+        var dn=evDone(e,o.occYear);
+        var eCol=itemColor(e.cats);
+        var round=isRoundBdayInYear(e,o.occYear);
+        var click=editMode?'openEditEvent(\''+q(e.id)+'\')':'toggleEvent(\''+q(e.id)+'\','+o.occYear+')';
+        var lbl=o.isStart?esc(e.name):'\u2192 '+esc(e.name);
+        return'<button class="dl-ev'+(dn?' done':'')+(round?' confetti':'')+'"'+(eCol&&!dn?' style="background:'+eCol+';color:'+textOn(eCol)+(o.isStart?'':';opacity:.75')+'"':(o.isStart?'':' style="opacity:.75"'))+' onclick="'+click+'">'+(round?confettiHTML():'')+(editMode?'\u270e ':'')+lbl+(o.isStart?evYearsTag(e,o.occYear,true):'')+(dn?' \u2713':'')+(round&&o.isStart?' \ud83c\udf89':'')+'</button>';
+      }).join(' ')
+      :dayMs.length?'':'<span style="font-size:12px;color:var(--line)">\u2014</span>')
+    +(dayMs.length?' '+dayMs.map(milestoneBtnHTML).join(' '):'')
+    +'</div></div></div>';
+
+  // Daglige rutiner
+  var dtodo=periodTodoItems({wk:weekNum(d),wKey:'w'+weekYear(d)+'-'+pad(weekNum(d)),ym:dy+'-'+pad(dm),m:dm,y:dy,daily:view.d,onlyGroup:'daily'});
+  h+='<div class="sec-title">Daglige rutiner <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>';
+  if(dtodo.items.length)h+=catBoxesHTML(dtodo.items);
+  else if(dtodo.total>0)h+='<div class="view-sub" style="color:var(--red)">\u2713 Alt for denne dagen er gjort.</div>';
+  else h+='<div class="card"><div class="empty">Ingen daglige rutiner enn\u00e5.</div></div>';
+  h+=routineTimeLogRowsHTML(dtodo.items);
+
+  // Timer i dag — prosjekter og resultater (flyttet hit fra Dagbok)
+  var timeItems=timeTrackedItems().filter(function(it){return itemStartedByPeriod(it,dy,dm,'m');});
+  if(timeItems.length){
+    h+='<div class="sec-title">Timer \u2014 prosjekter og resultater</div><div class="card">';
+    timeItems.forEach(function(it){
+      var tid='tlog_'+it.kind+'_'+it.refId;
+      var tToday=isToday?hoursToday(it.kind,it.refId):hoursFor(it.kind,it.refId,dy,dm,'m');
+      h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(it.name)+'</div>'
+        +(tToday?'<div class="entry-date">'+String(tToday).replace('.',',')+' t logget '+(isToday?'i dag':'denne dagen')+'</div>':'')
+        +'</div>'
+        +(isToday?('<input id="'+tid+'" class="inp" type="text" inputmode="decimal" style="width:52px;text-align:right;flex-shrink:0;align-self:center" placeholder="t" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\')">'
+          +'<button class="icon-btn" style="font-size:11px;flex-shrink:0;align-self:center" onclick="logTime(\''+it.kind+'\',\''+q(it.refId)+'\',document.getElementById(\''+tid+'\').value)">+ Logg</button>'):'')
+        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0;align-self:center" onclick="openTimeLogList(\''+it.kind+'\',\''+q(it.refId)+'\',\''+q(it.name)+'\')">Vis logg</button>'
+        +'</div>';
+    });
+    h+='</div>';
+  }
+  return h;
 }
 function ukeViewHTML(){
   var ws=new Date(view.ws);
@@ -4544,14 +4604,15 @@ function ukeViewHTML(){
   }
   h+='</div>';
 
-  // Rutiner og hendelser uten dato — kompakte bokser per hovedkategori
-  var wtodo=periodTodoItems({wk:wk,wKey:wKey,ym:ym,m:m,y:y,includeUndated:true});
+  // Ukentlige rutiner uten dato — kompakte bokser per hovedkategori
+  var wtodo=periodTodoItems({wk:wk,wKey:wKey,ym:ym,m:m,y:y,includeUndated:true,onlyGroup:'weekly'});
   if(wtodo.items.length){
-    h+='<div class="sec-title">Rutiner og hendelser <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>'
+    h+='<div class="sec-title">Ukentlige rutiner <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>'
       +catBoxesHTML(wtodo.items);
   } else if(wtodo.total>0){
     h+='<div class="view-sub" style="padding-top:10px;color:var(--red)">\u2713 Alt for denne uka er gjort.</div>';
   }
+  h+=routineTimeLogRowsHTML(wtodo.items);
   return h;
 }
 function miniMonthHTML(m,y){
@@ -4589,7 +4650,42 @@ function kalenderViewHTML(){
   h+='<div class="kal-grid">';
   for(var m=1;m<=12;m++)h+=miniMonthHTML(m,y);
   h+='</div>';
+
+  // Årlige rutiner
+  var ytodo=periodTodoItems({wk:1,wKey:'',ym:'',m:curMonth,y:y,includeUndated:true,onlyGroup:'yearly'});
+  h+='<div class="sec-title">\u00c5rlige rutiner <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>';
+  if(ytodo.items.length)h+=catBoxesHTML(ytodo.items);
+  else if(ytodo.total>0)h+='<div class="view-sub" style="color:var(--red)">\u2713 Alt for '+y+' er gjort.</div>';
+  else h+='<div class="card"><div class="empty">Ingen \u00e5rlige rutiner enn\u00e5.</div></div>';
+  h+=routineTimeLogRowsHTML(ytodo.items);
+
+  // Pengesammendrag for året
+  h+=periodMoneySummaryHTML(y,null,'\u00e5r');
   return h;
+}
+function periodMoneySummaryHTML(y,m,scope){
+  var items=moneyTrackedItems().filter(function(it){return itemStartedByPeriod(it,y,m,scope);});
+  if(!items.length)return'';
+  var tot={spar:0,in:0,ut:0};
+  items.forEach(function(it){
+    var r=it.moneyRes;
+    var sum=deposits.filter(function(d){
+      if(d.resultId!==r.id)return false;
+      var dy=Number((d.date||'').slice(0,4)),dm=Number((d.date||'').slice(5,7));
+      if(dy!==y)return false;
+      return scope==='m'?dm===m:true;
+    }).reduce(function(a,d){return a+(Number(d.amount)||0);},0);
+    tot[r.amountType]=(tot[r.amountType]||0)+sum;
+  });
+  return'<div class="sec-title">Penger <span style="font-weight:400;color:var(--rose)">\u00b7 '+(scope==='m'?'denne m\u00e5neden':'dette \u00e5ret')+'</span></div>'
+    +'<div class="card" style="padding:8px 14px">'
+    +'<div style="display:flex;gap:14px;font-size:13px">'
+    +'<span>Inntekt <b>'+fmtKr(tot.in)+'</b></span>'
+    +'<span>Utgift <b>'+fmtKr(tot.ut)+'</b></span>'
+    +'<span>Spart <b>'+fmtKr(tot.spar)+'</b></span>'
+    +'</div>'
+    +'<button class="icon-btn" style="font-size:11px;margin-top:6px" onclick="goBudsjett('+y+',\''+(scope==='m'?'m':'\u00e5r')+'\''+(scope==='m'?','+m:'')+')">\u00c5pne Tid og penger \u203a</button>'
+    +'</div>';
 }
 function rutinerViewHTML(){
   var m=view.month,catFilter=view.cat;
@@ -4614,7 +4710,7 @@ function rutinerViewHTML(){
     .sort(function(a,b){return(a.day||99)-(b.day||99)||nbSort(a.name,b.name);});
 
   {
-    h+='<div class="sec-title">Hendelser p\u00e5 dato <span style="font-weight:400;color:var(--rose)">\u00b7 med prosjektmilep\u00e6ler \u2014 rutiner hakes av i ukesvisningen</span></div>';
+    h+='<div class="sec-title">Hendelser p\u00e5 dato <span style="font-weight:400;color:var(--rose)">\u00b7 med prosjektmilep\u00e6ler</span></div>';
     var dated=monthEvents.filter(function(e){return e.day;});
     var undated=monthEvents.filter(function(e){return!e.day;});
     h+='<div class="card">'+dayListHTML(m,effY,dated,[],milestonesFor(m,effY))+'</div>';
@@ -4632,6 +4728,17 @@ function rutinerViewHTML(){
       h+='</div>';
     }
   }
+
+  // Månedlige rutiner
+  var mtodo=periodTodoItems({wk:1,wKey:'',ym:ym,m:m,y:effY,includeUndated:true,onlyGroup:'monthly'});
+  h+='<div class="sec-title">M\u00e5nedlige rutiner <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>';
+  if(mtodo.items.length)h+=catBoxesHTML(mtodo.items);
+  else if(mtodo.total>0)h+='<div class="view-sub" style="color:var(--red)">\u2713 Alt for denne m\u00e5neden er gjort.</div>';
+  else h+='<div class="card"><div class="empty">Ingen m\u00e5nedlige rutiner enn\u00e5.</div></div>';
+  h+=routineTimeLogRowsHTML(mtodo.items);
+
+  // Kort pengesammendrag for måneden
+  h+=periodMoneySummaryHTML(effY,m,'m');
   return h;
 }
 
@@ -4830,7 +4937,7 @@ function rapportViewHTML(){
     +'</div></div>';
 
   if(!goals.length){
-    h+='<div class="card"><div class="empty">Ingen verdier enn\u00e5. Legg til under Planlegging, s\u00e5 bygges rapporten rundt dem.</div></div>';
+    h+='<div class="card"><div class="empty">Ingen grunnverdier enn\u00e5. Legg til under Planlegging, s\u00e5 bygges rapporten rundt dem.</div></div>';
     return h;
   }
 
@@ -4883,18 +4990,18 @@ function rapportViewHTML(){
     var dirR=row.gr.filter(function(r){return!shown[r.id];});
     var dirE=row.ge.filter(function(e){return!shown[e.id];});
     if(dirR.length||dirE.length){
-      h+=secLbl(row.vRes.length?'Direkte p\u00e5 verdien':'Rutiner og hendelser')
+      h+=secLbl(row.vRes.length?'Direkte p\u00e5 grunnverdien':'Rutiner og hendelser')
         +'<div style="padding:2px 14px 10px">';
       dirR.forEach(function(r){var st=routineMonthStatus(r,m,y);h+=outLine(r.name,st.done,st.txt);});
       dirE.forEach(function(e){h+=outLine(e.name,evDone(e,y),'hendelse');});
       h+='</div>';
     } else if(!row.vRes.length){
-      h+=secLbl('Rutiner og hendelser')+secNote('Ingenting knyttet til denne verdien denne m\u00e5neden.');
+      h+=secLbl('Rutiner og hendelser')+secNote('Ingenting knyttet til denne grunnverdien denne m\u00e5neden.');
     }
 
     if(!(g.cats||[]).length){
       h+=secLbl('Takknemlighet')
-        +secNote('Koble verdien til hovedkategorier (via \u270e under Planlegging) for \u00e5 se takknemligheten den gir.');
+        +secNote('Koble grunnverdien til hovedkategorier (via \u270e under Planlegging) for \u00e5 se takknemligheten den gir.');
     } else {
       h+=secLbl('Takknemlighet \u00b7 '+gent.length);
       h+=gent.length?gent.map(entryRowHTML).join(''):secNote('Ingen innlegg i tilknyttede kategorier denne m\u00e5neden.');
@@ -4906,7 +5013,7 @@ function rapportViewHTML(){
   if(rest.length){
     h+='<div class="card" style="margin-top:14px">'
       +'<div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)">'
-      +'<span style="font-weight:700;flex:1">Utenfor verdiene</span>'
+      +'<span style="font-weight:700;flex:1">Utenfor grunnverdiene</span>'
       +'<span style="font-size:12px;color:var(--rose)">'+rest.length+' innlegg</span></div>'
       +secNote('Gleder du ikke har planlagt deg til.')
       +rest.map(entryRowHTML).join('')
@@ -4994,7 +5101,7 @@ function arsrapportViewHTML(){
       +'</div></div>';
   }
   if(!goals.length){
-    h+='<div class="card"><div class="empty">Ingen verdier enn\u00e5. Legg til under Planlegging, s\u00e5 bygges rapporten rundt dem.</div></div>';
+    h+='<div class="card"><div class="empty">Ingen grunnverdier enn\u00e5. Legg til under Planlegging, s\u00e5 bygges rapporten rundt dem.</div></div>';
   } else {
     var rows=goals.map(function(g){
       var resIdSet=resultsFor(g.id).map(function(x){return x.id;});
@@ -5055,18 +5162,18 @@ function arsrapportViewHTML(){
       var dirRY=row.gr.filter(function(w){return!shownY[w.r.id];});
       var dirEY=row.ge.filter(function(e){return!shownY[e.id];});
       if(dirRY.length||dirEY.length){
-        h+=secLbl(vRes.length?'Direkte p\u00e5 verdien':'Rutiner og hendelser')
+        h+=secLbl(vRes.length?'Direkte p\u00e5 grunnverdien':'Rutiner og hendelser')
           +'<div style="padding:2px 14px 10px">';
         dirRY.forEach(function(w){h+=rLine(w);});
         dirEY.forEach(function(e){h+=eLine(e);});
         h+='</div>';
       } else if(!vRes.length){
-        h+=secLbl('Rutiner og hendelser')+secNote('Ingenting knyttet til denne verdien i '+y+'.');
+        h+=secLbl('Rutiner og hendelser')+secNote('Ingenting knyttet til denne grunnverdien i '+y+'.');
       }
 
       if(!(g.cats||[]).length){
         h+=secLbl('Takknemlighet')
-          +secNote('Koble verdien til hovedkategorier (via \u270e under Planlegging) for \u00e5 se takknemligheten den gir.');
+          +secNote('Koble grunnverdien til hovedkategorier (via \u270e under Planlegging) for \u00e5 se takknemligheten den gir.');
       } else {
         h+=secLbl('Takknemlighet \u00b7 '+row.gent.length);
         if(row.gent.length){
@@ -5656,7 +5763,7 @@ function catUsage(catId){
   var u=[];
   var n;
   n=goals.filter(function(g){return(g.cats||[]).includes(catId);}).length;
-  if(n)u.push(n+' verdi'+(n>1?'er':''));
+  if(n)u.push(n+' grunnverdi'+(n>1?'er':''));
   n=results.filter(function(r){return(r.subCats||[]).includes(catId);}).length;
   if(n)u.push(n+' resultat'+(n>1?'er':''));
   n=routines.filter(function(r){return(r.cats||[]).includes(catId);}).length;
@@ -5953,8 +6060,8 @@ function budsjettViewHTML(){
 
 function planleggingViewHTML(){
   var h='<div class="view-title">Planlegging</div>'
-    +'<div class="view-sub">Verdier er slik du vil leve («Jeg tar vare på helsa»). Resultater er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['oversikt','Oversikt'],['verdier','Verdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser']];
+    +'<div class="view-sub">Grunnverdier er slik du vil leve («Jeg tar vare på helsa»). Resultater er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
+  var ptabs=[['oversikt','Oversikt'],['verdier','Grunnverdier'],['resultater','Resultater'],['rutiner','Rutiner'],['hendelser','Hendelser']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
@@ -5967,10 +6074,10 @@ function planleggingViewHTML(){
     h+=(oversiktSub==='tidslinje')?prosjektTidslinjeHTML():oversiktViewHTML();
   }
   if(planTab==='verdier'){
-  h+='<div class="sec-title">Verdier</div>';
-  h+='<button class="add-btn" onclick="openGoalModal()">+ Ny verdi</button>';
+  h+='<div class="sec-title">Grunnverdier</div>';
+  h+='<button class="add-btn" onclick="openGoalModal()">+ Ny grunnverdi</button>';
   if(!goals.length){
-    h+='<div class="card"><div class="empty">Ingen verdier ennå. En verdi er identitetsmålet — hvem du vil være — og eier en hovedkategori.</div></div>';
+    h+='<div class="card"><div class="empty">Ingen grunnverdier ennå. En grunnverdi er identitetsmålet — hvem du vil være — og eier en hovedkategori.</div></div>';
   } else {
     h+='<div class="card">';
     goals.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(g){
@@ -5987,7 +6094,7 @@ function planleggingViewHTML(){
         +(editMode?'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="event.stopPropagation();openEditGoal(\''+q(g.id)+'\')">\u270e</button>':'')
         +'</div>';
       if((g.span||'livet')==='fem'&&!resultsFor(g.id).length){
-        h+='<div style="padding:0 14px 8px;font-size:12px;color:var(--amber)">\u26a0 Fem\u00e5rig styringsverdi uten resultat \u2014 legg til minst ett resultat som viser at du lever den.</div>';
+        h+='<div style="padding:0 14px 8px;font-size:12px;color:var(--amber)">\u26a0 Fem\u00e5rig styringsgrunnverdi uten resultat \u2014 legg til minst ett resultat som viser at du lever den.</div>';
       }
       if(open){
         h+='<div style="padding:0 14px 12px 34px">';
@@ -6030,7 +6137,7 @@ function planleggingViewHTML(){
           linkedL.forEach(function(l){h+='<div style="font-size:13px;padding:2px 0">'+esc(l.name)+'</div>';});
         }
         if(!g.text&&!linkedR.length&&!linkedE.length&&!vResults.length){
-          h+='<div style="font-size:12px;color:var(--muted)">Ingen utdypning eller koblinger ennå. Bruk \u270e for å skrive mer, og koble resultater, rutiner og hendelser til verdien i skjemaene deres.</div>';
+          h+='<div style="font-size:12px;color:var(--muted)">Ingen utdypning eller koblinger ennå. Bruk \u270e for å skrive mer, og koble resultater, rutiner og hendelser til grunnverdien i skjemaene deres.</div>';
         }
         h+='</div>';
       }
@@ -6216,9 +6323,7 @@ function render(){
     +'<div class="stripe-ribbon"></div>'
     +'<div class="tabs">'
     +'<button class="tab'+(view.kind==='hjem'||view.kind==='dagbok'?' on':'')+'" onclick="goHjem()">Dagbok</button>'
-    +'<button class="tab'+(view.kind==='kalender'||view.kind==='rutiner'||view.kind==='uke'?' on':'')+'" onclick="goUke()">Kalender</button>'
-    +'<button class="tab'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'?' on':'')+'" onclick="goOppsummering()">Rapporter</button>'
-    +'<button class="tab'+(view.kind==='planlegging'?' on':'')+'" onclick="goPlanlegging()">Planlegging</button>'
+    +'<button class="tab'+(view.kind==='kalender'||view.kind==='rutiner'||view.kind==='uke'||view.kind==='dag'?' on':'')+'" onclick="goDag()">Loggf\u00f8ring</button>'
     +'</div>'
     +'</div>';
 
@@ -6227,6 +6332,7 @@ function render(){
   else if(view.kind==='dagbok')content=dagbokViewHTML();
   else if(view.kind==='rutiner')content=rutinerViewHTML();
   else if(view.kind==='kalender')content=kalenderViewHTML();
+  else if(view.kind==='dag')content=dagViewHTML();
   else if(view.kind==='uke')content=ukeViewHTML();
   else if(view.kind==='om')content=omViewHTML();
   else if(view.kind==='bursdager')content=bursdagerHubHTML();
