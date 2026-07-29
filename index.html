@@ -493,6 +493,43 @@ function beredBg(it){
   if(!it||!it.values||it.values.__bered!=='ja')return'';
   return it.have?'#FDF3C7':'#F8D9BC';
 }
+// Kompakt velger for utstyr og forbruksvarer: viser bare det som er valgt,
+// pluss en nedtrekksliste for å legge til. Unngår en vegg av knapper.
+function equipmentSourceItems(){
+  var out=[];
+  ['utstyr','forbruksvarer','strikkeutstyr'].forEach(function(key){
+    var lst=findFixedList(key);
+    if(!lst)return;
+    (lst.items||[]).forEach(function(it){out.push({id:it.id,name:it.name,src:lst.name});});
+  });
+  return out.sort(function(a,b){return nbSort(a.name,b.name);});
+}
+function equipmentPickerHTML(f){
+  var all=equipmentSourceItems();
+  if(!all.length)return'';
+  var sel=f.equipmentIds||[];
+  var chosen=all.filter(function(it){return sel.indexOf(it.id)>=0;});
+  var rest=all.filter(function(it){return sel.indexOf(it.id)<0;});
+  var h='<label class="field-lbl">Utstyr og forbruksvarer <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>';
+  if(chosen.length){
+    h+='<div class="chips">'+chosen.map(function(it){
+      return'<button class="chip on" onclick="toggleEquipmentId(\''+q(it.id)+'\')">'+esc(it.name)+' \u00d7</button>';
+    }).join('')+'</div>';
+  }
+  if(rest.length){
+    h+='<select class="inp" style="margin-top:6px" onchange="if(this.value){toggleEquipmentId(this.value);}">'
+      +'<option value="">+ Hent fra utstyr og forbruksvarer \u2026</option>'
+      +rest.map(function(it){return'<option value="'+esc(it.id)+'">'+esc(it.name)+' \u00b7 '+esc(it.src)+'</option>';}).join('')
+      +'</select>';
+  }
+  h+='<div class="hint">Merkes med \u00abbrukt til\u00bb n\u00e5r dette markeres som gjennomf\u00f8rt.</div>';
+  return h;
+}
+function toggleEquipmentId(id){
+  var a=mf().equipmentIds||[];
+  mf().equipmentIds=a.indexOf(id)>=0?a.filter(function(x){return x!==id;}):a.concat([id]);
+  render();
+}
 function listHasDetails(inv){return !!inv&&(inv.fixed==='beredskap'||inv.fixed==='utstyr');}
 var TILSTAND=['Ikke relevant','Som ny','Brukt, men velfungerende','Må repareres eller vedlikeholdes','Må erstattes'];
 function setItemVal(k,val){var f=mf();f.values=f.values||{};f.values[k]=(f.values[k]===val?'':val);render();}
@@ -662,6 +699,60 @@ function varetellingHubViewHTML(){
   }
   return h;
 }
+function goStrikkeverksted(){view={kind:'strikkeverksted'};drawerOpen=false;render();}
+function goStrikkeprosjekter(){view={kind:'strikkeprosjekter'};drawerOpen=false;render();}
+function strikkeverkstedViewHTML(){
+  var h='<div class="view-title">Strikkeverksted</div>'
+    +'<div class="view-sub">Alt som h\u00f8rer til strikkingen p\u00e5 ett sted.</div>';
+  var knitProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';})
+    .concat(results.filter(function(r){return r.subtype==='strikk';}).map(function(r){return{__res:true,id:r.id,name:resultShortTitle(r)};}));
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goStrikkeprosjekter()">'
+    +'<div class="entry-body"><div class="entry-text">Strikkeprosjekter</div>'
+    +'<div class="entry-date">'+knitProjs.length+' prosjekt'+(knitProjs.length===1?'':'er')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  [['garnlager','goGarnlager'],['strikkeoppskrifter','goStrikkeoppskrifter'],['strikkeutstyr','goStrikkeutstyr']].forEach(function(t){
+    var inv=findFixedList(t[0]);if(!inv)return;
+    var c=invCounts(inv);
+    h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="'+t[1]+'()">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+'</div>'
+      +'<div class="entry-date">'+c.total+' oppf\u00f8ring'+(c.total===1?'':'er')+'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  });
+  return h;
+}
+function goGarnlager(){view={kind:'garnlager'};drawerOpen=false;render();}
+function goStrikkeoppskrifter(){view={kind:'strikkeoppskrifter'};drawerOpen=false;render();}
+function goStrikkeutstyr(){view={kind:'strikkeutstyr'};drawerOpen=false;render();}
+function strikkeprosjekterViewHTML(){
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goStrikkeverksted()">\u2039</button></div>'
+    +'<div class="view-title">Strikkeprosjekter</div>'
+    +'<div class="view-sub">Vises ogs\u00e5 i prosjektoversiktene under Planlegger.</div>';
+  h+='<button class="add-btn" onclick="openProjModal();mf().subtype=\'strikk\';render()">+ Nytt strikkeprosjekt</button>';
+  var invProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';})
+    .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
+  var resProjs=results.filter(function(r){return r.subtype==='strikk';})
+    .sort(function(a,b){return nbSort(resultShortTitle(a),resultShortTitle(b));});
+  if(!invProjs.length&&!resProjs.length){
+    h+='<div class="card"><div class="empty">Ingen strikkeprosjekter enn\u00e5.</div></div>';
+    return h;
+  }
+  h+='<div class="card">';
+  invProjs.forEach(function(iv){
+    var c=invCounts(iv);
+    h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(dispName(iv))+(iv.completedDate?' <span style="font-size:10px;color:var(--red)">\u00b7 \u2713 ferdig</span>':'')+'</div>'
+      +'<div class="entry-date">'+c.have+' av '+c.total+(iv.endDate?' \u00b7 frist '+fmtDate(iv.endDate):'')+'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+  });
+  resProjs.forEach(function(r){
+    h+='<div class="entry-row" style="cursor:pointer" onclick="openEditResult(\''+q(r.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(resultShortTitle(r))+(r.achieved?' <span style="font-size:10px;color:var(--red)">\u00b7 \u2713 oppn\u00e5dd</span>':'')+'</div>'
+      +'<div class="entry-date">frist '+MND_FULL[r.month-1]+' '+r.year+'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+  });
+  h+='</div>';
+  return h;
+}
 function okonomiHubHTML(){
   rrTab='ressursbruk';
   var h=rrTabsHTML();
@@ -741,7 +832,9 @@ function printOversikt(invId){
 }
 function fixedListHubHTML(key,title,sub){
   var inv=findFixedList(key);
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goVaretelling()">\u2039</button></div>';
+  var knitKeys=['garnlager','strikkeoppskrifter','strikkeutstyr'];
+  var backFn=knitKeys.indexOf(key)>=0?'goStrikkeverksted()':'goVaretelling()';
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+backFn+'">\u2039</button></div>';
   h+='<div class="view-title">'+esc(title)+'</div>';
   if(sub)h+='<div class="view-sub">'+sub+'</div>';
   if(!inv)return h+'<div class="card"><div class="empty">Lista finnes ikke.</div></div>';
@@ -1217,6 +1310,30 @@ function load(){
     try{localStorage.setItem(SK+'_forbruksvarer1','1');}catch(e){}
     save();
   }
+  // Strikkeverksted — garnlager, oppskrifter og strikkeutstyr som egne faste lister
+  var sv1=false;try{sv1=!!localStorage.getItem(SK+'_strikkeverksted1');}catch(e){}
+  if(!sv1){
+    [['garnlager','Garnlager'],['strikkeoppskrifter','Strikkeoppskrifter'],['strikkeutstyr','Strikkepinner og annet strikkeutstyr']].forEach(function(t){
+      if(!inventories.some(function(iv){return iv.fixed===t[0];})){
+        inventories.push({id:'fixed_'+t[0],name:t[1],type:'inventar',fixed:t[0],qty:true,catId:'',fields:[],sections:[],items:[]});
+      }
+    });
+    // Flytt eventuelt garn som ligger under overskriften «Garnlager» på Forbruksvarer
+    var fvOld=inventories.find(function(iv){return iv.fixed==='forbruksvarer';});
+    var glNew=inventories.find(function(iv){return iv.fixed==='garnlager';});
+    if(fvOld&&glNew){
+      var gsec=(fvOld.sections||[]).find(function(sc){return(sc.name||'').toLowerCase()==='garnlager';});
+      if(gsec){
+        var moved=(fvOld.items||[]).filter(function(it){return it.sectionId===gsec.id;});
+        moved.forEach(function(it){it.sectionId=null;glNew.items.push(it);});
+        fvOld.items=(fvOld.items||[]).filter(function(it){return it.sectionId!==gsec.id;});
+        fvOld.sections=(fvOld.sections||[]).filter(function(sc){return sc.id!==gsec.id;});
+      }
+    }
+    try{localStorage.setItem(SK+'_strikkeverksted1','1');}catch(e){}
+    save();
+  }
+
   // Rydd bort eksempelkategoriene fra en tidligere versjon, hvis de ikke er tatt i bruk
   var fvClean1=false;try{fvClean1=!!localStorage.getItem(SK+'_forbruksvarer_clean1');}catch(e){}
   if(!fvClean1){
@@ -1418,7 +1535,9 @@ function deleteEntry(id){entries=entries.filter(function(e){return e.id!==id;});
 function toggleRoutine(id,ym){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
   r.log=r.log||[];
-  r.log=r.log.includes(ym)?r.log.filter(function(l){return l!==ym;}):[].concat(r.log,[ym]);
+  var wasOn=r.log.includes(ym);
+  r.log=wasOn?r.log.filter(function(l){return l!==ym;}):[].concat(r.log,[ym]);
+  if(!wasOn&&(r.equipmentIds||[]).length)markEquipmentUsed(r.equipmentIds,r.name+' '+fmtDate(isoDate(today)));
   checkRoutineMilestone(r);
   save();render();
 }
@@ -2180,9 +2299,12 @@ function projectLongLabel(inv){
   return desc+' '+MND_FULL[d.getMonth()]+' '+d.getFullYear();
 }
 function markEquipmentUsed(ids,label){
-  var ut=findFixedList('utstyr');if(!ut||!ids||!ids.length)return;
-  (ut.items||[]).forEach(function(it){
-    if(ids.indexOf(it.id)>=0)it.note=(it.note?it.note+' \u00b7 ':'')+'Brukt til \u00ab'+label+'\u00bb';
+  if(!ids||!ids.length)return;
+  ['utstyr','forbruksvarer','strikkeutstyr'].forEach(function(key){
+    var lst=findFixedList(key);if(!lst)return;
+    (lst.items||[]).forEach(function(it){
+      if(ids.indexOf(it.id)>=0)it.note=(it.note?it.note+' \u00b7 ':'')+'Brukt til \u00ab'+label+'\u00bb';
+    });
   });
 }
 function toggleProjectDone(invId){
@@ -2220,15 +2342,12 @@ function toggleProjectDone(invId){
 }
 function sendRestgarn(){
   var f=mf();var inv=invById(f.invId);if(!inv)return;
-  var fv=findFixedList('forbruksvarer');if(!fv)return;
-  fv.sections=fv.sections||[];
-  var sec=fv.sections.find(function(s){return(s.name||'').toLowerCase()==='garnlager';});
-  if(!sec){sec={id:'fv_garnlager',name:'Garnlager',parentId:''};fv.sections.push(sec);}
+  var fv=findFixedList('garnlager');if(!fv)return;
   fv.items=fv.items||[];
   f.rows.forEach(function(r){
     if(!r.on||!(r.name||'').trim())return;
     var amt=[r.gram?r.gram+' g':'',r.skeins?r.skeins+' n\u00f8ster':''].filter(Boolean).join(' / ');
-    fv.items.push({id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:sec.id,
+    fv.items.push({id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:null,
       name:r.name,note:['Restgarn fra '+dispName(inv),r.detail,amt].filter(Boolean).join(' \u00b7 '),
       values:{},have:true});
   });
@@ -2740,12 +2859,12 @@ function openEditEntry(id){
   render();
 }
 function openRoutineModal(){
-  modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',goalIds:[],resultIds:[],freq:'',ease:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',goalIds:[],resultIds:[],equipmentIds:[],freq:'',ease:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openEditRoutine(id){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
-  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),freq:r.freq||'',ease:r.ease||'',minutes:r.minutes||'',trackHours:!!r.trackHours,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),equipmentIds:[].concat(r.equipmentIds||[]),freq:r.freq||'',ease:r.ease||'',minutes:r.minutes||'',trackHours:!!r.trackHours,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openBdayModal(){
@@ -2968,13 +3087,13 @@ function saveEditEntry(){
 function routineValid(){var f=mf();return(f.name||'').trim().length>0;}
 function submitRoutine(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
-  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[]});
+  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[]});
   save();closeModal();
 }
 function saveEditRoutine(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var r=routines.find(function(x){return x.id===f.id;});if(!r)return;
-  r.name=name;r.cats=f.cats;r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
+  r.name=name;r.cats=f.cats;r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
   save();closeModal();
 }
 function submitEvent(){
@@ -3142,7 +3261,7 @@ function modalHTML(){
   } else if(step==='restgarn'){
     var rgInv=invById(f.invId);
     body='<div class="modal-title">Gratulerer med ferdig prosjekt! \ud83c\udf89</div>'
-      +'<div class="hint">Vil du sende restgarnet til garnlageret? Fyll inn omtrent hvor mye som er igjen \u2014 det legges inn som punkter under overskriften \u00abGarnlager\u00bb p\u00e5 Forbruksvarer.</div>'
+      +'<div class="hint">Vil du sende restgarnet til garnlageret? Fyll inn omtrent hvor mye som er igjen \u2014 det legges inn i Garnlager under Strikkeverksted.</div>'
       +f.rows.map(function(r,i){
         return'<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
           +'<button class="chk'+(r.on?' done':'')+'" onclick="mf().rows['+i+'].on=!mf().rows['+i+'].on;render()">'+(r.on?'\u2713':'')+'</button>'
@@ -3863,16 +3982,7 @@ function modalHTML(){
       +'</div>'
       +moneySection
       +timeSection
-      +(function(){
-        var ut=findFixedList('utstyr');
-        if(!ut||!(ut.items||[]).length)return'';
-        return'<label class="field-lbl">Utstyr brukt <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-          +'<div class="chips">'+ut.items.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(it){
-            var on=(f.equipmentIds||[]).includes(it.id);
-            return'<button class="chip'+(on?' on':'')+'" onclick="var a=mf().equipmentIds||[];mf().equipmentIds=a.includes(\''+q(it.id)+'\')?a.filter(function(x){return x!==\''+q(it.id)+'\';}):a.concat([\''+q(it.id)+'\']);render()">'+esc(it.name)+'</button>';
-          }).join('')+'</div>'
-          +'<div class="hint">Merkes automatisk p\u00e5 utstyret med \u00abbrukt til\u00bb n\u00e5r prosjektet markeres oppn\u00e5dd.</div>';
-      })()
+      +equipmentPickerHTML(f)
       +(evChips?'<label class="field-lbl">Kategori(er) <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
         +'<div class="chips">'+evChips+'</div>'
         +'<div class="hint">Innlegg i disse kategoriene vises som evidens for akkurat dette prosjektet.</div>':'')
@@ -4040,6 +4150,7 @@ function modalHTML(){
               +'</div>';
           })():''))
         :'')
+      +equipmentPickerHTML(f)
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +'<div class="hint">En rutine er noe som skjer fast flere ganger i \u00e5ret. Skjer det \u00e9n gang i \u00e5ret eller sjeldnere, legges det inn som hendelse.</div>'
@@ -4094,16 +4205,7 @@ function modalHTML(){
         +'<div class="hint">Innlegg i takknemlighetsboka som bruker disse stikkordene, vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og de tre Jenny-ene holdes fra hverandre.</div>':'')
       +(!f.bday?'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt, valgfritt</span></label>'
       +'<div class="chips">'+linkChipSection(f)+'</div>':'')
-      +(!f.bday?(function(){
-          var ut=findFixedList('utstyr');
-          if(!ut||!(ut.items||[]).length)return'';
-          return'<label class="field-lbl">Utstyr brukt <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-            +'<div class="chips">'+ut.items.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(it){
-              var on=(f.equipmentIds||[]).includes(it.id);
-              return'<button class="chip'+(on?' on':'')+'" onclick="var a=mf().equipmentIds||[];mf().equipmentIds=a.includes(\''+q(it.id)+'\')?a.filter(function(x){return x!==\''+q(it.id)+'\';}):a.concat([\''+q(it.id)+'\']);render()">'+esc(it.name)+'</button>';
-            }).join('')+'</div>'
-            +'<div class="hint">Merkes automatisk p\u00e5 utstyret med \u00abbrukt til\u00bb n\u00e5r hendelsen markeres gjennomf\u00f8rt.</div>';
-        })():'')
+      +(!f.bday?equipmentPickerHTML(f):'')
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +(isEditE?'<button class="del-full-btn" onclick="deleteEvent(\''+q(f.id)+'\')">Slett hendelse</button>':'')
@@ -4170,6 +4272,7 @@ function sidebarHTML(){
   h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Planlegger</div>';
   h+='<div class="side-month'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   h+='<div class="side-month'+(view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goBursdager()"><span class="s-arrow"></span>Bursdagsbok</div>';
+  h+='<div class="side-month'+(view.kind==='strikkeverksted'||view.kind==='strikkeprosjekter'||view.kind==='garnlager'||view.kind==='strikkeoppskrifter'||view.kind==='strikkeutstyr'?'" style="color:var(--red)':'')+'" onclick="goStrikkeverksted()"><span class="s-arrow"></span>Strikkeverksted</div>';
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
   return h;
 }
@@ -5872,7 +5975,7 @@ function inventarViewHTML(){
 
   var isPack=(inv.type||'inventar')==='pakke';
   var isProj=(inv.type||'inventar')==='prosjekt';
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+(isProj?'goPlanleggingProsjekt()':isPack&&!inv.fixed?'goPlanleggingPakke()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='forbruksvarer'?'goForbruksvarer()':inv.fixed==='anskaffelser'?'goOkonomi()':'goVaretelling()')+'">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+(isProj?'goPlanleggingProsjekt()':isPack&&!inv.fixed?'goPlanleggingPakke()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='forbruksvarer'?'goForbruksvarer()':inv.fixed==='garnlager'?'goGarnlager()':inv.fixed==='strikkeoppskrifter'?'goStrikkeoppskrifter()':inv.fixed==='strikkeutstyr'?'goStrikkeutstyr()':inv.fixed==='anskaffelser'?'goOkonomi()':'goVaretelling()')+'">\u2039</button></div>'
     +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
     +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
@@ -6727,6 +6830,11 @@ function render(){
   else if(view.kind==='bursdager')content=bursdagerHubHTML();
   else if(view.kind==='bursdagsliste')content=bursdagslisteViewHTML();
   else if(view.kind==='varetelling')content=varetellingHubViewHTML();
+  else if(view.kind==='strikkeverksted')content=strikkeverkstedViewHTML();
+  else if(view.kind==='strikkeprosjekter')content=strikkeprosjekterViewHTML();
+  else if(view.kind==='garnlager')content=fixedListHubHTML('garnlager','Garnlager','Garn du har liggende \u2014 inkludert restgarn fra ferdige prosjekter.');
+  else if(view.kind==='strikkeoppskrifter')content=fixedListHubHTML('strikkeoppskrifter','Strikkeoppskrifter','Oppskrifter du eier eller vil strikke.');
+  else if(view.kind==='strikkeutstyr')content=fixedListHubHTML('strikkeutstyr','Strikkepinner og annet strikkeutstyr','Pinner, m\u00e5lb\u00e5nd, markører og annet du bruker.');
   else if(view.kind==='beredskap')content=fixedListHubHTML('beredskap','Beredskap','Det du trenger for \u00e5 klare deg selv en uke.');
   else if(view.kind==='utstyr')content=fixedListHubHTML('utstyr','Utstyr','Ting du eier, ordnet etter bruk og plassering.');
   else if(view.kind==='forbruksvarer')content=fixedListHubHTML('forbruksvarer','Forbruksvarer','Ting som brukes opp og m\u00e5 fylles p\u00e5, ordnet etter type og plassering.');
