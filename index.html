@@ -101,7 +101,7 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .col-sw.none.on{border:2px solid var(--ink);box-shadow:none}
 /* Konfetti på runde bursdager */
 .milestone-glow{background-image:linear-gradient(rgba(242,238,229,.28),rgba(242,238,229,.28)),linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%);background-repeat:no-repeat;background-size:100% 100%;background-attachment:fixed}
-.pin-bg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;
+.pin-bg{position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:center;overflow:auto;
   background-image:linear-gradient(rgba(242,238,229,.82),rgba(242,238,229,.82)),linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%);
   background-repeat:no-repeat;background-size:100% 100%}
 .confetti{position:relative;overflow:hidden}
@@ -6162,17 +6162,31 @@ function catUsage(catId){
   return u;
 }
 function tagCloudSpread(counts){return cloudWordsHTML(counts,true);}
+// Inline-ordsky for kategoriblokkene — samme ti-mest-brukte-oppførsel, men uten kort og overskrift
+function inlineCloudHTML(counts,key){
+  var total=Object.keys(counts).filter(function(w){return counts[w]>0;}).length;
+  if(!total)return'';
+  var open=!!cloudOpen[key];
+  var body=cloudWordsHTML(counts,true,open?0:10);
+  if(!body)return'';
+  var h=body;
+  if(total>10){
+    h+='<div style="padding:2px 0 4px;text-align:center"><button class="icon-btn" style="font-size:10px;padding:1px 8px" onclick="cloudOpen[\''+q(key)+'\']=!cloudOpen[\''+q(key)+'\'];render()">'
+      +(open?'Vis f\u00e6rre':'Vis alle '+total)+'</button></div>';
+  }
+  return h;
+}
 function catTagCloudHTML(catId){
   var counts={};
   Object.keys(tagCats).forEach(function(t){if(tagCats[t]===catId)counts[t]=0;});
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
-  return tagCloudSpread(counts);
+  return inlineCloudHTML(counts,'cat'+catId);
 }
 function frittTagCloudHTML(){
   var counts={};
   var used=allTags();
   Object.keys(used).forEach(function(t){if(!tagCats[t])counts[t]=used[t];});
-  return tagCloudSpread(counts);
+  return inlineCloudHTML(counts,'fritt');
 }
 function hashtagsViewHTML(){
   var h='<div class="view-sub" style="padding-top:8px">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
@@ -6770,13 +6784,13 @@ function normAnswer(x){return String(x||'').trim().toLowerCase().replace(/\s+/g,
 function pinRender(){
   var pd=pinData();
   var st=window._pinState||(window._pinState={mode:'enter',buf:'',err:'',recovering:false,ansBuf:'',newBuf:''});
-  var box=function(inner){return'<div style="max-width:360px;width:100%;margin:0 auto;padding:24px;text-align:center">'+inner+'</div>';};
+  var box=function(inner){return'<div style="max-width:360px;width:100%;margin:0 auto;padding:118px 24px 32px;text-align:center">'+inner+'</div>';};
   var dots=function(n){var h='';for(var i=0;i<4;i++)h+='<span style="display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 6px;border:1.5px solid var(--sel-line);background:'+(i<n?'var(--ink)':'transparent')+'"></span>';return h;};
   var pad=function(handler){
-    var h='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:320px;margin:34px auto 0">';
+    var h='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:250px;margin:30px auto 0">';
     ['1','2','3','4','5','6','7','8','9','','0','\u232b'].forEach(function(k){
       if(k==='')h+='<div></div>';
-      else h+='<button onclick="'+handler+'(\''+k+'\')" style="font-size:26px;width:100%;aspect-ratio:2/3;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-family:inherit">'+k+'</button>';
+      else h+='<button onclick="'+handler+'(\''+k+'\')" style="font-size:21px;width:100%;aspect-ratio:2/3;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-family:inherit">'+k+'</button>';
     });
     return h+'</div>';
   };
