@@ -351,6 +351,7 @@ var DEFAULT_UNITS=['bokser','dl','g','kg','kroner','liter','ml','n\u00f8ster','s
 var customUnits=[];
 var weeklyAvailableHours=0;
 var soundOn=true;
+var showStrikk=true;
 // Original seiersfanfare — syntetisert, ingen lydfiler. Stigende treklang som lander
 // på oktaven, med en varm messinglignende klang (sagtann + mykt filter).
 var _audioCtx=null;
@@ -1199,6 +1200,7 @@ function load(){
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
   try{weeklyAvailableHours=Number(localStorage.getItem(SK+'_availhours'))||0;}catch(e){weeklyAvailableHours=0;}
   try{soundOn=localStorage.getItem(SK+'_sound')!=='0';}catch(e){soundOn=true;}
+  try{showStrikk=localStorage.getItem(SK+'_strikkmeny')!=='0';}catch(e){showStrikk=true;}
   try{places=JSON.parse(localStorage.getItem(SK+'_places')||'{"l1":[],"l2":[],"l3":[]}');}catch(e){places={l1:[],l2:[],l3:[]};}
   try{achievements=JSON.parse(localStorage.getItem(SK+'_ach')||'[]');}catch(e){achievements=[];}
   try{achDismissed=JSON.parse(localStorage.getItem(SK+'_achdis')||'[]');}catch(e){achDismissed=[];}
@@ -1473,6 +1475,7 @@ function save(){
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
   try{localStorage.setItem(SK+'_availhours',String(weeklyAvailableHours));}catch(e){}
   try{localStorage.setItem(SK+'_sound',soundOn?'1':'0');}catch(e){}
+  try{localStorage.setItem(SK+'_strikkmeny',showStrikk?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_places',JSON.stringify(places));}catch(e){}
   try{localStorage.setItem(SK+'_ach',JSON.stringify(achievements));}catch(e){}
   try{localStorage.setItem(SK+'_achdis',JSON.stringify(achDismissed));}catch(e){}
@@ -2119,6 +2122,11 @@ function gavePersonViewHTML(){
   return h;
 }
 function goInnstillinger(){view={kind:'innstillinger'};drawerOpen=false;render();}
+function toggleStrikkMeny(){
+  showStrikk=!showStrikk;
+  if(!showStrikk&&['strikkeverksted','strikkeprosjekter','garnlager','strikkeoppskrifter','strikkeutstyr'].indexOf(view.kind)>=0)view={kind:'personlig'};
+  save();render();
+}
 function goPersonlig(){view={kind:'personlig'};drawerOpen=false;render();}
 function personligViewHTML(){
   var cur=currentBgTone();
@@ -2153,6 +2161,17 @@ function personligViewHTML(){
   });
   h+='</div>'
     +'<div style="font-size:12px;color:var(--muted);padding-top:12px">'+(cur?'Valgt: '+esc((CAT_COLORS.find(function(x){return x.id===cur;})||{}).name||'')+'. Trykk den kremhvite for standard.':'Standard (kremhvit).')+'</div>'
+    +'</div>';
+  // Menypunkter
+  h+='<div class="sec-title">Menypunkter</div>'
+    +'<div class="view-sub">Sl\u00e5 av det du ikke bruker, s\u00e5 blir menyen kortere.</div>'
+    +'<div class="card" style="padding:12px 14px">'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="flex:1"><div class="entry-text">Strikkeverksted</div>'
+    +'<div class="entry-date">garnlager, oppskrifter og strikkeutstyr</div></div>'
+    +'<button class="chip'+(showStrikk?' on':'')+'" onclick="toggleStrikkMeny()">'+(showStrikk?'P\u00e5':'Av')+'</button>'
+    +'</div>'
+    +(showStrikk?'':'<div class="hint">Innholdet beholdes \u2014 det er bare skjult fra menyen.</div>')
     +'</div>';
   // Min bursdag
   var myb=myBirthday();
@@ -3668,14 +3687,18 @@ function modalHTML(){
     var qtyInput='';
     if(listHasQty(invT)){
       var qv=(f.values||{}).__qty||'';var qu=(f.values||{}).__unit||'n\u00f8ster';
-      qtyInput='<label class="field-lbl">Antall</label>'
+      // Strikkeoppskrifter: garnmengden oppskriften er «ment for», kun gram eller nøster
+      var yarnOnly=invT.fixed==='strikkeoppskrifter';
+      var unitList=yarnOnly?['g','n\u00f8ster']:allUnits();
+      if(yarnOnly&&unitList.indexOf(qu)<0)qu='g';
+      qtyInput='<label class="field-lbl">'+(yarnOnly?'Ment for':'Antall')+'</label>'
         +'<div style="display:flex;gap:8px;align-items:center">'
         +'<input class="inp" type="text" inputmode="numeric" style="width:100px;margin:0" value="'+esc(qv)+'" placeholder="0" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');mf().values.__qty=this.value;updateSaveBtn()">'
         +'<select class="inp" style="width:auto;margin:0" oninput="if(this.value===\'__new\'){mf()._addUnit=true;}else{mf().__unitSel=this.value;mf().values.__unit=this.value;}render()">'
-        +allUnits().map(function(u){return'<option value="'+u+'"'+(qu===u?' selected':'')+'>'+u+'</option>';}).join('')
-        +'<option value="__new">+ Ny enhet \u2026</option>'
+        +unitList.map(function(u){return'<option value="'+u+'"'+(qu===u?' selected':'')+'>'+u+'</option>';}).join('')
+        +(yarnOnly?'':'<option value="__new">+ Ny enhet \u2026</option>')
         +'</select></div>'
-        +(f._addUnit?'<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'
+        +(!yarnOnly&&f._addUnit?'<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'
           +'<input class="inp" type="text" style="margin:0;flex:1" placeholder="F.eks. flasker, ruller, par \u2026" value="'+esc(f._newUnit||'')+'" oninput="mf()._newUnit=this.value">'
           +'<button class="chip" onclick="commitNewUnit()">Legg til</button></div>':'');
     }
@@ -3726,14 +3749,46 @@ function modalHTML(){
             ?'<div class="hint">'+(f.have?'P\u00e5 plass \u2014 vises med lysegul bakgrunn i lista.':'Mangler \u2014 vises med oransje bakgrunn i lista til du haker den av.')+'</div>'
             :'');
       }
+      var fx=invT?(invT.fixed||''):'';
+      var noTilstand=['garnlager','strikkeoppskrifter','strikkeutstyr'].indexOf(fx)>=0;
+      // Garn: type og leverandør — brukes både på oppskrifter og i garnlageret
+      var garnSection='';
+      if(fx==='garnlager'||fx==='strikkeoppskrifter'){
+        garnSection='<label class="field-lbl">Type garn <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+          +'<input class="inp" type="text" value="'+esc(dv.__garntype||'')+'" placeholder="F.eks. finull, alpakka, sokkegarn \u2026" oninput="mf().values=mf().values||{};mf().values.__garntype=this.value">'
+          +'<label class="field-lbl">Leverand\u00f8r <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+          +'<input class="inp" type="text" value="'+esc(dv.__leverandor||'')+'" placeholder="F.eks. Rauma, Sandnes \u2026" oninput="mf().values=mf().values||{};mf().values.__leverandor=this.value">';
+      }
+      // Strikkepinner: rundpinner har to materialer (pinner og vaier), de andre ett
+      var pinneSection='';
+      if(fx==='strikkeutstyr'){
+        var pt=dv.__pinnetype||'';
+        pinneSection='<label class="field-lbl">Tykkelse <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 mm</span></label>'
+          +'<input class="inp" type="text" inputmode="decimal" style="width:100px" value="'+esc(dv.__tykkelse||'')+'" placeholder="F.eks. 3,5" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\');mf().values=mf().values||{};mf().values.__tykkelse=this.value">'
+          +'<label class="field-lbl">Type</label>'
+          +'<div class="chips">'+['Enkeltpinne','Rundpinne','Flettepinne'].map(function(t){
+              return'<button class="chip'+(pt===t?' on':'')+'" onclick="setItemVal(\'__pinnetype\',\''+q(t)+'\')">'+t+'</button>';
+            }).join('')+'</div>'
+          +'<label class="field-lbl">Lengde <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 cm</span></label>'
+          +'<input class="inp" type="text" inputmode="decimal" style="width:100px" value="'+esc(dv.__lengde||'')+'" placeholder="F.eks. 80" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\');mf().values=mf().values||{};mf().values.__lengde=this.value">'
+          +(pt==='Rundpinne'
+            ?'<label class="field-lbl">Materiale i pinnene</label>'
+             +'<input class="inp" type="text" value="'+esc(dv.__matPinner||'')+'" placeholder="F.eks. bambus, messing \u2026" oninput="mf().values=mf().values||{};mf().values.__matPinner=this.value">'
+             +'<label class="field-lbl">Materiale i vaieren</label>'
+             +'<input class="inp" type="text" value="'+esc(dv.__matVaier||'')+'" placeholder="F.eks. nylon, stål \u2026" oninput="mf().values=mf().values||{};mf().values.__matVaier=this.value">'
+            :'<label class="field-lbl">Materiale <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+             +'<input class="inp" type="text" value="'+esc(dv.__matPinner||'')+'" placeholder="F.eks. bambus, tre, aluminium \u2026" oninput="mf().values=mf().values||{};mf().values.__matPinner=this.value">');
+      }
       return beredSection
+        +garnSection
+        +pinneSection
         +'<label class="field-lbl">Merke <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
         +'<input class="inp" type="text" value="'+esc(dv.__merke||'')+'" placeholder="F.eks. Primus, Fj\u00e4llr\u00e4ven \u2026" oninput="mf().values=mf().values||{};mf().values.__merke=this.value">'
-        +'<label class="field-lbl">Tilstand <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+        +(noTilstand?'':'<label class="field-lbl">Tilstand <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
         +'<div class="chips">'+TILSTAND.map(function(t){
             return'<button class="chip'+(dv.__tilstand===t?' on':'')+'" onclick="mf().values=mf().values||{};setItemVal(\'__tilstand\',\''+q(t)+'\')">'+esc(t)+'</button>';
-          }).join('')+'<br></div>'
-        +(dv.__tilstand==='M\u00e5 erstattes'
+          }).join('')+'<br></div>')
+        +(!noTilstand&&dv.__tilstand==='M\u00e5 erstattes'
           ?(f._erstattSendt
             ?'<div class="hint-box" style="color:var(--red)">Lagt p\u00e5 innkj\u00f8pslista som \u00abErstattes: '+esc((f.name||'').trim())+'\u00bb.</div>'
             :'<button class="save-btn" style="background:transparent;border:1.5px solid var(--sel-line);color:var(--red)" onclick="invItemErstatt()">Send \u00abErstattes: '+esc((f.name||'').trim())+'\u00bb til innkj\u00f8pslista</button>')
@@ -4272,7 +4327,7 @@ function sidebarHTML(){
   h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Planlegger</div>';
   h+='<div class="side-month'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   h+='<div class="side-month'+(view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goBursdager()"><span class="s-arrow"></span>Bursdagsbok</div>';
-  h+='<div class="side-month'+(view.kind==='strikkeverksted'||view.kind==='strikkeprosjekter'||view.kind==='garnlager'||view.kind==='strikkeoppskrifter'||view.kind==='strikkeutstyr'?'" style="color:var(--red)':'')+'" onclick="goStrikkeverksted()"><span class="s-arrow"></span>Strikkeverksted</div>';
+  if(showStrikk)h+='<div class="side-month'+(view.kind==='strikkeverksted'||view.kind==='strikkeprosjekter'||view.kind==='garnlager'||view.kind==='strikkeoppskrifter'||view.kind==='strikkeutstyr'?'" style="color:var(--red)':'')+'" onclick="goStrikkeverksted()"><span class="s-arrow"></span>Strikkeverksted</div>';
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
   return h;
 }
@@ -6080,6 +6135,16 @@ function inventarViewHTML(){
     var expSt=listHasExp(inv)?expStatus((it.values||{}).__exp):null;
     var dRow=[];
     var dvv=it.values||{};
+    // Garn og strikkepinner: vis de listespesifikke feltene i sammendragslinja
+    if(dvv.__garntype||dvv.__leverandor){
+      dRow.push([dvv.__garntype?esc(dvv.__garntype):'',dvv.__leverandor?'fra '+esc(dvv.__leverandor):''].filter(Boolean).join(' '));
+    }
+    if(dvv.__tykkelse)dRow.push(esc(dvv.__tykkelse)+' mm');
+    if(dvv.__pinnetype)dRow.push(esc(dvv.__pinnetype).toLowerCase());
+    if(dvv.__lengde)dRow.push(esc(dvv.__lengde)+' cm');
+    if(dvv.__matPinner||dvv.__matVaier){
+      dRow.push(dvv.__matVaier?esc(dvv.__matPinner||'?')+'/'+esc(dvv.__matVaier):esc(dvv.__matPinner));
+    }
     if(dvv.__merke)dRow.push(esc(dvv.__merke));
     if(dvv.__tilstand)dRow.push('<span style="color:'+(dvv.__tilstand==='M\u00e5 erstattes'?'var(--red)':dvv.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(dvv.__tilstand)+'</span>');
     if(listHasDetails(inv)&&dvv.__kjopt)dRow.push('kj\u00f8pt '+esc(dvv.__kjopt));
@@ -6895,10 +6960,10 @@ function pinRender(){
   var box=function(inner){return'<div style="max-width:360px;width:100%;margin:0 auto;padding:118px 24px 32px;text-align:center">'+inner+'</div>';};
   var dots=function(n){var h='';for(var i=0;i<4;i++)h+='<span style="display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 6px;border:1.5px solid var(--sel-line);background:'+(i<n?'var(--ink)':'transparent')+'"></span>';return h;};
   var pad=function(handler){
-    var h='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:250px;margin:30px auto 0">';
+    var h='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:210px;margin:30px auto 0">';
     ['1','2','3','4','5','6','7','8','9','','0','\u232b'].forEach(function(k){
       if(k==='')h+='<div></div>';
-      else h+='<button onclick="'+handler+'(\''+k+'\')" style="font-size:21px;width:100%;aspect-ratio:2/3;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-family:inherit">'+k+'</button>';
+      else h+='<button onclick="'+handler+'(\''+k+'\')" style="font-size:19px;width:100%;aspect-ratio:4/5;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-family:inherit">'+k+'</button>';
     });
     return h+'</div>';
   };
