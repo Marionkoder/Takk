@@ -1382,6 +1382,7 @@ function projActive(iv){
 }
 
 var listFilter='alle';
+var monthCloudOpen=false;
 
 /* ── Navigasjon ── */
 function toggleDrawer(){drawerOpen=!drawerOpen;render();}
@@ -2818,10 +2819,15 @@ function cloudScale(){
   Object.keys(g).forEach(function(k){if(g[k]>m)m=g[k];});
   return Math.max(m,8);
 }
-function cloudWordsHTML(counts,clickable){
+function cloudWordsHTML(counts,clickable,limit){
   // Én felles motor for alle ordskyer — samme størrelser, avstand og utseende
-  var words=Object.keys(counts).filter(function(w){return counts[w]>0;}).sort(nbSort);
+  var words=Object.keys(counts).filter(function(w){return counts[w]>0;});
   if(!words.length)return'';
+  // Ved grense: plukk de mest brukte først, men vis dem alfabetisk som ellers
+  if(limit&&words.length>limit){
+    words=words.slice().sort(function(a,b){return counts[b]-counts[a]||nbSort(a,b);}).slice(0,limit);
+  }
+  words.sort(nbSort);
   // Felles skala for ALLE ordskyer: samme ord får samme størrelse overalt
   var scale=cloudScale();
   return'<div class="cloud">'+words.map(function(w){
@@ -2840,8 +2846,8 @@ function cloudWordsHTML(counts,clickable){
     return'<span class="'+cls+'" style="font-size:'+size+'px;cursor:default">#'+esc(w)+'</span>';
   }).join('')+'</div>';
 }
-function cloudHTML(counts,clickable){
-  var c=cloudWordsHTML(counts,clickable);
+function cloudHTML(counts,clickable,limit){
+  var c=cloudWordsHTML(counts,clickable,limit);
   return c?'<div class="card">'+c+'</div>':'';
 }
 
@@ -5278,8 +5284,16 @@ function rapportViewHTML(){
     +'</div>';
 
   var monthEntries=entries.filter(function(e){return e.date.slice(0,7)===ym;});
-  var mCloud=cloudHTML(tagCountsFor(monthEntries),false);
-  if(mCloud)h+='<div class="sec-title">Stikkord i '+MND_FULL[m-1]+'</div>'+mCloud;
+  var mCounts=tagCountsFor(monthEntries);
+  var mTotal=Object.keys(mCounts).filter(function(w){return mCounts[w]>0;}).length;
+  var mCloud=cloudHTML(mCounts,false,monthCloudOpen?0:10);
+  if(mCloud){
+    h+='<div class="sec-title">Stikkord i '+MND_FULL[m-1]+(!monthCloudOpen&&mTotal>10?' <span style="font-weight:400;color:var(--rose)">\u00b7 de ti mest brukte</span>':'')+'</div>'+mCloud;
+    if(mTotal>10){
+      h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="monthCloudOpen=!monthCloudOpen;render()">'
+        +(monthCloudOpen?'Vis bare de ti mest brukte':'Vis alle '+mTotal+' stikkord')+'</button></div>';
+    }
+  }
   var monthRoutines=routines.filter(function(r){var mo=r.months||[];return!mo.length||mo.includes(m);});
   var doneR=monthRoutines.filter(function(r){return routineMonthStatus(r,m,y).done;});
   var mEvents=monthEventsFor(m,y);
@@ -5569,18 +5583,6 @@ var PROFILES={
       '--btn':'#E2D8C0','--sel':'#D2C5A2','--sel-line':'#BFB088','--title':'#3B2E24',
       '--grp':'#9C6B3F','--ach-bg':'#F7F1DC','--ach-line':'#E6D9B4',
       '--lv1':'#7A2E28','--lv2':'#9C3D2E','--lv3':'#BF5638','--lv4':'#E07348','--lv5':'#FF9466'}
-  },
-  petrol:{
-    name:'Petrol',
-    desc:'Kj\u00f8lig og stram \u2014 Tahoma',
-    font:'Tahoma,Verdana,Geneva,sans-serif',
-    swatch:['#E8EEF1','#4E7B8C','#CC7F33'],
-    vars:{'--bg':'#E8EEF1','--card':'#FBFAF4','--ink':'#22404D','--red':'#B25A17',
-      '--salmon':'#F0B190','--red-soft':'#F9E4D5','--rose':'#8A6F58','--amber':'#C07A1E',
-      '--muted':'#6B8391','--line':'#CFDBE1','--done':'#DCE5E9','--done-line':'#B9CBD4',
-      '--btn':'#D6E1E6','--sel':'#BACDD6','--sel-line':'#9DB6C2','--title':'#2C5C71',
-      '--grp':'#B5702A','--ach-bg':'#FAF0D9','--ach-line':'#E8D7A6',
-      '--lv1':'#8A7A3A','--lv2':'#A98A2E','--lv3':'#C98A45','--lv4':'#D97F3A','--lv5':'#E89A5F'}
   }
 };
 function currentProfile(){
@@ -6762,7 +6764,7 @@ function pinRender(){
   var box=function(inner){return'<div style="max-width:360px;width:100%;margin:0 auto;padding:24px;text-align:center">'+inner+'</div>';};
   var dots=function(n){var h='';for(var i=0;i<4;i++)h+='<span style="display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 6px;border:1.5px solid var(--sel-line);background:'+(i<n?'var(--ink)':'transparent')+'"></span>';return h;};
   var pad=function(handler){
-    var h='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:320px;margin:26px auto 0">';
+    var h='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:320px;margin:34px auto 0">';
     ['1','2','3','4','5','6','7','8','9','','0','\u232b'].forEach(function(k){
       if(k==='')h+='<div></div>';
       else h+='<button onclick="'+handler+'(\''+k+'\')" style="font-size:26px;width:100%;aspect-ratio:2/3;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-family:inherit">'+k+'</button>';
@@ -6784,7 +6786,7 @@ function pinRender(){
       +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
       +pad('pinNewDigit'));
   } else {
-    h=box('<div style="font-size:17px;font-weight:700;margin-bottom:6px">Gode dager</div>'
+    h=box('<div style="font-size:21px;font-weight:800;letter-spacing:-.2px;line-height:1.25;margin-bottom:8px;color:var(--title,var(--ink))">Gode dager</div>'
       +'<div style="font-size:13px;color:var(--muted);margin-bottom:20px">Skriv PIN-koden</div>'
       +dots(st.buf.length)
       +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
