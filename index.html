@@ -1382,7 +1382,6 @@ function projActive(iv){
 }
 
 var listFilter='alle';
-var monthCloudOpen=false;
 
 /* ── Navigasjon ── */
 function toggleDrawer(){drawerOpen=!drawerOpen;render();}
@@ -2826,6 +2825,8 @@ function cloudWordsHTML(counts,clickable,limit){
   // Ved grense: plukk de mest brukte først, men vis dem alfabetisk som ellers
   if(limit&&words.length>limit){
     words=words.slice().sort(function(a,b){return counts[b]-counts[a]||nbSort(a,b);}).slice(0,limit);
+    // Et valgt stikkord må alltid være synlig, ellers forsvinner det man filtrerer på
+    if(clickable&&selectedTag&&counts[selectedTag]>0&&words.indexOf(selectedTag)<0)words.push(selectedTag);
   }
   words.sort(nbSort);
   // Felles skala for ALLE ordskyer: samme ord får samme størrelse overalt
@@ -2849,6 +2850,24 @@ function cloudWordsHTML(counts,clickable,limit){
 function cloudHTML(counts,clickable,limit){
   var c=cloudWordsHTML(counts,clickable,limit);
   return c?'<div class="card">'+c+'</div>':'';
+}
+// Felles ordsky-seksjon: viser de ti mest brukte som standard, med knapp for å vise alle.
+// key skiller de ulike rapportene fra hverandre så de kan utvides uavhengig.
+var cloudOpen={};
+function cloudSectionHTML(counts,clickable,key,title){
+  var total=Object.keys(counts).filter(function(w){return counts[w]>0;}).length;
+  if(!total)return'';
+  var open=!!cloudOpen[key];
+  var body=cloudHTML(counts,clickable,open?0:10);
+  if(!body)return'';
+  var h='';
+  if(title)h+='<div class="sec-title">'+title+(!open&&total>10?' <span style="font-weight:400;color:var(--rose)">\u00b7 de ti mest brukte</span>':'')+'</div>';
+  h+=body;
+  if(total>10){
+    h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="cloudOpen[\''+q(key)+'\']=!cloudOpen[\''+q(key)+'\'];render()">'
+      +(open?'Vis bare de ti mest brukte':'Vis alle '+total+' stikkord')+'</button></div>';
+  }
+  return h;
 }
 
 function openNewCat(){modal._prevStep=modal.step;modal.step='cat_new';mf()._newMain='';render();}
@@ -5166,7 +5185,7 @@ function oppsummeringViewHTML(){
 
   // Ordsky
   var counts=allTags();
-  var cloud=cloudHTML(counts,true);
+  var cloud=cloudSectionHTML(counts,true,'helhet','');
   if(!cloud){
     h+='<div class="card"><div class="empty">Ingen stikkord ennå. Legg til stikkord når du skriver innlegg.</div></div>';
   } else {
@@ -5284,16 +5303,7 @@ function rapportViewHTML(){
     +'</div>';
 
   var monthEntries=entries.filter(function(e){return e.date.slice(0,7)===ym;});
-  var mCounts=tagCountsFor(monthEntries);
-  var mTotal=Object.keys(mCounts).filter(function(w){return mCounts[w]>0;}).length;
-  var mCloud=cloudHTML(mCounts,false,monthCloudOpen?0:10);
-  if(mCloud){
-    h+='<div class="sec-title">Stikkord i '+MND_FULL[m-1]+(!monthCloudOpen&&mTotal>10?' <span style="font-weight:400;color:var(--rose)">\u00b7 de ti mest brukte</span>':'')+'</div>'+mCloud;
-    if(mTotal>10){
-      h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="monthCloudOpen=!monthCloudOpen;render()">'
-        +(monthCloudOpen?'Vis bare de ti mest brukte':'Vis alle '+mTotal+' stikkord')+'</button></div>';
-    }
-  }
+  h+=cloudSectionHTML(tagCountsFor(monthEntries),false,'md'+ym,'Stikkord i '+MND_FULL[m-1]);
   var monthRoutines=routines.filter(function(r){var mo=r.months||[];return!mo.length||mo.includes(m);});
   var doneR=monthRoutines.filter(function(r){return routineMonthStatus(r,m,y).done;});
   var mEvents=monthEventsFor(m,y);
@@ -5430,8 +5440,7 @@ function arsrapportViewHTML(){
     +'</div>';
 
   var yearEntries=entries.filter(function(e){return e.date.slice(0,4)===String(y)&&Number(e.date.slice(5,7))>=fromM;});
-  var yCloud=cloudHTML(tagCountsFor(yearEntries),false);
-  if(yCloud)h+='<div class="sec-title">Stikkord i '+y+'</div>'+yCloud;
+  h+=cloudSectionHTML(tagCountsFor(yearEntries),false,'yr'+y,'Stikkord i '+y);
   var logCount=0;
   routines.forEach(function(r){(r.log||[]).forEach(function(k){
     if(k.charAt(0)==='w'){
@@ -6786,7 +6795,7 @@ function pinRender(){
       +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
       +pad('pinNewDigit'));
   } else {
-    h=box('<div style="font-size:21px;font-weight:800;letter-spacing:-.2px;line-height:1.25;margin-bottom:8px;color:var(--title,var(--ink))">Gode dager</div>'
+    h=box('<div style="font-size:21px;font-weight:800;letter-spacing:.02em;line-height:1.25;margin-bottom:8px;color:var(--title,var(--ink));text-transform:uppercase">Gode dager</div>'
       +'<div style="font-size:13px;color:var(--muted);margin-bottom:20px">Skriv PIN-koden</div>'
       +dots(st.buf.length)
       +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
