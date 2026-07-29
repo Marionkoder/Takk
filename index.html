@@ -444,6 +444,7 @@ var PAKKE_DEFAULT_SEKSJONER=[
   {id:'pk_toalett',name:'Toalettsaker'},
   {id:'pk_lesestoff',name:'Lesestoff'}
 ];
+var STORRELSER=['S','M','L'];
 var PROSJEKTTYPER=[
   ['strikk','Strikkeprosjekt'],
   ['sy','Syprosjekt'],
@@ -566,8 +567,8 @@ function invItemToInnkjop(){
     date:'',inCal:false,values:{__qty:v.__qty||'1',__unit:v.__unit||'stk'},have:false}]);
   save();closeModal();
 }
-function listHasQty(inv){return !!inv&&(inv.type||'inventar')!=='prosjekt';}
-function listHasPlass(inv){return !!inv&&(inv.type||'inventar')==='inventar';}
+function listHasQty(inv){return !!inv&&(inv.type||'inventar')!=='prosjekt'&&inv.fixed!=='garntyper';}
+function listHasPlass(inv){return !!inv&&(inv.type||'inventar')==='inventar'&&inv.fixed!=='garntyper';}
 function itemPlaceTxt(it){
   var v=it.values||{};
   return [v.__p1,v.__p2,v.__p3].filter(Boolean).join(' \u00b7 ');
@@ -702,7 +703,7 @@ function varetellingHubViewHTML(){
 }
 // ── Garnmatching: hvilke oppskrifter dekkes av garnet i lageret? ──
 function garnGrams(it){
-  var v=it.values||{};
+  var v=(it&&it.values)||{};
   var q=Number(v.__qty)||0;if(!q)return 0;
   var u=(v.__unit||'').toLowerCase();
   if(u==='g')return q;
@@ -728,8 +729,17 @@ function garnMatch(a,b){
 function garnStashItems(){var l=findFixedList('garnlager');return l?(l.items||[]):[];}
 function oppskriftItems(){var l=findFixedList('strikkeoppskrifter');return l?(l.items||[]):[];}
 // For én oppskrift: hvor mye passende garn finnes, og hvilke poser er det?
-function garnForOppskrift(op){
-  var need=garnGrams(op);
+function oppskriftNeed(op,sz){
+  var v=op.values||{};
+  var q=Number(v['__qty'+sz]);
+  if(!q)return 0;
+  return garnGrams({values:{__qty:String(q),__unit:v.__unit,__gramPerNoste:v.__gramPerNoste}});
+}
+function oppskriftSizes(op){
+  return STORRELSER.filter(function(sz){return oppskriftNeed(op,sz)>0;});
+}
+function garnForOppskrift(op,sz){
+  var need=sz?oppskriftNeed(op,sz):garnGrams(op);
   var k=garnKey(op);
   var hits=[];var have=0;var unknown=false;
   garnStashItems().forEach(function(g){
@@ -749,6 +759,17 @@ function oppskrifterForGarn(g){
   return oppskriftItems().filter(function(op){return!!garnMatch(k,garnKey(op));});
 }
 function garnStatusHTML(op){
+  var sizes=oppskriftSizes(op);
+  if(sizes.length){
+    var any=garnForOppskrift(op,sizes[0]);
+    if(!any.hits.length)return'<span style="color:var(--muted)">ingen passende garn i lageret</span>';
+    return sizes.map(function(sz){
+      var rr=garnForOppskrift(op,sz);
+      if(rr.enough)return'<span style="color:var(--red);font-weight:700">'+sz+' \u2713</span>';
+      if(rr.unknown)return'<span style="color:var(--amber)">'+sz+' ?</span>';
+      return'<span style="color:var(--amber)">'+sz+' \u2212'+rr.short+' g</span>';
+    }).join(' \u00b7 ')+' <span style="color:var(--muted)">(har '+any.have+' g)</span>';
+  }
   var r=garnForOppskrift(op);
   if(!r.hits.length)return'<span style="color:var(--muted)">ingen passende garn i lageret</span>';
   if(!r.need)return'<span style="color:var(--muted)">'+r.have+' g passende garn \u2014 oppskriften mangler mengde</span>';
@@ -756,6 +777,36 @@ function garnStatusHTML(op){
   if(r.enough)return'<span style="color:var(--red);font-weight:700">\u2713 nok garn \u00b7 '+r.have+' av '+r.need+' g</span>';
   return'<span style="color:var(--amber)">mangler '+r.short+' g \u00b7 har '+r.have+' av '+r.need+' g</span>';
 }
+function fyllFraGarntype(id){
+  var reg=findFixedList('garntyper');if(!reg)return;
+  var gt=(reg.items||[]).find(function(x){return x.id===id;});if(!gt)return;
+  var v=mf().values=mf().values||{};
+  var src=gt.values||{};
+  v.__garntypeId=gt.id;
+  v.__garnnavn=src.__garnnavn||gt.name;
+  v.__garntype=src.__garntype||'';
+  v.__fiber=src.__fiber||'';
+  v.__leverandor=src.__leverandor||'';
+  v.__gramPerNoste=src.__gramPerNoste||'';
+  render();
+}
+function lagreSomGarntype(){
+  var reg=findFixedList('garntyper');if(!reg)return;
+  var v=mf().values||{};
+  var navn=(v.__garnnavn||'').trim();if(!navn)return;
+  var found=(reg.items||[]).find(function(x){return(x.name||'').toLowerCase()===navn.toLowerCase();});
+  if(!found){
+    found={id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:null,name:navn,note:'',values:{},have:true};
+    reg.items=(reg.items||[]).concat([found]);
+  }
+  found.values=Object.assign({},found.values||{},{
+    __garnnavn:navn,__garntype:v.__garntype||'',__fiber:v.__fiber||'',
+    __leverandor:v.__leverandor||'',__gramPerNoste:v.__gramPerNoste||''});
+  mf().values.__garntypeId=found.id;
+  mf()._garntypeLagret=true;
+  save();render();
+}
+function goGarntyper(){view={kind:'garntyper'};drawerOpen=false;render();}
 function goGarnmatch(){view={kind:'garnmatch'};drawerOpen=false;render();}
 function garnmatchViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goStrikkeverksted()">\u2039</button></div>'
@@ -764,9 +815,16 @@ function garnmatchViewHTML(){
   var ops=oppskriftItems();
   if(!ops.length)return h+'<div class="card"><div class="empty">Ingen oppskrifter enn\u00e5.</div></div>';
   var rows=ops.map(function(op){return{op:op,r:garnForOppskrift(op)};});
-  var rank=function(x){return x.r.enough?0:x.r.hits.length?1:2;};
+  var rank=function(x){
+    var szs=oppskriftSizes(x.op);
+    if(szs.length){
+      if(!x.r.hits.length)return 2;
+      return szs.some(function(sz){return garnForOppskrift(x.op,sz).enough;})?0:1;
+    }
+    return x.r.enough?0:x.r.hits.length?1:2;
+  };
   rows.sort(function(a,b){return rank(a)-rank(b)||nbSort(a.op.name,b.op.name);});
-  var groups=[[0,'Nok garn'],[1,'Mangler litt'],[2,'Ingen match']];
+  var groups=[[0,'Nok garn til minst \u00e9n st\u00f8rrelse'],[1,'Mangler litt'],[2,'Ingen match']];
   groups.forEach(function(gr){
     var sub=rows.filter(function(x){return rank(x)===gr[0];});
     if(!sub.length)return;
@@ -799,7 +857,7 @@ function strikkeverkstedViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Hva kan jeg strikke n\u00e5?</div>'
     +'<div class="entry-date">garnlageret matchet mot oppskriftene</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  [['garnlager','goGarnlager'],['strikkeoppskrifter','goStrikkeoppskrifter'],['strikkeutstyr','goStrikkeutstyr']].forEach(function(t){
+  [['garnlager','goGarnlager'],['garntyper','goGarntyper'],['strikkeoppskrifter','goStrikkeoppskrifter'],['strikkeutstyr','goStrikkeutstyr']].forEach(function(t){
     var inv=findFixedList(t[0]);if(!inv)return;
     var c=invCounts(inv);
     h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="'+t[1]+'()">'
@@ -921,7 +979,7 @@ function printOversikt(invId){
 }
 function fixedListHubHTML(key,title,sub){
   var inv=findFixedList(key);
-  var knitKeys=['garnlager','strikkeoppskrifter','strikkeutstyr'];
+  var knitKeys=['garnlager','garntyper','strikkeoppskrifter','strikkeutstyr'];
   var backFn=knitKeys.indexOf(key)>=0?'goStrikkeverksted()':'goVaretelling()';
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+backFn+'">\u2039</button></div>';
   h+='<div class="view-title">'+esc(title)+'</div>';
@@ -1403,7 +1461,7 @@ function load(){
   // Strikkeverksted — garnlager, oppskrifter og strikkeutstyr som egne faste lister
   var sv1=false;try{sv1=!!localStorage.getItem(SK+'_strikkeverksted1');}catch(e){}
   if(!sv1){
-    [['garnlager','Garnlager'],['strikkeoppskrifter','Strikkeoppskrifter'],['strikkeutstyr','Strikkepinner og annet strikkeutstyr']].forEach(function(t){
+    [['garnlager','Garnlager'],['garntyper','Garntyper'],['strikkeoppskrifter','Strikkeoppskrifter'],['strikkeutstyr','Strikkepinner og annet strikkeutstyr']].forEach(function(t){
       if(!inventories.some(function(iv){return iv.fixed===t[0];})){
         inventories.push({id:'fixed_'+t[0],name:t[1],type:'inventar',fixed:t[0],qty:true,catId:'',fields:[],sections:[],items:[]});
       }
@@ -3794,16 +3852,30 @@ function modalHTML(){
       var yarnOnly=invT.fixed==='strikkeoppskrifter';
       var unitList=yarnOnly?['g','n\u00f8ster']:allUnits();
       if(yarnOnly&&unitList.indexOf(qu)<0)qu='g';
-      qtyInput='<label class="field-lbl">'+(yarnOnly?'Ment for':'Antall')+'</label>'
+      if(yarnOnly){
+        // Garnmengden avhenger av størrelse — ett felt per størrelse, felles enhet
+        qtyInput='<label class="field-lbl">Ment for</label>'
+          +'<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">'
+          +STORRELSER.map(function(sz){
+            return'<div><div style="font-size:11px;color:var(--muted);padding-left:2px">'+sz+'</div>'
+              +'<input class="inp" type="text" inputmode="numeric" style="width:72px;margin:0" value="'+esc((f.values||{})['__qty'+sz]||'')+'" placeholder="0" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');mf().values[\'__qty'+sz+'\']=this.value;updateSaveBtn()"></div>';
+          }).join('')
+          +'<select class="inp" style="width:auto;margin:0" oninput="mf().values.__unit=this.value;render()">'
+          +unitList.map(function(u){return'<option value="'+u+'"'+(qu===u?' selected':'')+'>'+u+'</option>';}).join('')
+          +'</select></div>'
+          +'<div class="hint">Fyll ut de st\u00f8rrelsene oppskriften gjelder for \u2014 tomme felt hoppes over.</div>';
+      } else {
+      qtyInput='<label class="field-lbl">Antall</label>'
         +'<div style="display:flex;gap:8px;align-items:center">'
         +'<input class="inp" type="text" inputmode="numeric" style="width:100px;margin:0" value="'+esc(qv)+'" placeholder="0" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');mf().values.__qty=this.value;updateSaveBtn()">'
         +'<select class="inp" style="width:auto;margin:0" oninput="if(this.value===\'__new\'){mf()._addUnit=true;}else{mf().__unitSel=this.value;mf().values.__unit=this.value;}render()">'
         +unitList.map(function(u){return'<option value="'+u+'"'+(qu===u?' selected':'')+'>'+u+'</option>';}).join('')
         +(yarnOnly?'':'<option value="__new">+ Ny enhet \u2026</option>')
         +'</select></div>'
-        +(!yarnOnly&&f._addUnit?'<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'
+        +(f._addUnit?'<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'
           +'<input class="inp" type="text" style="margin:0;flex:1" placeholder="F.eks. flasker, ruller, par \u2026" value="'+esc(f._newUnit||'')+'" oninput="mf()._newUnit=this.value">'
           +'<button class="chip" onclick="commitNewUnit()">Legg til</button></div>':'');
+      }
     }
     var plassInput='';
     if(listHasPlass(invT)){
@@ -3856,17 +3928,32 @@ function modalHTML(){
       var noTilstand=['garnlager','strikkeoppskrifter','strikkeutstyr'].indexOf(fx)>=0;
       // Garn: type og leverandør — brukes både på oppskrifter og i garnlageret
       var garnSection='';
-      if(fx==='garnlager'||fx==='strikkeoppskrifter'){
+      if(fx==='garnlager'||fx==='strikkeoppskrifter'||fx==='garntyper'){
         var gI=function(key,lbl,ph){
           return'<label class="field-lbl">'+lbl+' <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
             +'<input class="inp" type="text" value="'+esc(dv[key]||'')+'" placeholder="'+ph+'" oninput="mf().values=mf().values||{};mf().values.'+key+'=this.value">';
         };
-        garnSection=gI('__garnnavn','Garnnavn','F.eks. Finull, Peer Gynt \u2026')
+        // Hent ferdig utfylt garn fra registeret, så du slipper å skrive alt på nytt
+        var reg=findFixedList('garntyper');
+        if(fx!=='garntyper'&&reg&&(reg.items||[]).length){
+          garnSection+='<label class="field-lbl">Garntype fra registeret</label>'
+            +'<select class="inp" onchange="if(this.value)fyllFraGarntype(this.value)">'
+            +'<option value="">+ Hent fra garntyper \u2026</option>'
+            +reg.items.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(gt){
+              return'<option value="'+esc(gt.id)+'">'+esc(gt.name)+'</option>';
+            }).join('')+'</select>';
+        }
+        garnSection+=gI('__garnnavn','Garnnavn','F.eks. Finull, Peer Gynt \u2026')
           +gI('__garntype','Garntype','F.eks. sokkegarn, gensergarn, sjalgarn \u2026')
           +gI('__fiber','Fiber','F.eks. 100 % ull, 70 % alpakka / 30 % silke')
           +gI('__leverandor','Leverand\u00f8r','F.eks. Rauma, Sandnes \u2026')
           +'<label class="field-lbl">Gram per n\u00f8ste <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 gj\u00f8r at appen kan regne om mellom gram og n\u00f8ster</span></label>'
           +'<input class="inp" type="text" inputmode="numeric" style="width:100px" value="'+esc(dv.__gramPerNoste||'')+'" placeholder="F.eks. 50" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');mf().values=mf().values||{};mf().values.__gramPerNoste=this.value">';
+        if(fx!=='garntyper'&&(dv.__garnnavn||'').trim()){
+          garnSection+=(f._garntypeLagret
+            ?'<div class="hint-box" style="color:var(--red)">Lagret i garntyper.</div>'
+            :'<button class="icon-btn" style="font-size:11px;margin-top:6px" onclick="lagreSomGarntype()">Lagre som garntype</button>');
+        }
       }
       // Strikkepinner: rundpinner har to materialer (pinner og vaier), de andre ett
       var pinneSection='';
@@ -4436,7 +4523,7 @@ function sidebarHTML(){
   h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Planlegger</div>';
   h+='<div class="side-month'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   h+='<div class="side-month'+(view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goBursdager()"><span class="s-arrow"></span>Bursdagsbok</div>';
-  if(showStrikk)h+='<div class="side-month'+(view.kind==='strikkeverksted'||view.kind==='strikkeprosjekter'||view.kind==='garnlager'||view.kind==='strikkeoppskrifter'||view.kind==='strikkeutstyr'?'" style="color:var(--red)':'')+'" onclick="goStrikkeverksted()"><span class="s-arrow"></span>Strikkeverksted</div>';
+  if(showStrikk)h+='<div class="side-month'+(view.kind==='strikkeverksted'||view.kind==='strikkeprosjekter'||view.kind==='garnlager'||view.kind==='garntyper'||view.kind==='strikkeoppskrifter'||view.kind==='strikkeutstyr'?'" style="color:var(--red)':'')+'" onclick="goStrikkeverksted()"><span class="s-arrow"></span>Strikkeverksted</div>';
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
   return h;
 }
@@ -6139,7 +6226,7 @@ function inventarViewHTML(){
 
   var isPack=(inv.type||'inventar')==='pakke';
   var isProj=(inv.type||'inventar')==='prosjekt';
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+(isProj?'goPlanleggingProsjekt()':isPack&&!inv.fixed?'goPlanleggingPakke()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='forbruksvarer'?'goForbruksvarer()':inv.fixed==='garnlager'?'goGarnlager()':inv.fixed==='strikkeoppskrifter'?'goStrikkeoppskrifter()':inv.fixed==='strikkeutstyr'?'goStrikkeutstyr()':inv.fixed==='anskaffelser'?'goOkonomi()':'goVaretelling()')+'">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+(isProj?'goPlanleggingProsjekt()':isPack&&!inv.fixed?'goPlanleggingPakke()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='forbruksvarer'?'goForbruksvarer()':inv.fixed==='garnlager'?'goGarnlager()':inv.fixed==='garntyper'?'goGarntyper()':inv.fixed==='strikkeoppskrifter'?'goStrikkeoppskrifter()':inv.fixed==='strikkeutstyr'?'goStrikkeutstyr()':inv.fixed==='anskaffelser'?'goOkonomi()':'goVaretelling()')+'">\u2039</button></div>'
     +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
     +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
@@ -7018,6 +7105,7 @@ function render(){
   else if(view.kind==='garnmatch')content=garnmatchViewHTML();
   else if(view.kind==='strikkeprosjekter')content=strikkeprosjekterViewHTML();
   else if(view.kind==='garnlager')content=fixedListHubHTML('garnlager','Garnlager','Garn du har liggende \u2014 inkludert restgarn fra ferdige prosjekter.');
+  else if(view.kind==='garntyper')content=fixedListHubHTML('garntyper','Garntyper','Oppslagsverk: fyll ut ett garn \u00e9n gang, og hent det inn i lager og oppskrifter.');
   else if(view.kind==='strikkeoppskrifter')content=fixedListHubHTML('strikkeoppskrifter','Strikkeoppskrifter','Oppskrifter du eier eller vil strikke.');
   else if(view.kind==='strikkeutstyr')content=fixedListHubHTML('strikkeutstyr','Strikkepinner og annet strikkeutstyr','Pinner, m\u00e5lb\u00e5nd, markører og annet du bruker.');
   else if(view.kind==='beredskap')content=fixedListHubHTML('beredskap','Beredskap','Det du trenger for \u00e5 klare deg selv en uke.');
