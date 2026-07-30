@@ -855,6 +855,92 @@ function catIdsUnder(cat){
   if(!cat)return [];
   return [cat.id].concat(cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;}));
 }
+function goGruppe(tag){view={kind:'gruppe',tag:tag};drawerOpen=false;render();}
+// Samler alt appen vet om en gruppe: hvem som er med, bursdagene deres,
+// planer merket med gruppen, og dagbokinnlegg med gruppens hashtagg.
+function gruppeMedlemmer(tag){
+  return events.filter(function(e){
+    return e.bday&&personTagsFor(e.name).indexOf(normTag(tag))>=0;
+  }).map(function(e){return e;});
+}
+function gruppeViewHTML(){
+  var tag=normTag(view.tag||'');
+  var medl=gruppeMedlemmer(tag);
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goFolk()">\u2039</button></div>'
+    +'<div class="view-title">#'+esc(tag)+'</div>'
+    +'<div class="view-sub">'+medl.length+' person'+(medl.length===1?'':'er')+' i denne gruppen</div>';
+
+  // Medlemmer, med når de sist ble skrevet om
+  var yearAgo=new Date(today);yearAgo.setFullYear(yearAgo.getFullYear()-1);
+  h+='<div class="card">'+medl.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
+    var cnt=personEntryCountSince(e.name,isoDate(yearAgo));
+    var d=daysToNextBday(e);
+    return'<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
+      +'<div class="entry-date">bursdag '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]
+      +' \u00b7 om '+d+' dager \u00b7 '
+      +(cnt?cnt+' innlegg siste \u00e5r':'<span style="color:var(--amber)">ingen innlegg siste \u00e5r</span>')
+      +'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+  }).join('')+'</div>';
+
+  // Bursdager i rekkefølge
+  var iToday=isoDate(today);
+  var soon=medl.slice().sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b);});
+  if(soon.length){
+    h+='<div class="sec-title">Neste bursdager</div><div class="card">'
+      +soon.slice(0,5).map(function(e){
+        var d=daysToNextBday(e);
+        var nAge=bdayNextAge(e);
+        var round=isRoundBdayNext(e);
+        return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative">'
+          +(round?confettiHTML():'')
+          +'<div class="entry-body"><div class="entry-text">\ud83c\udf82 '+esc(e.name)+(nAge?' fyller '+nAge:'')+(round?' \ud83c\udf89':'')+'</div>'
+          +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
+      }).join('')+'</div>';
+  }
+
+  // Planer merket med gruppens hashtagg som personmerke
+  var planer=events.filter(function(e){
+    if(e.bday)return false;
+    return(e.personTags||[]).map(normTag).indexOf(tag)>=0;
+  });
+  h+='<div class="sec-title">Planer med gruppen</div>';
+  if(planer.length){
+    h+='<div class="card">'+planer.map(function(e){
+      return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
+        +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    }).join('')+'</div>';
+  } else {
+    h+='<div class="card"><div class="empty">Ingen planer merket med #'+esc(tag)+' enn\u00e5.</div></div>';
+  }
+  h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="nyGruppePlan(\''+q(tag)+'\')">+ Ny plan med gruppen</button></div>';
+
+  // Dagbokinnlegg med gruppens hashtagg
+  var innl=entries.filter(function(e){return(e.tags||[]).map(normTag).indexOf(tag)>=0;})
+    .sort(function(a,b){return a.date<b.date?1:-1;});
+  h+='<div class="sec-title">Innlegg med #'+esc(tag)+' <span style="font-weight:400;color:var(--rose)">\u00b7 '+innl.length+'</span></div>';
+  if(innl.length){
+    h+='<div class="card">'+innl.slice(0,10).map(function(e){
+      return'<div class="entry-row"><div class="entry-body">'
+        +'<div class="entry-text" style="font-size:13px">'+esc(e.text)+'</div>'
+        +'<div class="entry-date">'+fmtDate(e.date)+'</div></div></div>';
+    }).join('')+'</div>'
+      +(innl.length>10?'<div style="padding:4px 12px 0;font-size:11px;color:var(--muted)">Viser de 10 nyeste.</div>':'');
+  } else {
+    h+='<div class="card"><div class="empty">Ingen innlegg med denne hashtaggen enn\u00e5.</div></div>';
+  }
+  return h;
+}
+function nyGruppePlan(tag){
+  openEventModal();
+  var c=folkCat();
+  if(c)mf().cats=[c.id];
+  mf().personTags=[normTag(tag)];
+  render();
+}
 function nyFolkPlan(){
   openEventModal();
   var c=folkCat();
@@ -895,8 +981,17 @@ function folkViewHTML(){
     var d=daysToNextBday(e);
     return d>=0&&d<=14;
   }).sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b);});
-  var evs=events.filter(function(e){return!e.bday&&inCat(e.cats);})
-    .sort(function(a,b){return(a.month*100+(a.day||0))-(b.month*100+(b.day||0));});
+  // Bare planer som ligger foran oss — gjentakende regnes alltid som kommende
+  var iToday=isoDate(today);
+  var planDato=function(e){
+    var y=e.repeat?(((e.month*100+(e.day||31))<(curMonth*100+today.getDate()))?curYear+1:curYear):e.year;
+    return y+'-'+pad(e.month)+'-'+pad(e.day||1);
+  };
+  var evs=events.filter(function(e){
+    if(e.bday||!inCat(e.cats))return false;
+    if(e.repeat)return true;
+    return planDato(e)>=iToday;
+  }).sort(function(a,b){return planDato(a)<planDato(b)?-1:1;});
 
   h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">';
   h+='<div style="flex:1;min-width:0">'
@@ -922,7 +1017,7 @@ function folkViewHTML(){
           +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(e.name)+'</div>'
           +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div></div>';
       }).join('')
-      :'<div class="empty">Ingen planer enn\u00e5.</div>')
+      :'<div class="empty">Ingen planer framover.</div>')
     +'</div>'
     +'<div style="padding:6px 0 0"><button class="icon-btn" style="font-size:11px" onclick="nyFolkPlan()">+ Ny plan</button></div>'
     +'</div>';
@@ -941,9 +1036,11 @@ function folkViewHTML(){
   if(gNavn.length){
     h+='<div class="card">'+gNavn.map(function(t){
       var folk=grupper[t].slice().sort(nbSort);
-      return'<div class="entry-row"><div class="entry-body">'
+      return'<div class="entry-row" style="cursor:pointer" onclick="goGruppe(\''+q(t)+'\')">'
+        +'<div class="entry-body">'
         +'<div class="entry-text">#'+esc(t)+' <span style="font-size:11px;font-weight:400;color:var(--muted)">\u00b7 '+folk.length+'</span></div>'
-        +'<div class="entry-date">'+esc(folk.join(', '))+'</div></div></div>';
+        +'<div class="entry-date">'+esc(folk.join(', '))+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     }).join('')+'</div>';
   } else {
     h+='<div class="card"><div class="empty">En gruppe er en hashtagg som flere personer deler \u2014 f.eks. #familie p\u00e5 flere. Hashtagger bare \u00e9n person har, regnes ikke som gruppe.</div></div>';
@@ -2460,7 +2557,7 @@ function gavePersonViewHTML(){
 function goInnstillinger(){view={kind:'innstillinger'};drawerOpen=false;render();}
 function toggleFolkMeny(){
   showFolk=!showFolk;
-  if(!showFolk&&['folk','bursdager','bursdagsliste','gaver','gaveperson'].indexOf(view.kind)>=0)view={kind:'personlig'};
+  if(!showFolk&&['folk','gruppe','bursdager','bursdagsliste','gaver','gaveperson'].indexOf(view.kind)>=0)view={kind:'personlig'};
   save();render();
 }
 function toggleStrikkMeny(){
@@ -3245,7 +3342,7 @@ function openBdayModal(){
   render();
 }
 function openEventModal(){
-  modal={step:'event',form:{name:'',cats:[],month:curMonth,year:curYear,day:'',repeat:false,bday:false,interval:1,sinceYear:'',goalIds:[],resultIds:[],equipmentIds:[],ease:'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'event',form:{name:'',cats:[],month:curMonth,year:curYear,day:'',repeat:false,bday:false,interval:1,sinceYear:'',goalIds:[],resultIds:[],equipmentIds:[],personTags:[],ease:'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openEditEvent(id){
@@ -3472,7 +3569,7 @@ function saveEditRoutine(){
 function submitEvent(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   if(f.bday&&bdayCount()>=BDAY_MAX)return;
-  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,repeat:!!f.repeat,bday:!!f.bday,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.bday?(f.personTags||[]):[],done:false,log:[]});
+  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,repeat:!!f.repeat,bday:!!f.bday,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],done:false,log:[]});
   if(f._fromLater)laters=laters.filter(function(l){return l.id!==f._fromLater;});
   save();closeModal();
 }
@@ -3483,7 +3580,7 @@ function saveEditEvent(){
   e.day=f.day?Number(f.day):null;e.toMonth=(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null;e.toDay=(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null;e.repeat=!!f.repeat;e.bday=!!f.bday;e.interval=Number(f.interval)||1;
   e.sinceYear=f.sinceYear?Number(f.sinceYear):null;
   e.goalIds=f.bday?[]:(f.goalIds||[]);e.resultIds=f.bday?[]:(f.resultIds||[]);e.equipmentIds=f.bday?[]:(f.equipmentIds||[]);e.ease=(f.ease||'').trim();
-  e.personTags=f.bday?(f.personTags||[]):[];
+  e.personTags=f.personTags||[];
   if(e.repeat&&!e.log)e.log=[];
   save();closeModal();
 }
@@ -4659,6 +4756,13 @@ function modalHTML(){
         +'<div class="hint">Innlegg i takknemlighetsboka som bruker disse stikkordene, vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og de tre Jenny-ene holdes fra hverandre.</div>':'')
       +(!f.bday?'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt, valgfritt</span></label>'
       +'<div class="chips">'+linkChipSection(f)+'</div>':'')
+      +(!f.bday&&(f.personTags||[]).length
+        ?'<label class="field-lbl">Gruppe</label>'
+         +'<div class="chips">'+(f.personTags||[]).map(function(t){
+            return'<button class="chip on" onclick="mf().personTags=(mf().personTags||[]).filter(function(x){return x!==\''+q(t)+'\';});render()">#'+esc(t)+' \u00d7</button>';
+          }).join('')+'</div>'
+         +'<div class="hint">Planen vises p\u00e5 gruppesiden under Folk.</div>'
+        :'')
       +(!f.bday?equipmentPickerHTML(f):'')
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
@@ -4725,7 +4829,7 @@ function sidebarHTML(){
   h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='administrer'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
   h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Planlegger</div>';
   h+='<div class="side-month'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
-  if(showFolk)h+='<div class="side-month'+(view.kind==='folk'||view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goFolk()"><span class="s-arrow"></span>Folk</div>';
+  if(showFolk)h+='<div class="side-month'+(view.kind==='folk'||view.kind==='gruppe'||view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goFolk()"><span class="s-arrow"></span>Folk</div>';
   if(showStrikk)h+='<div class="side-month'+(view.kind==='strikkeverksted'||view.kind==='strikkeprosjekter'||view.kind==='garnlager'||view.kind==='garntyper'||view.kind==='strikkeoppskrifter'||view.kind==='strikkeutstyr'?'" style="color:var(--red)':'')+'" onclick="goStrikkeverksted()"><span class="s-arrow"></span>Strikkeverksted</div>';
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
   return h;
@@ -7363,6 +7467,7 @@ function render(){
   else if(view.kind==='bursdagsliste')content=bursdagslisteViewHTML();
   else if(view.kind==='varetelling')content=varetellingHubViewHTML();
   else if(view.kind==='folk')content=folkViewHTML();
+  else if(view.kind==='gruppe')content=gruppeViewHTML();
   else if(view.kind==='strikkeverksted')content=strikkeverkstedViewHTML();
   else if(view.kind==='garnmatch')content=garnmatchViewHTML();
   else if(view.kind==='strikkeprosjekter')content=strikkeprosjekterViewHTML();
