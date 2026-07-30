@@ -2623,7 +2623,19 @@ function gavePersonViewHTML(){
       return(e.year+'-'+pad(e.month)+'-'+pad(e.day||1))<iToday0;
     }).sort(function(a,b){return(b.year*10000+b.month*100+(b.day||0))-(a.year*10000+a.month*100+(a.day||0));});
     var evRad=function(e){
-      var dato=(e.day?e.day+'.':'')+(e.toDay?'\u2013'+e.toDay+'. ':' ')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year);
+      // Sluttdatoen har egen måned, og perioden kan gå over et årsskifte
+      var dato;
+      if(e.toDay){
+        var wraps=(e.toMonth<e.month)||(e.toMonth===e.month&&e.toDay<e.day);
+        var sluttAar=e.repeat?null:(e.year+(wraps?1:0));
+        var sammeMnd=(e.toMonth||e.month)===e.month&&!wraps;
+        dato=(sammeMnd
+            ?e.day+'.\u2013'+e.toDay+'. '+MND_FULL[e.month-1]
+            :e.day+'. '+MND_FULL[e.month-1]+' \u2013 '+e.toDay+'. '+MND_FULL[(e.toMonth||e.month)-1])
+          +(e.repeat?' hvert \u00e5r':(sluttAar!==e.year?' '+e.year+'\u2013'+sluttAar:' '+e.year));
+      } else {
+        dato=(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year);
+      }
       return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
         +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
         +'<div class="entry-date">'+dato+'</div></div>'
