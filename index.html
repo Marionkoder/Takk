@@ -986,13 +986,17 @@ function fixedListHubHTML(key,title,sub){
   if(sub)h+='<div class="view-sub">'+sub+'</div>';
   if(!inv)return h+'<div class="card"><div class="empty">Lista finnes ikke.</div></div>';
   var c=invCounts(inv);
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goListOversikt(\''+q(inv.id)+'\')">'
-    +'<div class="entry-body"><div class="entry-text">Oversikt</div>'
-    +'<div class="entry-date">hvor tingene er \u2014 ordnet etter plassering</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  var lex=key==='garntyper';
+  // Garnleksikonet har ingen plassering og ingenting å hake av — bare selve lista
+  if(!lex){
+    h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goListOversikt(\''+q(inv.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">Oversikt</div>'
+      +'<div class="entry-date">hvor tingene er \u2014 ordnet etter plassering</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  }
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
     +'<div class="entry-body"><div class="entry-text">Liste</div>'
-    +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
+    +'<div class="entry-date">'+(lex?c.total+' garntype'+(c.total===1?'':'r'):c.have+' av '+c.total+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':''))+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   return h;
 }
@@ -1613,6 +1617,29 @@ function load(){
     try{localStorage.setItem(SK+'_qtyall','1');}catch(e){}
     save();
   }
+
+  // Sikring: alle faste lister skal finnes uansett hvilke migreringsflagg som
+  // alt er satt. Uten denne blir nye lister aldri opprettet for dem som
+  // allerede har kjørt en tidligere versjon — det var feilen med Garntyper.
+  var FASTE_LISTER=[
+    ['beredskap','Beredskap'],
+    ['utstyr','Utstyr'],
+    ['forbruksvarer','Forbruksvarer'],
+    ['anskaffelser','Innkj\u00f8psliste'],
+    ['garnlager','Garnlager'],
+    ['garntyper','Garntyper'],
+    ['strikkeoppskrifter','Strikkeoppskrifter'],
+    ['strikkeutstyr','Strikkepinner og annet strikkeutstyr']
+  ];
+  var lagtTil=false;
+  FASTE_LISTER.forEach(function(t){
+    if(!inventories.some(function(iv){return iv.fixed===t[0];})){
+      inventories.push({id:'fixed_'+t[0],name:t[1],type:'inventar',fixed:t[0],
+        qty:t[0]!=='garntyper',catId:'',fields:[],sections:[],items:[]});
+      lagtTil=true;
+    }
+  });
+  if(lagtTil)save();
   render();
 }
 function save(){
@@ -2835,7 +2862,9 @@ function openInvItemModal(invId,secId){
   var iv=invById(invId)||{};
   var vals=listHasQty(iv)?{__unit:'n\u00f8ster'}:{};
   if(iv.fixed==='anskaffelser'&&!secId)secId='ik_passer';
-  modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:vals,have:false,_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
+  var t=iv.type||'inventar';
+  var defHave=(t!=='pakke'&&t!=='prosjekt');
+  modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:vals,have:defHave,_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
 }
 function openEditInvItem(invId,itemId){
   var inv=invById(invId);var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
@@ -2844,12 +2873,15 @@ function openEditInvItem(invId,itemId){
 function submitInvItem(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
   var inv=invById(f.invId);if(!inv)return;
+  // I garnleksikonet er navnet garnnavnet — speil det så matchingen finner det igjen
+  if(inv.fixed==='garntyper'){f.values=f.values||{};f.values.__garnnavn=n;}
   inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:f.sectionId||null,name:n,note:(f.note||'').trim(),date:f.mdate||'',inCal:!!f.inCal,values:f.values||{},have:!!f.have,goalIds:f.goalIds||[],resultIds:f.resultIds||[],routineIds:f.routineIds||[],eventIds:f.eventIds||[]}]);
   save();closeModal();
 }
 function saveEditInvItem(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
   var inv=invById(f.invId);var it=(inv.items||[]).find(function(x){return x.id===f.id;});if(!it)return;
+  if(inv.fixed==='garntyper'){f.values=f.values||{};f.values.__garnnavn=n;}
   it.name=n;it.sectionId=f.sectionId||null;it.note=(f.note||'').trim();it.date=f.mdate||'';it.inCal=!!f.inCal;it.values=f.values||{};it.have=!!f.have;
   save();closeModal();
 }
@@ -3932,11 +3964,12 @@ function modalHTML(){
           +'<button class="chip'+(dv.__bered==='nei'||!dv.__bered?' on':'')+'" onclick="setItemVal(\'__bered\',\'nei\')">Nei</button>'
           +'</div>'
           +(dv.__bered==='ja'
-            ?'<div class="hint">'+(f.have?'P\u00e5 plass \u2014 vises med lysegul bakgrunn i lista.':'Mangler \u2014 vises med oransje bakgrunn i lista til du haker den av.')+'</div>'
+            ?'<div class="hint">'+(f.have?'P\u00e5 plass \u2014 vises med lysegul bakgrunn i lista.':'Mangler \u2014 vises med oransje bakgrunn i lista til du setter den som p\u00e5 plass.')+'</div>'
             :'');
       }
       var fx=invT?(invT.fixed||''):'';
-      var noTilstand=['garnlager','strikkeoppskrifter','strikkeutstyr'].indexOf(fx)>=0;
+      var noTilstand=['garnlager','garntyper','strikkeoppskrifter','strikkeutstyr'].indexOf(fx)>=0;
+      var isLeksikon=fx==='garntyper';
       // Garn: type og leverandør — brukes både på oppskrifter og i garnlageret
       var garnSection='';
       if(fx==='garnlager'||fx==='strikkeoppskrifter'||fx==='garntyper'){
@@ -3954,10 +3987,10 @@ function modalHTML(){
               return'<option value="'+esc(gt.id)+'">'+esc(gt.name)+'</option>';
             }).join('')+'</select>';
         }
-        garnSection+=gI('__garnnavn','Garnnavn','F.eks. Finull, Peer Gynt \u2026')
+        garnSection+=(fx==='garntyper'?'':gI('__garnnavn','Garnnavn','F.eks. Finull, Peer Gynt \u2026'))
           +gI('__garntype','Garntype','F.eks. sokkegarn, gensergarn, sjalgarn \u2026')
           +gI('__fiber','Fiber','F.eks. 100 % ull, 70 % alpakka / 30 % silke')
-          +gI('__leverandor','Leverand\u00f8r','F.eks. Rauma, Sandnes \u2026')
+          +gI('__leverandor','Produsent','F.eks. Rauma, Sandnes \u2026')
           +'<label class="field-lbl">Gram per n\u00f8ste <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 gj\u00f8r at appen kan regne om mellom gram og n\u00f8ster</span></label>'
           +'<input class="inp" type="text" inputmode="numeric" style="width:100px" value="'+esc(dv.__gramPerNoste||'')+'" placeholder="F.eks. 50" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');mf().values=mf().values||{};mf().values.__gramPerNoste=this.value">';
         if(fx!=='garntyper'&&(dv.__garnnavn||'').trim()){
@@ -3989,8 +4022,8 @@ function modalHTML(){
       return beredSection
         +garnSection
         +pinneSection
-        +'<label class="field-lbl">Merke <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-        +'<input class="inp" type="text" value="'+esc(dv.__merke||'')+'" placeholder="F.eks. Primus, Fj\u00e4llr\u00e4ven \u2026" oninput="mf().values=mf().values||{};mf().values.__merke=this.value">'
+        +(isLeksikon?'':'<label class="field-lbl">Merke <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+        +'<input class="inp" type="text" value="'+esc(dv.__merke||'')+'" placeholder="F.eks. Primus, Fj\u00e4llr\u00e4ven \u2026" oninput="mf().values=mf().values||{};mf().values.__merke=this.value">')
         +(noTilstand?'':'<label class="field-lbl">Tilstand <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
         +'<div class="chips">'+TILSTAND.map(function(t){
             return'<button class="chip'+(dv.__tilstand===t?' on':'')+'" onclick="mf().values=mf().values||{};setItemVal(\'__tilstand\',\''+q(t)+'\')">'+esc(t)+'</button>';
@@ -4035,14 +4068,23 @@ function modalHTML(){
         +'Beredskap \u00b7 '+(on?'p\u00e5 plass':'mangler')+'</div>';
     })()
       +'<div class="modal-title">'+(isEditT?(isProj?'Rediger milep\u00e6l':'Rediger punkt'):(isProj?'Ny milep\u00e6l':'Nytt punkt'))+'</div>'
-      +'<label class="field-lbl">Navn</label>'
-      +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="F.eks. f\u00f4rede vinterst\u00f8vletter til penbruk \u2026" oninput="mf().name=this.value;updateSaveBtn()">'
+      +'<label class="field-lbl">'+(invT.fixed==='garntyper'?'Garnnavn':'Navn')+'</label>'
+      +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="'+(invT.fixed==='garntyper'?'F.eks. Finull, Peer Gynt \u2026':'F.eks. f\u00f4rede vinterst\u00f8vletter til penbruk \u2026')+'" oninput="mf().name=this.value;updateSaveBtn()">'
+      +((function(){
+        var t=invT.type||'inventar';
+        if(t==='pakke'||t==='prosjekt'||invT.fixed==='garntyper')return'';
+        return'<label class="field-lbl">Status</label>'
+          +'<div class="chips">'
+          +'<button class="chip'+(f.have?' on':'')+'" onclick="mf().have=true;render()">P\u00e5 plass</button>'
+          +'<button class="chip'+(f.have?'':' on')+'" onclick="mf().have=false;render()">Mangler</button>'
+          +'</div>';
+      })())
       +(((invT.sections||[]).length)?'<label class="field-lbl">'+(invT.fixed==='anskaffelser'?'Prioritering':'Overskrift')+'</label>'
       +'<select class="inp" style="width:auto" oninput="mf().sectionId=this.value">'+secOpts+'</select>':'')
       +qtyInput
       +plassInput
       +expInput
-      +fargeInput
+      +(invT.fixed==='garntyper'?'':fargeInput)
       +stdInputs
       +detailInputs
       +fieldInputs
@@ -6184,6 +6226,26 @@ function printListHTML(inv){
       var pins3=(K3.needles||[]).filter(function(n){return n.th||n.len;}).map(function(n){return(n.th?n.th+' mm':'?')+(n.len?' \u00d7 '+n.len+' cm':'');}).join(', ');
       if(pins3)h+='<div class="p-meta">Pinner: '+esc(pins3)+'</div>';
     }
+    if(inv.subtype==='sy'&&inv.sew){
+      var S3=inv.sew;
+      if(S3.toWhom)h+='<div class="p-meta">Til: '+esc(S3.toWhom)+'</div>';
+      (S3.fabrics||[]).forEach(function(y){
+        var parts=[y.name,y.color,y.mat,y.prod].filter(Boolean).join(' \u00b7 ');
+        var amt=y.meters?y.meters+' meter':'';
+        if(parts||amt)h+='<div class="p-meta">Stoff: '+esc(parts)+(amt?' \u00b7 '+amt:'')+'</div>';
+      });
+      if(S3.pattern)h+='<div class="p-meta">S\u00f8mm\u00f8nster: '+esc(S3.pattern)+'</div>';
+      if(S3.notions)h+='<div class="p-meta">S\u00f8mtilbeh\u00f8r: '+esc(S3.notions)+'</div>';
+    }
+    if((inv.subtype==='vedlikehold'||inv.subtype==='oppussing')&&inv.maint){
+      var M3=inv.maint;
+      var mats=(M3.materials||[]).filter(function(m){return(m.name||'').trim();})
+        .map(function(m){return m.name+(m.amount?' ('+m.amount+')':'');}).join(', ');
+      if(mats)h+='<div class="p-meta">Materialer: '+esc(mats)+'</div>';
+      var eqs=(M3.equipment||[]).filter(function(e){return(e.name||'').trim();})
+        .map(function(e){return e.name;}).join(', ');
+      if(eqs)h+='<div class="p-meta">Utstyr: '+esc(eqs)+'</div>';
+    }
     (inv.fields||[]).forEach(function(fd){
       var v=(inv.varValues||{})[fd.id];
       if(v)h+='<div class="p-meta">'+esc(fd.name)+': '+esc(v)+'</div>';
@@ -6287,6 +6349,26 @@ function inventarViewHTML(){
       }).join(', ');
       fr('Pinner',pins);
     }
+    if(inv.subtype==='sy'&&inv.sew){
+      var S2=inv.sew;
+      var fr2=function(lbl,val){if(val)frameRows+='<div style="display:flex;gap:8px;font-size:13px;padding:2px 0"><span style="width:110px;flex-shrink:0;color:var(--muted)">'+lbl+'</span><span>'+esc(val)+'</span></div>';};
+      fr2('Til hvem',S2.toWhom);
+      (S2.fabrics||[]).forEach(function(y,i){
+        var parts=[y.name,y.color,y.mat,y.prod].filter(Boolean).join(' \u00b7 ');
+        var amt=y.meters?y.meters+' meter':'';
+        if(parts||amt)fr2('Stoff'+((S2.fabrics||[]).length>1?' '+(i+1):''),parts+(amt?(parts?' \u00b7 ':'')+amt:''));
+      });
+      fr2('S\u00f8mm\u00f8nster',S2.pattern);
+      fr2('S\u00f8mtilbeh\u00f8r',S2.notions);
+    }
+    if((inv.subtype==='vedlikehold'||inv.subtype==='oppussing')&&inv.maint){
+      var M2=inv.maint;
+      var fr3=function(lbl,val){if(val)frameRows+='<div style="display:flex;gap:8px;font-size:13px;padding:2px 0"><span style="width:110px;flex-shrink:0;color:var(--muted)">'+lbl+'</span><span>'+esc(val)+'</span></div>';};
+      fr3('Materialer',(M2.materials||[]).filter(function(m){return(m.name||'').trim();})
+        .map(function(m){return m.name+(m.amount?' ('+m.amount+')':'');}).join(', '));
+      fr3('Utstyr',(M2.equipment||[]).filter(function(e){return(e.name||'').trim();})
+        .map(function(e){return e.name;}).join(', '));
+    }
     (inv.fields||[]).forEach(function(fd){
       var v=(inv.varValues||{})[fd.id];
       if(v)frameRows+='<div style="display:flex;gap:8px;font-size:13px;padding:2px 0"><span style="width:110px;flex-shrink:0;color:var(--muted)">'+esc(fd.name)+'</span><span>'+esc(v)+'</span></div>';
@@ -6367,9 +6449,13 @@ function inventarViewHTML(){
     if(listHasDetails(inv)&&dvv.__kjopt)dRow.push('kj\u00f8pt '+esc(dvv.__kjopt));
     var twoBtn=listHasDetails(inv);
     var bBg=beredBg(it);
+    var isLex=inv.fixed==='garntyper';
+    // «På plass / Mangler» i stedet for avhaking — gjelder alle inventarlister.
+    // Pakkelister og prosjekter beholder haken, der betyr den pakket / milepæl nådd.
+    var showState=!twoBtn&&!isLex&&!isPack&&!isProj;
     return'<div class="entry-row"'+(bBg?' style="background:'+bBg+'"':'')+'>'
-      +(twoBtn?'':'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>')
-      +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj?'':' style="color:var(--amber)"')+'>'+esc(it.name)
+      +((twoBtn||isLex||showState)?'':'<button class="chk'+(it.have?' done':'')+'" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'\u2713':'')+'</button>')
+      +'<div class="entry-body"><div class="entry-text"'+(it.have||isPack||isProj||isLex?'':' style="color:var(--amber)"')+'>'+esc(it.name)
       +(isProj&&it.date?(function(){
           var ps=it.sectionId?(inv.sections||[]).find(function(x){return x.id===it.sectionId;}):null;
           var outside=ps&&((ps.startDate&&it.date<ps.startDate)||(ps.endDate&&it.date>ps.endDate));
@@ -6388,12 +6474,12 @@ function inventarViewHTML(){
         var others=inventories.filter(function(iv){return iv.id!==inv.id&&(iv.items||[]).some(function(x){return x.syncId===it.syncId;});}).map(function(iv){return iv.name;});
         return others.length?'<div style="font-size:11px;color:var(--rose)">Ogs\u00e5 p\u00e5: '+esc(others.join(' \u00b7 '))+'</div>':'';
       })()
-      +(twoBtn?'<div class="chips" style="padding-top:5px">'
+      +(twoBtn||showState?'<div class="chips" style="padding-top:5px">'
           +'<button class="chip'+(it.have?' on':'')+'" style="font-size:11px" onclick="toggleInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.have?'P\u00e5 plass':'Mangler')+'</button>'
-          +(it.have?'':'<button class="chip'+(it.planned?' on':'')+'" style="font-size:11px" onclick="setInvPlanned(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.planned?'Innkj\u00f8p planlagt':'Sett p\u00e5 innkj\u00f8pslista')+'</button>')
+          +(twoBtn&&!it.have?'<button class="chip'+(it.planned?' on':'')+'" style="font-size:11px" onclick="setInvPlanned(\''+q(inv.id)+'\',\''+q(it.id)+'\')">'+(it.planned?'Innkj\u00f8p planlagt':'Sett p\u00e5 innkj\u00f8pslista')+'</button>':'')
         +'</div>':'')
       +'</div>'
-      +(twoBtn||it.have||isPack||isProj?'':'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="invRowToLater(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u2192 Vent</button>')
+      +(twoBtn||showState||it.have||isPack||isProj?'':'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="invRowToLater(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u2192 Vent</button>')
       +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u270e</button>'
       +'</div>';
   };
@@ -6930,7 +7016,21 @@ function planleggingViewHTML(){
   }
   if(planTab==='prosjekter'){
   h+='<div class="sec-title">Prosjekter <span style="font-weight:400;color:var(--rose)">\u00b7 m\u00e5lbare, med frist</span></div>';
-  h+='<button class="add-btn" onclick="openResultModal()">+ Nytt prosjekt</button>';
+  h+='<button class="add-btn" onclick="openProjModal()">+ Nytt prosjekt</button>';
+  // Prosjekter med egen liste — samme sted som de enklere, så ingenting er skjult
+  var pInvs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';})
+    .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
+  if(pInvs.length){
+    h+='<div class="card">'+pInvs.map(function(iv){
+      var ic=invCounts(iv);
+      return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text"'+(iv.completedDate?' style="opacity:.55"':'')+'>'+esc(dispName(iv))
+        +' <span style="font-size:10px;font-weight:400;color:var(--rose)">\u00b7 '+esc(prosjekttypeName(iv.subtype).toLowerCase())+'</span></div>'
+        +'<div class="entry-date">'+ic.have+' av '+ic.total+' milep\u00e6ler'
+        +(iv.completedDate?' \u00b7 <span style="color:var(--red)">\u2713 ferdig '+fmtDate(iv.completedDate)+'</span>':(iv.endDate?' \u00b7 frist '+fmtDate(iv.endDate):''))+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    }).join('')+'</div>';
+  }
   if(results.length){
     h+='<div class="card">';
     results.slice().sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);}).forEach(function(r){
