@@ -861,7 +861,6 @@ function nyFolkPlan(){
   if(c)mf().cats=[c.id];
   render();
 }
-var folkPersonerOpen=false;
 function goFolk(){view={kind:'folk'};drawerOpen=false;render();}
 function folkViewHTML(){
   var cat=folkCat();
@@ -872,23 +871,6 @@ function folkViewHTML(){
   var ids=catIdsUnder(cat);
   var inCat=function(list){return(list||[]).some(function(c){return ids.indexOf(c)>=0;});};
   var bdays=events.filter(function(e){return e.bday;});
-
-  // Personsider — alfabetisk, kollapsbar så den ikke tar hele skjermen
-  var navn=bdays.map(function(e){return e.name;}).sort(nbSort);
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="folkPersonerOpen=!folkPersonerOpen;render()">'
-    +'<div class="entry-body"><div class="entry-text">Personsider</div>'
-    +'<div class="entry-date">'+navn.length+' person'+(navn.length===1?'':'er')+'</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">'+(folkPersonerOpen?'\u2039':'\u203a')+'</span></div>';
-  if(folkPersonerOpen){
-    h+=navn.length
-      ?navn.map(function(n){
-        return'<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(n)+'\')">'
-          +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(n)+'</div></div>'
-          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-      }).join('')
-      :'<div class="empty">Ingen personer enn\u00e5.</div>';
-  }
-  h+='</div>';
 
   // Grunnverdien som gir kategorien retning
   var gs=goals.filter(function(g){return inCat(g.cats);});
@@ -1353,6 +1335,7 @@ function celebNext(){window._celebSlide=(window._celebSlide||0)+1;render();}
 function celebPrev(){window._celebSlide=Math.max(0,(window._celebSlide||0)-1);render();}
 function closeCelebration(){markCelebrationSeen();window._celebSlide=0;goHjem();}
 function goBursdager(){goFolk();}
+var bdaySort='dato';
 function goBursdagsliste(){view={kind:'bursdagsliste'};drawerOpen=false;render();}
 function goGaver(){view={kind:'gaver'};drawerOpen=false;render();}
 function bursdagerHubHTML(){
@@ -1370,9 +1353,23 @@ function bursdagerHubHTML(){
   return h;
 }
 function bursdagslisteViewHTML(){
-  var bdays=events.filter(function(e){return e.bday;}).sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
+  var bdays=events.filter(function(e){return e.bday;});
+  // Sortering: dato (n\u00e6rmest f\u00f8rst), alfabetisk, eller alder (eldst f\u00f8rst)
+  if(bdaySort==='navn')bdays.sort(function(a,b){return nbSort(a.name,b.name);});
+  else if(bdaySort==='alder')bdays.sort(function(a,b){
+    var aa=ageToday(a),ab=ageToday(b);
+    if(aa===null&&ab===null)return nbSort(a.name,b.name);
+    if(aa===null)return 1;
+    if(ab===null)return-1;
+    return ab-aa||nbSort(a.name,b.name);
+  });
+  else bdays.sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goFolk()">\u2039</button></div>'
     +'<div class="view-title">Bursdagsliste <span style="font-size:12px;font-weight:400;color:var(--rose)">\u00b7 '+bdays.length+' av '+BDAY_MAX+'</span></div>';
+  h+='<div class="chips" style="padding:8px 12px 0">'
+    +[['dato','Dato'],['navn','Alfabetisk'],['alder','Alder']].map(function(t){
+      return'<button class="chip'+(bdaySort===t[0]?' on':'')+'" onclick="bdaySort=\''+t[0]+'\';render()">'+t[1]+'</button>';
+    }).join('')+'</div>';
   if(bdays.length<BDAY_MAX)h+='<button class="add-btn" onclick="openBdayModal()">+ Ny bursdag</button>';
   if(bdays.length){
     h+='<div class="card" style="padding:6px 0">';
