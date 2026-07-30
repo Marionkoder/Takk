@@ -1482,6 +1482,17 @@ function load(){
     save();
   }
 
+  // Garntyper kom etter de tre første strikkelistene — egen migrering, ellers
+  // ville den aldri blitt opprettet for de som alt hadde åpnet forrige versjon
+  var gt1=false;try{gt1=!!localStorage.getItem(SK+'_garntyper1');}catch(e){}
+  if(!gt1){
+    if(!inventories.some(function(iv){return iv.fixed==='garntyper';})){
+      inventories.push({id:'fixed_garntyper',name:'Garntyper',type:'inventar',fixed:'garntyper',qty:false,catId:'',fields:[],sections:[],items:[]});
+    }
+    try{localStorage.setItem(SK+'_garntyper1','1');}catch(e){}
+    save();
+  }
+
   // Rydd bort eksempelkategoriene fra en tidligere versjon, hvis de ikke er tatt i bruk
   var fvClean1=false;try{fvClean1=!!localStorage.getItem(SK+'_forbruksvarer_clean1');}catch(e){}
   if(!fvClean1){
