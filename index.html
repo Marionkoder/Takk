@@ -2168,11 +2168,11 @@ function resultCatMatch(r,entryCats){
     return!!(c&&c.parentId&&sc.includes(c.parentId));
   });
 }
-function openResultModal(){modal={step:'result',form:{name:'',shortTitle:'',subtype:'',valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'',hoursTotal:'',hoursMode:'total',trackHours:true,invIds:[],equipmentIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
+function openResultModal(){modal={step:'result',form:{name:'',shortTitle:'',subtype:'',tags:[],valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'',hoursTotal:'',hoursMode:'total',trackHours:true,invIds:[],equipmentIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
 function openEditResult(id){
   var r=resultById(id);if(!r)return;
   var linkedInvs=inventories.filter(function(iv){return(iv.resultIds||[]).includes(id);}).map(function(iv){return iv.id;});
-  modal={step:'result_edit',form:{id:id,name:r.name,shortTitle:r.shortTitle||'',subtype:r.subtype||'',valueId:r.valueId,month:r.month,year:r.year,startMonth:r.startMonth||'',startYear:r.startYear||'',subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'',hoursTotal:r.hoursTotal||'',hoursMode:r.hoursMode||'total',trackHours:r.trackHours!==false,invIds:linkedInvs,equipmentIds:[].concat(r.equipmentIds||[]),budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
+  modal={step:'result_edit',form:{id:id,name:r.name,tags:[].concat(r.tags||[]),shortTitle:r.shortTitle||'',subtype:r.subtype||'',valueId:r.valueId,month:r.month,year:r.year,startMonth:r.startMonth||'',startYear:r.startYear||'',subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'',hoursTotal:r.hoursTotal||'',hoursMode:r.hoursMode||'total',trackHours:r.trackHours!==false,invIds:linkedInvs,equipmentIds:[].concat(r.equipmentIds||[]),budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
     forutsetninger:r.forutsetninger||'',risikoer:r.risikoer||'',
     routineIds:routines.filter(function(x){return (x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;}),
     eventIds:events.filter(function(x){return !x.bday&&(x.resultIds||[]).indexOf(id)>=0;}).map(function(x){return x.id;})}};render();
@@ -2298,9 +2298,10 @@ function placeResultFormInBudget(){
   save();render();
 }
 function submitResult(){
+  flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId||!f.subtype)return;
   var newId='x'+Date.now()+Math.random().toString(36).slice(2,6);
-  results.push({id:newId,name:name,shortTitle:(f.shortTitle||'').trim(),subtype:f.subtype,valueId:f.valueId,month:Number(f.month),year:Number(f.year),startMonth:f.startMonth?Number(f.startMonth):null,startYear:f.startYear?Number(f.startYear):null,subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'',hoursTotal:numVal(f.hoursTotal)||'',hoursMode:f.hoursMode==='monthly'?'monthly':'total',trackHours:f.trackHours!==false,equipmentIds:f.equipmentIds||[],milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
+  results.push({id:newId,name:name,tags:f.tags||[],shortTitle:(f.shortTitle||'').trim(),subtype:f.subtype,valueId:f.valueId,month:Number(f.month),year:Number(f.year),startMonth:f.startMonth?Number(f.startMonth):null,startYear:f.startYear?Number(f.startYear):null,subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'',hoursTotal:numVal(f.hoursTotal)||'',hoursMode:f.hoursMode==='monthly'?'monthly':'total',trackHours:f.trackHours!==false,equipmentIds:f.equipmentIds||[],milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
   if(f.achieved&&(f.equipmentIds||[]).length)markEquipmentUsed(f.equipmentIds,name+' '+MND_FULL[Number(f.month)-1]+' '+f.year);
   syncResultRoutines(newId,f.routineIds);syncResultEvents(newId,f.eventIds);
   syncResultInvs(newId,f.invIds);
@@ -2309,10 +2310,11 @@ function submitResult(){
   save();closeModal();
 }
 function saveEditResult(){
+  flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId||!f.subtype)return;
   var r=resultById(f.id);if(!r)return;
   var wasAchieved=!!r.achieved;
-  r.name=name;r.shortTitle=(f.shortTitle||'').trim();r.subtype=f.subtype;r.valueId=f.valueId;r.month=Number(f.month);r.year=Number(f.year);
+  r.name=name;r.tags=f.tags||[];r.shortTitle=(f.shortTitle||'').trim();r.subtype=f.subtype;r.valueId=f.valueId;r.month=Number(f.month);r.year=Number(f.year);
   r.startMonth=f.startMonth?Number(f.startMonth):null;r.startYear=f.startYear?Number(f.startYear):null;
   r.subCats=f.subCats||[];r.achieved=!!f.achieved;r.targetAmount=parseKr(f.targetAmount);
   r.amountType=f.amountType||'';
@@ -2604,6 +2606,39 @@ function gavePersonViewHTML(){
   if(!gs.length){
     h+='<div class="card"><div class="empty">Ingen gaver logget for '+esc(pn)+' enn\u00e5. Trykk \u00ab+ Gave\u00bb for \u00e5 registrere en gave eller notere en id\u00e9.</div></div>';
   }
+  // Planer og hendelser merket med personens hashtagger
+  var pTags0=personTagsFor(pn);
+  if(pTags0.length){
+    var iToday0=isoDate(today);
+    var pEvs=events.filter(function(e){
+      if(e.bday)return false;
+      return(e.tags||[]).some(function(t){return pTags0.indexOf(normTag(t))>=0;});
+    });
+    var kommende=pEvs.filter(function(e){
+      if(e.repeat)return true;
+      return(e.year+'-'+pad(e.month)+'-'+pad(e.day||1))>=iToday0;
+    }).sort(function(a,b){return(a.month*100+(a.day||0))-(b.month*100+(b.day||0));});
+    var tidligere=pEvs.filter(function(e){
+      if(e.repeat)return false;
+      return(e.year+'-'+pad(e.month)+'-'+pad(e.day||1))<iToday0;
+    }).sort(function(a,b){return(b.year*10000+b.month*100+(b.day||0))-(a.year*10000+a.month*100+(a.day||0));});
+    var evRad=function(e){
+      var dato=(e.day?e.day+'.':'')+(e.toDay?'\u2013'+e.toDay+'. ':' ')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year);
+      return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
+        +'<div class="entry-date">'+dato+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    };
+    if(kommende.length||tidligere.length){
+      h+='<div class="sec-title">Planer med '+esc(pn)+'</div>';
+      if(kommende.length)h+='<div class="card">'+kommende.map(evRad).join('')+'</div>';
+      if(tidligere.length){
+        h+='<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">Vi har gjort</div>'
+          +'<div class="card">'+tidligere.slice(0,10).map(evRad).join('')+'</div>';
+      }
+    }
+  }
+
   // Takknemlig for — innlegg som handler om personen (via valgte hashtagger)
   var pTags=personTagsFor(pn);
   var pEntries=entriesForPerson(pn);
@@ -2925,7 +2960,7 @@ function openPakkeModal(){modal={step:'inv',form:{name:'',type:'pakke',startDate
 function blankKnit(){return{shortTitle:'',toWhom:'',pattern:'',needles:[{th:'',len:''}],yarns:[{name:'',mat:'',prod:'',color:'',gram:'',skeins:''}]};}
 function blankSew(){return{shortTitle:'',toWhom:'',pattern:'',notions:'',fabrics:[{name:'',mat:'',prod:'',color:'',meters:''}]};}
 function blankMaint(){return{materials:[{name:'',amount:''}],equipment:[{name:''}]};}
-function openProjModal(){modal={step:'inv',form:{name:'',type:'prosjekt',subtype:'',_lockType:true,startDate:'',endDate:'',catId:'',catIds:[],longTitle:'',resources:'',hoursTotal:'',trackHours:true,varValues:{},knit:blankKnit(),sew:blankSew(),maint:blankMaint(),goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
+function openProjModal(){modal={step:'inv',form:{name:'',type:'prosjekt',subtype:'',_lockType:true,tags:[],startDate:'',endDate:'',catId:'',catIds:[],longTitle:'',resources:'',hoursTotal:'',trackHours:true,varValues:{},knit:blankKnit(),sew:blankSew(),maint:blankMaint(),goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
 function toggleProjCat(id){var a=mf().catIds||[];mf().catIds=a.indexOf(id)>=0?a.filter(function(x){return x!==id;}):a.concat([id]);render();}
 function addKnitYarn(){mf().knit.yarns.push({name:'',mat:'',prod:'',color:'',gram:'',skeins:''});render();}
 function rmKnitYarn(i){var k=mf().knit;if(k.yarns.length>1)k.yarns.splice(i,1);render();}
@@ -3077,7 +3112,7 @@ function hoursToday(kind,refId){
 function openEditInv(id){
   var inv=invById(id);if(!inv)return;
   var linkedRes=(inv.resultIds&&inv.resultIds[0])?resultById(inv.resultIds[0]):null;
-  modal={step:'inv_edit',form:{id:id,name:inv.name,type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',fixed:inv.fixed||'',qty:!!inv.qty,pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),sew:inv.sew?JSON.parse(JSON.stringify(inv.sew)):blankSew(),maint:inv.maint?JSON.parse(JSON.stringify(inv.maint)):blankMaint(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',catIds:(inv.catIds&&inv.catIds.length?inv.catIds.slice():(inv.catId?[inv.catId]:[])),longTitle:linkedRes?linkedRes.name:'',resources:inv.resources||'',hoursTotal:inv.hoursTotal||'',trackHours:inv.trackHours!==false,varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
+  modal={step:'inv_edit',form:{id:id,name:inv.name,tags:[].concat(inv.tags||[]),type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',fixed:inv.fixed||'',qty:!!inv.qty,pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),sew:inv.sew?JSON.parse(JSON.stringify(inv.sew)):blankSew(),maint:inv.maint?JSON.parse(JSON.stringify(inv.maint)):blankMaint(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',catIds:(inv.catIds&&inv.catIds.length?inv.catIds.slice():(inv.catId?[inv.catId]:[])),longTitle:linkedRes?linkedRes.name:'',resources:inv.resources||'',hoursTotal:inv.hoursTotal||'',trackHours:inv.trackHours!==false,varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
 }
 function fieldNumKind(fd){
   var n=(fd.name||'').trim().toLowerCase();
@@ -3120,17 +3155,19 @@ function syncProjectResult(inv,f){
   }
 }
 function submitInv(){
+  flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var catIds=f.type==='prosjekt'?(f.catIds||[]):[];
-  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,sew:f.subtype==='sy'?f.sew:undefined,maint:(f.subtype==='vedlikehold'||f.subtype==='oppussing')?f.maint:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.type==='prosjekt'?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.type==='prosjekt'?f.trackHours!==false:undefined,varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:f.type==='pakke'?JSON.parse(JSON.stringify(PAKKE_DEFAULT_SEKSJONER)):[],items:[]};
+  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,tags:f.tags||[],type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,sew:f.subtype==='sy'?f.sew:undefined,maint:(f.subtype==='vedlikehold'||f.subtype==='oppussing')?f.maint:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.type==='prosjekt'?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.type==='prosjekt'?f.trackHours!==false:undefined,varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:f.type==='pakke'?JSON.parse(JSON.stringify(PAKKE_DEFAULT_SEKSJONER)):[],items:[]};
   syncProjectResult(inv,f);
   inventories.push(inv);save();closeModal();goInventar(inv.id);
 }
 function saveEditInv(){
+  flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var inv=invById(f.id);if(!inv)return;
   var catIds=f.type==='prosjekt'?(f.catIds||[]):[];
-  inv.name=name;inv.type=f.type||'inventar';inv.subtype=f.subtype||'';inv.pakkeFast=f.type==='pakke'?!!f.pakkeFast:undefined;if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;if(f.subtype==='sy')inv.sew=f.sew;else delete inv.sew;if(f.subtype==='vedlikehold'||f.subtype==='oppussing')inv.maint=f.maint;else delete inv.maint;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=f.type==='prosjekt'?(catIds[0]||''):(f.catId||'');inv.catIds=catIds;if(f.type==='prosjekt')inv.resources=(f.resources||'').trim();inv.hoursTotal=numVal(f.hoursTotal)||'';if(f.type==='prosjekt')inv.trackHours=f.trackHours!==false;inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
+  inv.name=name;inv.tags=f.tags||[];inv.type=f.type||'inventar';inv.subtype=f.subtype||'';inv.pakkeFast=f.type==='pakke'?!!f.pakkeFast:undefined;if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;if(f.subtype==='sy')inv.sew=f.sew;else delete inv.sew;if(f.subtype==='vedlikehold'||f.subtype==='oppussing')inv.maint=f.maint;else delete inv.maint;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=f.type==='prosjekt'?(catIds[0]||''):(f.catId||'');inv.catIds=catIds;if(f.type==='prosjekt')inv.resources=(f.resources||'').trim();inv.hoursTotal=numVal(f.hoursTotal)||'';if(f.type==='prosjekt')inv.trackHours=f.trackHours!==false;inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
   syncProjectResult(inv,f);
   save();closeModal();
 }
@@ -3392,27 +3429,27 @@ function openEditEntry(id){
   render();
 }
 function openRoutineModal(){
-  modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',goalIds:[],resultIds:[],equipmentIds:[],freq:'',ease:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',tags:[],goalIds:[],resultIds:[],equipmentIds:[],freq:'',ease:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openEditRoutine(id){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
-  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),equipmentIds:[].concat(r.equipmentIds||[]),freq:r.freq||'',ease:r.ease||'',minutes:r.minutes||'',trackHours:!!r.trackHours,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),tags:[].concat(r.tags||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),equipmentIds:[].concat(r.equipmentIds||[]),freq:r.freq||'',ease:r.ease||'',minutes:r.minutes||'',trackHours:!!r.trackHours,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openBdayModal(memorial){
-  modal={step:'event',form:{name:'',cats:[],month:curMonth,year:curYear,day:'',toMonth:'',toDay:'',repeat:true,bday:true,memorial:!!memorial,interval:1,sinceYear:'',goalIds:[],resultIds:[],ease:'',personTags:[],_ptInput:'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'event',form:{name:'',cats:[],month:curMonth,year:curYear,day:'',toMonth:'',toDay:'',repeat:true,bday:true,memorial:!!memorial,tags:[],interval:1,sinceYear:'',goalIds:[],resultIds:[],ease:'',personTags:[],_ptInput:'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openMinneModal(){openBdayModal(true);}
 function erMinne(e){return!!(e&&e.bday&&e.memorial);}
 function openEventModal(){
-  modal={step:'event',form:{name:'',cats:[],month:curMonth,year:curYear,day:'',repeat:false,bday:false,interval:1,sinceYear:'',goalIds:[],resultIds:[],equipmentIds:[],personTags:[],ease:'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'event',form:{name:'',cats:[],month:curMonth,year:curYear,day:'',repeat:false,bday:false,interval:1,sinceYear:'',goalIds:[],resultIds:[],equipmentIds:[],personTags:[],tags:[],ease:'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openEditEvent(id){
   var e=events.find(function(x){return x.id===id;});if(!e)return;
-  modal={step:'event_edit',form:{id:id,name:e.name,cats:[].concat(e.cats||[]),month:e.month,year:e.year,day:e.day||'',toMonth:e.toMonth||'',toDay:e.toDay||'',repeat:!!e.repeat,bday:!!e.bday,memorial:!!e.memorial,interval:Number(e.interval)||1,sinceYear:e.sinceYear||'',goalIds:[].concat(e.goalIds||[]),resultIds:[].concat(e.resultIds||[]),equipmentIds:[].concat(e.equipmentIds||[]),ease:e.ease||'',personTags:[].concat(e.personTags||[]),_ptInput:'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'event_edit',form:{id:id,name:e.name,cats:[].concat(e.cats||[]),tags:[].concat(e.tags||[]),month:e.month,year:e.year,day:e.day||'',toMonth:e.toMonth||'',toDay:e.toDay||'',repeat:!!e.repeat,bday:!!e.bday,memorial:!!e.memorial,interval:Number(e.interval)||1,sinceYear:e.sinceYear||'',goalIds:[].concat(e.goalIds||[]),resultIds:[].concat(e.resultIds||[]),equipmentIds:[].concat(e.equipmentIds||[]),ease:e.ease||'',personTags:[].concat(e.personTags||[]),_ptInput:'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 var confirmArm=null;
@@ -3458,9 +3495,25 @@ function toggleExistingTag(t){
   render();
 }
 function allTags(){
+  // Kun dagbokinnlegg — ordskyene måler takknemlighet, ikke planlegging
   var counts={};
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){counts[t]=(counts[t]||0)+1;});});
   return counts;
+}
+function allTagsPool(){
+  // Alle stikkord i bruk, uansett hvor. Brukes til forslag og til Administrer.
+  var counts=allTags();
+  [events,routines,results,inventories].forEach(function(list){
+    (list||[]).forEach(function(x){(x.tags||[]).forEach(function(t){counts[t]=(counts[t]||0)+1;});});
+  });
+  return counts;
+}
+function tagPillsHTML(tags){
+  if(!tags||!tags.length)return'';
+  return'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">'+tags.map(function(t){
+    var tc=tagColor(t);
+    return'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>';
+  }).join('')+'</div>';
 }
 function tagCountsFor(list){
   var counts={};
@@ -3591,6 +3644,8 @@ function deleteCat(id){
 }
 
 function flushTags(f){
+  if(!f)return;
+  f.tags=f.tags||[];
   var inp=document.getElementById('tag-inp');
   if(inp&&inp.value.trim()){
     inp.value.split(',').map(function(v){return v.trim().toLowerCase();}).filter(Boolean)
@@ -3621,28 +3676,32 @@ function saveEditEntry(){
 }
 function routineValid(){var f=mf();return(f.name||'').trim().length>0;}
 function submitRoutine(){
+  flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
-  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[]});
+  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,tags:f.tags||[],months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[]});
   save();closeModal();
 }
 function saveEditRoutine(){
+  flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var r=routines.find(function(x){return x.id===f.id;});if(!r)return;
-  r.name=name;r.cats=f.cats;r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
+  r.name=name;r.cats=f.cats;r.tags=f.tags||[];r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
   save();closeModal();
 }
 function submitEvent(){
+  flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   if(f.bday&&bdayCount()>=BDAY_MAX)return;
-  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,repeat:!!f.repeat,bday:!!f.bday,memorial:!!f.memorial,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],done:false,log:[]});
+  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,tags:f.tags||[],repeat:!!f.repeat,bday:!!f.bday,memorial:!!f.memorial,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],done:false,log:[]});
   if(f._fromLater)laters=laters.filter(function(l){return l.id!==f._fromLater;});
   save();closeModal();
 }
 function saveEditEvent(){
+  flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var e=events.find(function(x){return x.id===f.id;});if(!e)return;
   e.name=name;e.cats=f.cats;e.month=Number(f.month);e.year=Number(f.year);
-  e.day=f.day?Number(f.day):null;e.toMonth=(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null;e.toDay=(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null;e.repeat=!!f.repeat;e.bday=!!f.bday;e.memorial=!!f.memorial;e.interval=Number(f.interval)||1;
+  e.day=f.day?Number(f.day):null;e.toMonth=(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null;e.toDay=(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null;e.tags=f.tags||[];e.repeat=!!f.repeat;e.bday=!!f.bday;e.memorial=!!f.memorial;e.interval=Number(f.interval)||1;
   e.sinceYear=f.sinceYear?Number(f.sinceYear):null;
   e.goalIds=f.bday?[]:(f.goalIds||[]);e.resultIds=f.bday?[]:(f.resultIds||[]);e.equipmentIds=f.bday?[]:(f.equipmentIds||[]);e.ease=(f.ease||'').trim();
   e.personTags=f.personTags||[];
@@ -3709,7 +3768,7 @@ function catChipSection(f,withMains){
 }
 
 function tagSectionHTML(f){
-  var existing=Object.keys(allTags()).sort(nbSort).filter(function(t){return !f.tags.includes(t);});
+  var existing=Object.keys(allTagsPool()).sort(nbSort).filter(function(t){return !f.tags.includes(t);});
   return (f.tags||[]).map(function(t){
     return'<button class="chip on" onclick="removeTag(\''+q(t)+'\')">'+esc(t)+' ✕</button>';
   }).join('')
@@ -4135,6 +4194,7 @@ function modalHTML(){
          +knitSection
          +sySection
          +maintSection
+         +'<label class="field-lbl">Stikkord <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'+tagSectionHTML(f)
         :'')
       +'<label class="field-lbl">Variabler <span style="font-weight:400;text-transform:none;letter-spacing:0">'+(isProjM?'\u2013 planens egne felter, f.eks. garn, farge, budsjett':'\u2013 egne felter per punkt, valgfritt')+'</span></label>'
       +(isProjM
@@ -4613,6 +4673,7 @@ function modalHTML(){
       +moneySection
       +timeSection
       +equipmentPickerHTML(f)
+      +'<label class="field-lbl">Stikkord <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'+tagSectionHTML(f)
       +(evChips?'<label class="field-lbl">Kategori(er) <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
         +'<div class="chips">'+evChips+'</div>'
         +'<div class="hint">Innlegg i disse kategoriene vises som evidens for akkurat dette prosjektet.</div>':'')
@@ -4781,6 +4842,7 @@ function modalHTML(){
           })():''))
         :'')
       +equipmentPickerHTML(f)
+      +'<label class="field-lbl">Stikkord <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'+tagSectionHTML(f)
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +'<div class="hint">En rutine er noe som skjer fast flere ganger i \u00e5ret. Skjer det \u00e9n gang i \u00e5ret eller sjeldnere, legges det inn som hendelse.</div>'
@@ -4844,6 +4906,7 @@ function modalHTML(){
          +'<div class="hint">Planen vises p\u00e5 gruppesiden under Folk.</div>'
         :'')
       +(!f.bday?equipmentPickerHTML(f):'')
+      +'<label class="field-lbl">Stikkord <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'+tagSectionHTML(f)
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +(isEditE?'<button class="del-full-btn" onclick="deleteEvent(\''+q(f.id)+'\')">Slett hendelse</button>':'')
@@ -6995,7 +7058,7 @@ function frittTagCloudHTML(){
 }
 function hashtagsViewHTML(){
   var h='<div class="view-sub" style="padding-top:8px">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
-  var counts=allTags();
+  var counts=allTagsPool();
   var tags=Object.keys(counts);
   if(!tags.length)return h+'<div class="card"><div class="empty">Ingen stikkord enn\u00e5. Legg til stikkord n\u00e5r du skriver innlegg.</div></div>';
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
@@ -7393,6 +7456,7 @@ function planleggingViewHTML(){
           }).join('')+'<div style="font-size:10px;color:var(--muted);padding-top:2px">'+done+' av '+ms.length+' milep\u00e6ler</div></div>';
         })()
         +catPillsHTML((r.subCats&&r.subCats.length)?r.subCats:(v?(v.cats||[]):[]))
+        +tagPillsHTML(r.tags)
         +'</div>'
         +(r.targetAmount?'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="openDepositModal(\''+q(r.id)+'\')">+ kr</button>':'')
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditResult(\''+q(r.id)+'\')">\u270e</button>'
@@ -7450,6 +7514,7 @@ function planleggingViewHTML(){
         +'<div class="entry-date">'+esc(months)+'</div>'
         +gLine
         +catPillsHTML(r.cats)+'</div>'
+        +tagPillsHTML(r.tags)
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditRoutine(\''+q(r.id)+'\')">✎</button>'
         +'</div>';
     });
@@ -7473,6 +7538,7 @@ function planleggingViewHTML(){
         +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' · hvert år (fra '+e.year+')':' '+e.year)+(evYears(e,curYear)!==null?' · '+evYears(e,curYear)+' år i '+curYear:'')+'</div>'
         +(e.ease?'<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(e.ease)+'</div>':'')
         +catPillsHTML(e.cats)+'</div>'
+        +tagPillsHTML(e.tags)
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditEvent(\''+q(e.id)+'\')">✎</button>'
         +'</div>';
     });
