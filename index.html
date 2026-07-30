@@ -855,6 +855,13 @@ function catIdsUnder(cat){
   if(!cat)return [];
   return [cat.id].concat(cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;}));
 }
+function nyFolkPlan(){
+  openEventModal();
+  var c=folkCat();
+  if(c)mf().cats=[c.id];
+  render();
+}
+var folkPersonerOpen=false;
 function goFolk(){view={kind:'folk'};drawerOpen=false;render();}
 function folkViewHTML(){
   var cat=folkCat();
@@ -864,6 +871,24 @@ function folkViewHTML(){
   }
   var ids=catIdsUnder(cat);
   var inCat=function(list){return(list||[]).some(function(c){return ids.indexOf(c)>=0;});};
+  var bdays=events.filter(function(e){return e.bday;});
+
+  // Personsider — alfabetisk, kollapsbar så den ikke tar hele skjermen
+  var navn=bdays.map(function(e){return e.name;}).sort(nbSort);
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="folkPersonerOpen=!folkPersonerOpen;render()">'
+    +'<div class="entry-body"><div class="entry-text">Personsider</div>'
+    +'<div class="entry-date">'+navn.length+' person'+(navn.length===1?'':'er')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">'+(folkPersonerOpen?'\u2039':'\u203a')+'</span></div>';
+  if(folkPersonerOpen){
+    h+=navn.length
+      ?navn.map(function(n){
+        return'<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(n)+'\')">'
+          +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(n)+'</div></div>'
+          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+      }).join('')
+      :'<div class="empty">Ingen personer enn\u00e5.</div>';
+  }
+  h+='</div>';
 
   // Grunnverdien som gir kategorien retning
   var gs=goals.filter(function(g){return inCat(g.cats);});
@@ -874,54 +899,6 @@ function folkViewHTML(){
         +(g.text?'<div style="font-size:13px;color:var(--muted);margin-top:3px">'+esc(g.text)+'</div>':'')+'</div>';
     });
     h+='</div>';
-  } else {
-    h+='<div class="card"><div class="empty">Ingen grunnverdi knyttet til Folk enn\u00e5.</div></div>';
-  }
-
-  // Bursdager framover
-  var soon=events.filter(function(e){
-    if(!e.bday)return false;
-    var d=daysToNextBday(e);
-    return d>=0&&d<=30;
-  }).sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b);});
-  h+='<div class="sec-title">Bursdager <span style="font-weight:400;color:var(--rose)">\u00b7 neste m\u00e5ned</span></div>';
-  if(soon.length){
-    h+='<div class="card">'+soon.map(function(e){
-      var d=daysToNextBday(e);
-      var nAge=bdayNextAge(e);
-      return'<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">\ud83c\udf82 '+esc(e.name)+(nAge?' fyller '+nAge:'')+'</div>'
-        +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    }).join('')+'</div>';
-  } else {
-    h+='<div class="card"><div class="empty">Ingen bursdager den neste m\u00e5neden.</div></div>';
-  }
-  var bdCount=events.filter(function(e){return e.bday;}).length;
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBursdager()">'
-    +'<div class="entry-body"><div class="entry-text">Bursdagsbok</div>'
-    +'<div class="entry-date">'+bdCount+' person'+(bdCount===1?'':'er')+' \u00b7 bursdagsliste, gaver og hilsener</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-
-  // Grupper av folk — bygget på personhashtaggene
-  var grupper={};
-  events.filter(function(e){return e.bday&&(e.personTags||[]).length;}).forEach(function(e){
-    personTagsFor(e.name).forEach(function(t){
-      grupper[t]=grupper[t]||[];
-      grupper[t].push(e.name);
-    });
-  });
-  var gNavn=Object.keys(grupper).sort(nbSort);
-  h+='<div class="sec-title">Grupper</div>';
-  if(gNavn.length){
-    h+='<div class="card">'+gNavn.map(function(t){
-      var folk=grupper[t].slice().sort(nbSort);
-      return'<div class="entry-row"><div class="entry-body">'
-        +'<div class="entry-text">#'+esc(t)+' <span style="font-size:11px;font-weight:400;color:var(--muted)">\u00b7 '+folk.length+'</span></div>'
-        +'<div class="entry-date">'+esc(folk.join(', '))+'</div></div></div>';
-    }).join('')+'</div>';
-  } else {
-    h+='<div class="card"><div class="empty">Ingen grupper enn\u00e5. Knytt hashtagger som #familie eller #venner til personene i Bursdagsboka.</div></div>';
   }
 
   // Ordskya for kategorien
@@ -931,18 +908,74 @@ function folkViewHTML(){
   var sky=cloudSectionHTML(counts,true,'folk','Stikkord i Folk');
   if(sky)h+=sky;
 
-  // Hendelser og planer i kategorien
+  // Bursdager og planer side om side
+  var soon=bdays.filter(function(e){
+    var d=daysToNextBday(e);
+    return d>=0&&d<=14;
+  }).sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b);});
   var evs=events.filter(function(e){return!e.bday&&inCat(e.cats);})
     .sort(function(a,b){return(a.month*100+(a.day||0))-(b.month*100+(b.day||0));});
-  if(evs.length){
-    h+='<div class="sec-title">Planer med folk</div><div class="card">'
-      +evs.map(function(e){
+
+  h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">';
+  h+='<div style="flex:1;min-width:0">'
+    +'<div class="sec-title">Bursdager <span style="font-weight:400;color:var(--rose)">\u00b7 14 dager</span></div>'
+    +'<div class="card">'
+    +(soon.length?soon.map(function(e){
+        var d=daysToNextBday(e);
+        var nAge=bdayNextAge(e);
+        var round=isRoundBdayNext(e);
+        return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
+          +(round?confettiHTML():'')
+          +'<div class="entry-body"><div class="entry-text" style="font-size:13px">\ud83c\udf82 '+esc(e.name)
+          +(nAge?' fyller '+nAge:'')+(round?' \ud83c\udf89':'')+'</div>'
+          +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
+      }).join('')
+      :'<div class="empty">Ingen de neste fjorten dagene.</div>')
+    +'</div></div>';
+  h+='<div style="flex:1;min-width:0">'
+    +'<div class="sec-title">Planer med folk</div>'
+    +'<div class="card">'
+    +(evs.length?evs.map(function(e){
         return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
-          +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
-          +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
-          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-      }).join('')+'</div>';
+          +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(e.name)+'</div>'
+          +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div></div>';
+      }).join('')
+      :'<div class="empty">Ingen planer enn\u00e5.</div>')
+    +'</div>'
+    +'<div style="padding:6px 0 0"><button class="icon-btn" style="font-size:11px" onclick="nyFolkPlan()">+ Ny plan</button></div>'
+    +'</div>';
+  h+='</div>';
+
+  // Grupper — bare der flere personer deler samme hashtagg
+  var grupper={};
+  bdays.forEach(function(e){
+    personTagsFor(e.name).forEach(function(t){
+      grupper[t]=grupper[t]||[];
+      if(grupper[t].indexOf(e.name)<0)grupper[t].push(e.name);
+    });
+  });
+  var gNavn=Object.keys(grupper).filter(function(t){return grupper[t].length>1;}).sort(nbSort);
+  h+='<div class="sec-title">Grupper</div>';
+  if(gNavn.length){
+    h+='<div class="card">'+gNavn.map(function(t){
+      var folk=grupper[t].slice().sort(nbSort);
+      return'<div class="entry-row"><div class="entry-body">'
+        +'<div class="entry-text">#'+esc(t)+' <span style="font-size:11px;font-weight:400;color:var(--muted)">\u00b7 '+folk.length+'</span></div>'
+        +'<div class="entry-date">'+esc(folk.join(', '))+'</div></div></div>';
+    }).join('')+'</div>';
+  } else {
+    h+='<div class="card"><div class="empty">En gruppe er en hashtagg som flere personer deler \u2014 f.eks. #familie p\u00e5 flere. Hashtagger bare \u00e9n person har, regnes ikke som gruppe.</div></div>';
   }
+
+  // Bursdagsliste og Gavelogg rett på Folk
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBursdagsliste()">'
+    +'<div class="entry-body"><div class="entry-text">Bursdagsliste</div>'
+    +'<div class="entry-date">alle bursdager gjennom \u00e5ret</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goGaver()">'
+    +'<div class="entry-body"><div class="entry-text">Gavelogg</div>'
+    +'<div class="entry-date">gaver gitt og f\u00e5tt, og gaveid\u00e9er</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   return h;
 }
 function goStrikkeverksted(){view={kind:'strikkeverksted'};drawerOpen=false;render();}
@@ -1319,7 +1352,7 @@ function startCelebration(){window._celebSlide=0;view={kind:'celebration'};drawe
 function celebNext(){window._celebSlide=(window._celebSlide||0)+1;render();}
 function celebPrev(){window._celebSlide=Math.max(0,(window._celebSlide||0)-1);render();}
 function closeCelebration(){markCelebrationSeen();window._celebSlide=0;goHjem();}
-function goBursdager(){view={kind:'bursdager'};drawerOpen=false;render();}
+function goBursdager(){goFolk();}
 function goBursdagsliste(){view={kind:'bursdagsliste'};drawerOpen=false;render();}
 function goGaver(){view={kind:'gaver'};drawerOpen=false;render();}
 function bursdagerHubHTML(){
@@ -1338,7 +1371,7 @@ function bursdagerHubHTML(){
 }
 function bursdagslisteViewHTML(){
   var bdays=events.filter(function(e){return e.bday;}).sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBursdager()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goFolk()">\u2039</button></div>'
     +'<div class="view-title">Bursdagsliste <span style="font-size:12px;font-weight:400;color:var(--rose)">\u00b7 '+bdays.length+' av '+BDAY_MAX+'</span></div>';
   if(bdays.length<BDAY_MAX)h+='<button class="add-btn" onclick="openBdayModal()">+ Ny bursdag</button>';
   if(bdays.length){
@@ -1407,7 +1440,7 @@ function toggleGreet(person,year,kind){
   else gifts.push({id:'gr'+Date.now()+Math.random().toString(36).slice(2,6),greetMark:true,person:(person||'').trim(),kind:kind,year:year,what:'',idea:false});
   save();render();
 }
-function goGavePerson(person){view={kind:'gaveperson',person:person,_from:(view&&(view.kind==='gaver')?'gaver':'bursdagsliste')};drawerOpen=false;render();}
+function goGavePerson(person){view={kind:'gaveperson',person:person,_from:(view&&(view.kind==='gaver')?'gaver':view&&view.kind==='folk'?'folk':'bursdagsliste')};drawerOpen=false;render();}
 function giftKindLabel(k){return k==='jul'?'Julegave':k==='annet'?'Annen gave':'Bursdagsgave';}
 function normTag(t){return String(t||'').trim().toLowerCase().replace(/^#/,'').replace(/\s+/g,'');}
 function personTagsFor(person){
@@ -2279,7 +2312,8 @@ function giftMatrixHTML(entries,names,clickable){
 }
 function gaverViewHTML(){
   var people=giftPeople();
-  var h='<div class="view-title">Gaver</div>';
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goFolk()">\u2039</button></div>'
+    +'<div class="view-title">Gavelogg</div>';
   h+='<button class="add-btn" onclick="openGiftModal(\'\')">+ Ny gave eller idé</button>';
   h+='<button class="add-btn" style="margin-top:6px" onclick="openReceivedGiftModal(\'\')">+ Gave jeg har f\u00e5tt</button>';
   if(!people.length&&!giftGivers().length){
@@ -2334,7 +2368,7 @@ function gavePersonViewHTML(){
   if(bd&&bd.day){
     titleName+=', '+bd.day+'. '+MND_FULL[bd.month-1]+(Number(bd.sinceYear)>0?' '+bd.sinceYear:'');
   }
-  var backTo=view._from==='gaver'?'goGaver()':'goBursdagsliste()';
+  var backTo=view._from==='gaver'?'goGaver()':view._from==='folk'?'goFolk()':'goBursdagsliste()';
   var h='<div style="padding:12px 12px 0"><button class="icon-btn" onclick="'+backTo+'">\u2039</button></div>'
     +'<div style="display:flex;align-items:flex-start;gap:8px;padding:2px 12px 0">'
     +'<div class="view-title" style="padding:0;flex:1;min-width:0">'+titleName+'</div>'
