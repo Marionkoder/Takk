@@ -358,6 +358,7 @@ var showFolk=true;
 var showHelse=true;
 var showMat=true;
 var showHjem=true;
+var showKomp=true;
 // Original seiersfanfare — syntetisert, ingen lydfiler. Stigende treklang som lander
 // på oktaven, med en varm messinglignende klang (sagtann + mykt filter).
 var _audioCtx=null;
@@ -1227,6 +1228,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
 function goHelse(){view={kind:'helse'};drawerOpen=false;render();}
 function goMatDrikke(){view={kind:'matdrikke'};drawerOpen=false;render();}
 function goHjem2(){view={kind:'hjemkat'};drawerOpen=false;render();}
+function goKompetanse(){view={kind:'kompetanse'};drawerOpen=false;render();}
 function goKreativitet(){view={kind:'kreativitet'};drawerOpen=false;render();}
 function kreativitetViewHTML(){
   // Bruker den generiske kategorisiden, med verkstedene lagt inn etter ordskya
@@ -1781,6 +1783,7 @@ function load(){
   try{showHelse=localStorage.getItem(SK+'_helsemeny')!=='0';}catch(e){showHelse=true;}
   try{showMat=localStorage.getItem(SK+'_matmeny')!=='0';}catch(e){showMat=true;}
   try{showHjem=localStorage.getItem(SK+'_hjemmeny')!=='0';}catch(e){showHjem=true;}
+  try{showKomp=localStorage.getItem(SK+'_kompmeny')!=='0';}catch(e){showKomp=true;}
   try{places=JSON.parse(localStorage.getItem(SK+'_places')||'{"l1":[],"l2":[],"l3":[]}');}catch(e){places={l1:[],l2:[],l3:[]};}
   try{achievements=JSON.parse(localStorage.getItem(SK+'_ach')||'[]');}catch(e){achievements=[];}
   try{achDismissed=JSON.parse(localStorage.getItem(SK+'_achdis')||'[]');}catch(e){achDismissed=[];}
@@ -1820,11 +1823,21 @@ function load(){
   // Tredje runde: kategorier som har fått egne sider i appen
   var seeded3=false;try{seeded3=!!localStorage.getItem(SK+'_seeded3');}catch(e){}
   if(!seeded3){
-    [['c_kreativitet','Kreativitet','aubergine'],['c_matdrikke','Mat og drikke','rust']].forEach(function(t){
+    [['c_kreativitet','Kreativitet','aubergine'],['c_matdrikke','Mat og drikke','rust'],['c_kompetanse','Kompetanse','marine']].forEach(function(t){
       var exists=cats.some(function(c){return!c.parentId&&c.name.toLowerCase()===t[1].toLowerCase();});
       if(!exists)cats.push({id:t[0],name:t[1],color:t[2]});
     });
     try{localStorage.setItem(SK+'_seeded3','1');}catch(e){}
+    save();
+  }
+
+  // Kompetanse kom etter de to andre — egen migrering, ellers ville den uteblitt
+  var komp1=false;try{komp1=!!localStorage.getItem(SK+'_kompetanse1');}catch(e){}
+  if(!komp1){
+    if(!cats.some(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='kompetanse';})){
+      cats.push({id:'c_kompetanse',name:'Kompetanse',color:'marine'});
+    }
+    try{localStorage.setItem(SK+'_kompetanse1','1');}catch(e){}
     save();
   }
 
@@ -2192,6 +2205,7 @@ function save(){
   try{localStorage.setItem(SK+'_helsemeny',showHelse?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_matmeny',showMat?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_hjemmeny',showHjem?'1':'0');}catch(e){}
+  try{localStorage.setItem(SK+'_kompmeny',showKomp?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_places',JSON.stringify(places));}catch(e){}
   try{localStorage.setItem(SK+'_ach',JSON.stringify(achievements));}catch(e){}
   try{localStorage.setItem(SK+'_achdis',JSON.stringify(achDismissed));}catch(e){}
@@ -2922,6 +2936,11 @@ function toggleHelseMeny(){
   if(!showHelse&&view.kind==='helse')view={kind:'personlig'};
   save();render();
 }
+function toggleKompMeny(){
+  showKomp=!showKomp;
+  if(!showKomp&&view.kind==='kompetanse')view={kind:'personlig'};
+  save();render();
+}
 function toggleHjemMeny(){
   showHjem=!showHjem;
   if(!showHjem&&view.kind==='hjemkat')view={kind:'personlig'};
@@ -3013,6 +3032,12 @@ function personligViewHTML(){
     +'<div style="flex:1"><div class="entry-text">Hjem</div>'
     +'<div class="entry-date">prosjekter, rutiner og stikkord for kategorien</div></div>'
     +'<button class="chip'+(showHjem?' on':'')+'" onclick="toggleHjemMeny()">'+(showHjem?'P\u00e5':'Av')+'</button>'
+    +'</div></div>'
+    +'<div class="card" style="padding:12px 14px">'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="flex:1"><div class="entry-text">Kompetanse</div>'
+    +'<div class="entry-date">prosjekter, rutiner og stikkord for kategorien</div></div>'
+    +'<button class="chip'+(showKomp?' on':'')+'" onclick="toggleKompMeny()">'+(showKomp?'P\u00e5':'Av')+'</button>'
     +'</div></div>';
   // Min bursdag
   var myb=myBirthday();
@@ -5360,6 +5385,7 @@ function sidebarHTML(){
   if(showHelse)h+='<div class="side-month'+(view.kind==='helse'?'" style="color:var(--red)':'')+'" onclick="goHelse()"><span class="s-arrow"></span>Helse</div>';
   if(showMat)h+='<div class="side-month'+(view.kind==='matdrikke'?'" style="color:var(--red)':'')+'" onclick="goMatDrikke()"><span class="s-arrow"></span>Mat og drikke</div>';
   if(showHjem)h+='<div class="side-month'+(view.kind==='hjemkat'?'" style="color:var(--red)':'')+'" onclick="goHjem2()"><span class="s-arrow"></span>Hjem</div>';
+  if(showKomp)h+='<div class="side-month'+(view.kind==='kompetanse'?'" style="color:var(--red)':'')+'" onclick="goKompetanse()"><span class="s-arrow"></span>Kompetanse</div>';
   h+='<div class="side-month'+(view.kind==='utstyr'?'" style="color:var(--red)':'')+'" onclick="goUtstyr()"><span class="s-arrow"></span>Utstyr</div>';
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
   return h;
@@ -6908,19 +6934,10 @@ function ganttHTML(rader,tittel){
       +MND_FULL[mo.m-1].slice(0,3).toUpperCase()+(mo.m===1||i===0?'<br>'+String(mo.y).slice(2):'')+'</div>';
   });
   h+='</div>';
-  // Rader — gruppert og sortert på prosjekttype, deretter startdato innad i typen
-  var typeOrder=PROSJEKTTYPER.map(function(t){return t[0];});
-  projs.sort(function(a,b){
-    var ta=typeOrder.indexOf(a.subtype),tb=typeOrder.indexOf(b.subtype);
-    if(ta!==tb)return ta-tb;
-    return a.startDate<b.startDate?-1:1;
-  });
-  var curType=null;
+  // Rader — sortert på startdato. Prosjekttypen styrer hvilke felter prosjektet
+  // har, men trenger ikke vises i tidslinjen.
+  projs.sort(function(a,b){return a.startDate<b.startDate?-1:1;});
   projs.forEach(function(iv){
-    if(iv.subtype!==curType){
-      curType=iv.subtype;
-      h+='<div style="margin-top:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(prosjekttypeName(curType))+'</div>';
-    }
     var a=iv.startDate,b=iv.endDate;
     var l=pct(a),r=pct(b);
     var w=Math.max(2,r-l);
@@ -8011,6 +8028,7 @@ function render(){
   else if(view.kind==='helse')content=katSideHTML('helse','Helse','kat_helse');
   else if(view.kind==='matdrikke')content=katSideHTML('mat og drikke','Mat og drikke','kat_mat');
   else if(view.kind==='hjemkat')content=katSideHTML('hjem','Hjem','kat_hjem');
+  else if(view.kind==='kompetanse')content=katSideHTML('kompetanse','Kompetanse','kat_komp');
   else if(view.kind==='grupper')content=grupperViewHTML();
   else if(view.kind==='gruppe')content=gruppeViewHTML();
   else if(view.kind==='strikkeverksted')content=strikkeverkstedViewHTML();
