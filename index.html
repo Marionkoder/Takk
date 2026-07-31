@@ -1135,6 +1135,12 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
       +'<div class="card">'+(naere.length?naere.map(evRad).join(''):'<div class="empty">Ingen planer framover.</div>')+'</div>'
     +'</div>'
     +'</div>';
+  // Gantt for prosjektene i denne kategorien
+  var katRader=ganttRows().filter(function(rad){
+    return(rad.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;});
+  });
+  if(katRader.length)h+=ganttHTML(katRader,'Prosjektene i tid');
+
   if(ekstra)h+=ekstra;
 
   // Underkategorier som egne bokser
@@ -6845,7 +6851,8 @@ function ganttRows(){
   var rows=[];
   inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&(iv.startDate||iv.endDate);}).forEach(function(iv){
     rows.push({id:iv.id,kind:'proj',name:dispName(iv),subtype:iv.subtype||'annet',startDate:iv.startDate||iv.endDate,endDate:iv.endDate||iv.startDate,
-      catId:iv.catId||null,done:!!iv.completedDate,sections:iv.sections||[],click:'goInventar(\''+q(iv.id)+'\')'});
+      catId:iv.catId||null,cats:(iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[])),
+      done:!!iv.completedDate,sections:iv.sections||[],click:'goInventar(\''+q(iv.id)+'\')'});
   });
   var owned=projResultIdSet();
   results.filter(function(r){return!owned[r.id];}).forEach(function(r){
@@ -6854,12 +6861,13 @@ function ganttRows(){
     if(!sd&&!ed)return;
     if(!sd)sd=ed;if(!ed)ed=sd;
     rows.push({id:r.id,kind:'result',name:resultShortTitle(r),subtype:r.subtype||'annet',startDate:sd,endDate:ed,
-      catId:(r.subCats||[])[0]||null,done:!!r.achieved,sections:[],click:'openEditResult(\''+q(r.id)+'\')'});
+      catId:(r.subCats||[])[0]||null,cats:catsForResult(r),
+      done:!!r.achieved,sections:[],click:'openEditResult(\''+q(r.id)+'\')'});
   });
   return rows;
 }
-function ganttHTML(){
-  var projs=ganttRows();
+function ganttHTML(rader,tittel){
+  var projs=rader||ganttRows();
   if(!projs.length)return'';
   // Tidsvindu i hele måneder, begrenset til 18
   var minD=null,maxD=null;
@@ -6890,7 +6898,7 @@ function ganttHTML(){
   months.forEach(function(mo,i){
     if(i>0&&(mo.m===1||mo.m===4||mo.m===7||mo.m===10))qLines.push(pct(mo.y+'-'+pad(mo.m)+'-01'));
   });
-  var h='<div class="sec-title">Prosjektene i tid</div>'
+  var h='<div class="sec-title">'+esc(tittel||'Prosjektene i tid')+'</div>'
     +'<div class="card" style="padding:10px 14px 12px">';
   // Månedslinjal: JAN FEB MAR … med diskret kvartalsskille
   h+='<div style="display:flex;margin-left:88px">';
