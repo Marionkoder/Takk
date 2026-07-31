@@ -1825,9 +1825,9 @@ function load(){
         var finnes=cats.some(function(c){return c.parentId===hjemCat.id&&c.name.toLowerCase()===t[1].toLowerCase();});
         if(!finnes)cats.push({id:t[0],name:t[1],parentId:hjemCat.id});
       });
+      try{localStorage.setItem(SK+'_hjemunder1','1');}catch(e){}
+      save();
     }
-    try{localStorage.setItem(SK+'_hjemunder1','1');}catch(e){}
-    save();
   }
 
   // Faste lister: Planlagte anskaffelser + Beredskapslager (Gaveloggen er egen datastruktur)
@@ -3812,14 +3812,24 @@ function cloudSectionHTML(counts,clickable,key,title,kompakt){
   return h;
 }
 
-function openNewCat(){modal._prevStep=modal.step;modal.step='cat_new';mf()._newMain='';render();}
+function openNewCat(){
+  modal._prevStep=modal.step;modal.step='cat_new';
+  mf()._newMain='';
+  // Er en hovedkategori alt valgt i skjemaet, foreslås den som forelder
+  var valgt=mf().cats||mf().catIds||[];
+  var foresl=valgt.filter(function(id){var c=catById(id);return c&&!c.parentId;})[0]||'';
+  mf()._newParent=foresl;
+  render();
+}
 function backFromCat(){if(!modal._prevStep){closeModal();return;}modal.step=modal._prevStep;render();}
 function saveNewCat(){
   var f=mf();
   var mainName=(f._newMain||'').trim();if(!mainName)return;
   var mc={id:'c'+Date.now()+Math.random().toString(36).slice(2,6),name:mainName};
+  if(f._newParent)mc.parentId=f._newParent;
   cats.push(mc);
   if(mf().cats)mf().cats=[].concat(mf().cats,[mc.id]);
+  if(mf().catIds)mf().catIds=[].concat(mf().catIds,[mc.id]);
   save();
   if(!modal._prevStep){closeModal();return;}
   modal.step=modal._prevStep;
@@ -4230,6 +4240,16 @@ function modalHTML(){
       +'<div class="modal-title">Ny kategori</div>'
       +'<label class="field-lbl">Navn</label>'
       +'<input class="inp" type="text" value="'+esc(f._newMain||'')+'" placeholder="F.eks. Mennesker, Natur, Kreativitet …" oninput="mf()._newMain=this.value;updateSaveBtn()">'
+      +(function(){
+        var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
+        if(!mains.length)return'';
+        return'<label class="field-lbl">Plassering</label>'
+          +'<div class="chips">'
+          +'<button class="chip'+(f._newParent?'':' on')+'" onclick="mf()._newParent=\'\';render()">Egen hovedkategori</button>'
+          +mains.map(function(m){
+            return'<button class="chip'+(f._newParent===m.id?' on':'')+'" onclick="mf()._newParent=\''+q(m.id)+'\';render()">Under '+esc(m.name)+'</button>';
+          }).join('')+'</div>';
+      })()
       +'<button class="save-btn" onclick="saveNewCat()" '+((f._newMain||'').trim()?'':'disabled')+'>Legg til</button>';
 
   } else if(step==='cat_edit'){
