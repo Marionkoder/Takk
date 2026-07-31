@@ -846,11 +846,21 @@ function garnmatchViewHTML(){
 // ── Kategoriside: Folk ──
 // Ikke en ny beholder, men et utsnitt av det som alt finnes, filtrert på kategorien.
 // Kategorien eier ingenting — derfor tåler den å skrus av uten at data forsvinner.
-function folkCat(){
+function katVedNavn(navn){
   return cats.filter(function(c){return!c.parentId;}).find(function(c){
-    return(c.name||'').trim().toLowerCase()==='folk';
+    return(c.name||'').trim().toLowerCase()===navn;
   })||null;
 }
+// Kategorisidene får kategoriens egen farge som bakgrunn, sterkt uttynnet
+// så teksten fortsatt er lett å lese
+function katSideStart(cat){
+  var col=cat?catColor(cat.id):null;
+  var bg=col?lightHex(col,0.86):'';
+  return'<div style="min-height:100%'+(bg?';background:'+bg:'')+'">';
+}
+function katSideSlutt(){return'</div>';}
+function folkCat(){return katVedNavn('folk');}
+function kreativitetCat(){return katVedNavn('kreativitet');}
 function catIdsUnder(cat){
   if(!cat)return [];
   return [cat.id].concat(cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;}));
@@ -965,9 +975,9 @@ function nyFolkPlan(){
 function goFolk(){view={kind:'folk'};drawerOpen=false;render();}
 function folkViewHTML(){
   var cat=folkCat();
-  var h='<div class="view-title">Folk</div>';
+  var h=katSideStart(cat)+'<div class="view-title">Folk</div>';
   if(!cat){
-    return h+'<div class="card"><div class="empty">Denne siden viser alt som h\u00f8rer til hovedkategorien \u00abFolk\u00bb. Opprett en hovedkategori med det navnet under Administrer for \u00e5 ta den i bruk.</div></div>';
+    return h+'<div class="card"><div class="empty">Denne siden viser alt som h\u00f8rer til hovedkategorien \u00abFolk\u00bb. Opprett en hovedkategori med det navnet under Administrer for \u00e5 ta den i bruk.</div></div>'+katSideSlutt();
   }
   var ids=catIdsUnder(cat);
   var inCat=function(list){return(list||[]).some(function(c){return ids.indexOf(c)>=0;});};
@@ -1069,12 +1079,76 @@ function folkViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Grupper</div>'
     +'<div class="entry-date">'+(antG?antG+' gruppe'+(antG===1?'':'r'):'ingen grupper enn\u00e5')+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  return h;
+  return h+katSideSlutt();
+}
+function goKreativitet(){view={kind:'kreativitet'};drawerOpen=false;render();}
+function kreativitetViewHTML(){
+  var cat=kreativitetCat();
+  var h=katSideStart(cat)+'<div class="view-title">Kreativitet</div>';
+  if(!cat){
+    return h+'<div class="card"><div class="empty">Denne siden viser alt som h\u00f8rer til hovedkategorien \u00abKreativitet\u00bb. Opprett en hovedkategori med det navnet under Administrer for \u00e5 ta den i bruk.</div></div>'+katSideSlutt();
+  }
+  var ids=catIdsUnder(cat);
+  var inCat=function(list){return(list||[]).some(function(c){return ids.indexOf(c)>=0;});};
+
+  // Grunnverdien som gir kategorien retning
+  var gs=goals.filter(function(g){return inCat(g.cats);});
+  if(gs.length){
+    h+='<div class="card" style="border-left:4px solid '+(catColor(cat.id)||'var(--rose)')+'">';
+    gs.forEach(function(g){
+      h+='<div style="padding:10px 14px"><div style="font-size:15px;font-weight:800">'+esc(g.name)+'</div>'
+        +(g.text?'<div style="font-size:13px;color:var(--muted);margin-top:3px">'+esc(g.text)+'</div>':'')+'</div>';
+    });
+    h+='</div>';
+  }
+
+  // Ordskya for kategorien
+  var counts={};
+  Object.keys(tagCats).forEach(function(t){if(ids.indexOf(tagCats[t])>=0)counts[t]=0;});
+  entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
+  var sky=cloudSectionHTML(counts,true,'kreativitet','Stikkord i Kreativitet');
+  if(sky)h+=sky;
+
+  // Verksteder — aktiviteter under kategorien
+  h+='<div class="sec-title">Verksteder</div>';
+  var knitProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';}).length
+    +results.filter(function(r){return r.subtype==='strikk';}).length;
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goStrikkeverksted()">'
+    +'<div class="entry-body"><div class="entry-text">Strikkeverksted</div>'
+    +'<div class="entry-date">'+knitProjs+' prosjekt'+(knitProjs===1?'':'er')+' \u00b7 garnlager, oppskrifter og utstyr</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+
+  // Prosjekter i kategorien som ikke er strikking
+  var andre=inventories.filter(function(iv){
+    return(iv.type||'inventar')==='prosjekt'&&iv.subtype!=='strikk'&&inCat(iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[]));
+  }).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
+  var andreRes=results.filter(function(r){
+    return r.subtype!=='strikk'&&inCat(catsForResult(r));
+  }).sort(function(a,b){return nbSort(resultShortTitle(a),resultShortTitle(b));});
+  if(andre.length||andreRes.length){
+    h+='<div class="sec-title">Andre prosjekter</div><div class="card">';
+    andre.forEach(function(iv){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(dispName(iv))
+        +' <span style="font-size:10px;font-weight:400;color:var(--rose)">\u00b7 '+esc(prosjekttypeName(iv.subtype).toLowerCase())+'</span></div>'
+        +'<div class="entry-date">'+(iv.completedDate?'\u2713 ferdig '+fmtDate(iv.completedDate):(iv.endDate?'frist '+fmtDate(iv.endDate):'ingen frist'))+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    andreRes.forEach(function(r){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditResult(\''+q(r.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(resultShortTitle(r))+'</div>'
+        +'<div class="entry-date">frist '+MND_FULL[r.month-1]+' '+r.year+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    h+='</div>';
+  }
+  return h+katSideSlutt();
 }
 function goStrikkeverksted(){view={kind:'strikkeverksted'};drawerOpen=false;render();}
 function goStrikkeprosjekter(){view={kind:'strikkeprosjekter'};drawerOpen=false;render();}
 function strikkeverkstedViewHTML(){
-  var h='<div class="view-title">Strikkeverksted</div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goKreativitet()">\u2039</button></div>'
+    +'<div class="view-title">Strikkeverksted</div>'
     +'<div class="view-sub">Alt som h\u00f8rer til strikkingen p\u00e5 ett sted.</div>';
   var knitProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';})
     .concat(results.filter(function(r){return r.subtype==='strikk';}).map(function(r){return{__res:true,id:r.id,name:resultShortTitle(r)};}));
@@ -1642,6 +1716,17 @@ function load(){
       if(!exists)cats.push({id:t[0],name:t[1],color:t[2]});
     });
     try{localStorage.setItem(SK+'_seeded2','1');}catch(e){}
+    save();
+  }
+
+  // Tredje runde: kategorier som har fått egne sider i appen
+  var seeded3=false;try{seeded3=!!localStorage.getItem(SK+'_seeded3');}catch(e){}
+  if(!seeded3){
+    [['c_kreativitet','Kreativitet','aubergine'],['c_matdrikke','Mat og drikke','rust']].forEach(function(t){
+      var exists=cats.some(function(c){return!c.parentId&&c.name.toLowerCase()===t[1].toLowerCase();});
+      if(!exists)cats.push({id:t[0],name:t[1],color:t[2]});
+    });
+    try{localStorage.setItem(SK+'_seeded3','1');}catch(e){}
     save();
   }
 
@@ -2546,8 +2631,8 @@ function gavePersonViewHTML(){
       +'</div>';
   }
   if(bd){
-    var dd=daysToNextBday(bd);var nAge=bdayNextAge(bd);
-    h+='<div class="view-sub" style="padding-top:2px">'+(nAge!==null?'Fyller '+nAge+' om '+dd+' dager':(dd===0?'Bursdag i dag':dd===1?'Bursdag i morgen':'Bursdag om '+dd+' dager'))+'</div>';
+    var dd=daysToNextBday(bd);var nAge=erMinne(bd)?null:bdayNextAge(bd);
+    h+='<div class="view-sub" style="padding-top:2px">'+(erMinne(bd)?'Minnebursdag '+(bd.day?bd.day+'. ':'')+MND_FULL[bd.month-1]:(nAge!==null?'Fyller '+nAge+' om '+dd+' dager':(dd===0?'Bursdag i dag':dd===1?'Bursdag i morgen':'Bursdag om '+dd+' dager')))+'</div>';
     h+='<div class="stripe-thin"></div>';
   }
   // Idébank øverst
@@ -2672,7 +2757,7 @@ function toggleFolkMeny(){
 }
 function toggleStrikkMeny(){
   showStrikk=!showStrikk;
-  if(!showStrikk&&['strikkeverksted','strikkeprosjekter','garnlager','strikkeoppskrifter','strikkeutstyr'].indexOf(view.kind)>=0)view={kind:'personlig'};
+  if(!showStrikk&&['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch'].indexOf(view.kind)>=0)view={kind:'personlig'};
   save();render();
 }
 function goPersonlig(){view={kind:'personlig'};drawerOpen=false;render();}
@@ -2715,8 +2800,8 @@ function personligViewHTML(){
     +'<div class="view-sub">Sl\u00e5 av det du ikke bruker, s\u00e5 blir menyen kortere.</div>'
     +'<div class="card" style="padding:12px 14px">'
     +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Strikkeverksted</div>'
-    +'<div class="entry-date">garnlager, oppskrifter og strikkeutstyr</div></div>'
+    +'<div style="flex:1"><div class="entry-text">Kreativitet</div>'
+    +'<div class="entry-date">strikkeverksted, garnlager og oppskrifter</div></div>'
     +'<button class="chip'+(showStrikk?' on':'')+'" onclick="toggleStrikkMeny()">'+(showStrikk?'P\u00e5':'Av')+'</button>'
     +'</div>'
     +(showStrikk?'':'<div class="hint">Innholdet beholdes \u2014 det er bare skjult fra menyen.</div>')
@@ -4985,7 +5070,7 @@ function sidebarHTML(){
   h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Planlegger</div>';
   h+='<div class="side-month'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   if(showFolk)h+='<div class="side-month'+(view.kind==='folk'||view.kind==='grupper'||view.kind==='gruppe'||view.kind==='bursdager'||view.kind==='bursdagsliste'||view.kind==='gaver'||view.kind==='gaveperson'?'" style="color:var(--red)':'')+'" onclick="goFolk()"><span class="s-arrow"></span>Folk</div>';
-  if(showStrikk)h+='<div class="side-month'+(view.kind==='strikkeverksted'||view.kind==='strikkeprosjekter'||view.kind==='garnlager'||view.kind==='garntyper'||view.kind==='strikkeoppskrifter'||view.kind==='strikkeutstyr'?'" style="color:var(--red)':'')+'" onclick="goStrikkeverksted()"><span class="s-arrow"></span>Strikkeverksted</div>';
+  if(showStrikk)h+='<div class="side-month'+(view.kind==='kreativitet'||view.kind==='strikkeverksted'||view.kind==='strikkeprosjekter'||view.kind==='garnlager'||view.kind==='garntyper'||view.kind==='strikkeoppskrifter'||view.kind==='strikkeutstyr'||view.kind==='garnmatch'?'" style="color:var(--red)':'')+'" onclick="goKreativitet()"><span class="s-arrow"></span>Kreativitet</div>';
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
   return h;
 }
@@ -5360,9 +5445,9 @@ function hjemViewHTML(){
   }
 
   // Bursdag i dag — lavendelfelt med konfetti, over «neste to ukene»
-  var bdayToday=events.filter(function(e){return e.bday&&daysToNextBday(e)===0;});
+  var bdayToday=events.filter(function(e){return e.bday&&!erMinne(e)&&daysToNextBday(e)===0;});
   bdayToday.forEach(function(e){
-    var nAge=bdayNextAge(e);
+    var nAge=erMinne(e)?null:bdayNextAge(e);
     var yearAgo=new Date(today);yearAgo.setFullYear(yearAgo.getFullYear()-1);
     var cnt=personEntryCountSince(e.name,isoDate(yearAgo));
     h+='<div class="card confetti" style="position:relative;overflow:hidden;background:#EDE7F1;border-color:#C9BBD6;padding:16px 16px 14px;margin-top:10px">'
@@ -7625,6 +7710,7 @@ function render(){
   else if(view.kind==='bursdagsliste')content=bursdagslisteViewHTML();
   else if(view.kind==='varetelling')content=varetellingHubViewHTML();
   else if(view.kind==='folk')content=folkViewHTML();
+  else if(view.kind==='kreativitet')content=kreativitetViewHTML();
   else if(view.kind==='grupper')content=grupperViewHTML();
   else if(view.kind==='gruppe')content=gruppeViewHTML();
   else if(view.kind==='strikkeverksted')content=strikkeverkstedViewHTML();
