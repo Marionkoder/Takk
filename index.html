@@ -3908,6 +3908,10 @@ function cloudSectionHTML(counts,clickable,key,title,kompakt){
   return h;
 }
 
+function openNySubCat(parentId){
+  modal={step:'cat_new',form:{_newMain:'',_newParent:parentId||'',cats:[]}};
+  render();
+}
 function openNewCat(){
   modal._prevStep=modal.step;modal.step='cat_new';
   mf()._newMain='';
@@ -4332,8 +4336,9 @@ function modalHTML(){
       +'<button class="save-btn" onclick="closeModal()">Ferdig</button>';
 
   } else if(step==='cat_new'){
-    body='<button class="step-back" onclick="backFromCat()">← Tilbake</button>'
-      +'<div class="modal-title">Ny kategori</div>'
+    var underNavn=f._newParent?(catById(f._newParent)||{}).name:'';
+    body=(modal._prevStep?'<button class="step-back" onclick="backFromCat()">← Tilbake</button>':'')
+      +'<div class="modal-title">'+(underNavn?'Ny underkategori under '+esc(underNavn):'Ny kategori')+'</div>'
       +'<label class="field-lbl">Navn</label>'
       +'<input class="inp" type="text" value="'+esc(f._newMain||'')+'" placeholder="F.eks. Mennesker, Natur, Kreativitet …" oninput="mf()._newMain=this.value;updateSaveBtn()">'
       +(function(){
