@@ -1117,9 +1117,11 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
   var alleEvs=events.filter(function(e){
     if(e.bday||!inCat(e.cats))return false;
     if(e.repeat)return true;
-    return(e.year+'-'+pad(e.month)+'-'+pad(e.day||1))>=iToday;
-  }).sort(function(a,b){return(a.month*100+(a.day||0))-(b.month*100+(b.day||0));});
-  var naere=alleEvs.slice(0,5);
+    // Mangler dagen, teller hendelsen som kommende ut hele måneden
+    var sisteDag=e.day||new Date(e.year,e.month,0).getDate();
+    return(e.year+'-'+pad(e.month)+'-'+pad(sisteDag))>=iToday;
+  }).sort(function(a,b){return(a.year*10000+a.month*100+(a.day||0))-(b.year*10000+b.month*100+(b.day||0));});
+  var naere=alleEvs.slice(0,3);
   var naereIds={};naere.forEach(function(e){naereIds[e.id]=1;});
   var evRad=function(e){
     return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
@@ -1146,6 +1148,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
       .sort(function(a,b){return nbSort(resultShortTitle(a),resultShortTitle(b));});
     var uRts=routines.filter(function(r){return(r.cats||[]).indexOf(uc.id)>=0;})
       .sort(function(a,b){return nbSort(a.name,b.name);});
+    // Alt som ikke alt står blant de tre førstkommende
     var uEvs=alleEvs.filter(function(e){return!naereIds[e.id]&&(e.cats||[]).indexOf(uc.id)>=0;});
     // Vises også når den er tom — en nyopprettet underkategori skal synes
     h+='<div class="sec-title">'+esc(uc.name)+'</div><div class="card">';
@@ -2859,11 +2862,11 @@ function gavePersonViewHTML(){
     });
     var kommende=pEvs.filter(function(e){
       if(e.repeat)return true;
-      return(e.year+'-'+pad(e.month)+'-'+pad(e.day||1))>=iToday0;
+      return(e.year+'-'+pad(e.month)+'-'+pad(e.day||new Date(e.year,e.month,0).getDate()))>=iToday0;
     }).sort(function(a,b){return(a.month*100+(a.day||0))-(b.month*100+(b.day||0));});
     var tidligere=pEvs.filter(function(e){
       if(e.repeat)return false;
-      return(e.year+'-'+pad(e.month)+'-'+pad(e.day||1))<iToday0;
+      return(e.year+'-'+pad(e.month)+'-'+pad(e.day||new Date(e.year,e.month,0).getDate()))<iToday0;
     }).sort(function(a,b){return(b.year*10000+b.month*100+(b.day||0))-(a.year*10000+a.month*100+(a.day||0));});
     var evRad=function(e){
       // Sluttdatoen har egen måned, og perioden kan gå over et årsskifte
