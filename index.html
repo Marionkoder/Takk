@@ -4874,12 +4874,27 @@ function modalHTML(){
       if(vGoal&&(vGoal.cats||[]).length)return(vGoal.cats||[]).includes(c.id);
       return true;
     }).sort(function(a,b){return nbSort(a.name,b.name);});
+    var valgtS=f.subCats||[];
     var evChips=catPool.map(function(c){
-      var on=(f.subCats||[]).includes(c.id);
-      return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormSubCat(\''+q(c.id)+'\')">'+esc(c.name)+'</button>';
+      var on=valgtS.includes(c.id);
+      var under=cats.filter(function(x){return x.parentId===c.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
+      var noenUnder=under.some(function(x){return valgtS.includes(x.id);});
+      var ut='<button class="chip'+(on?' on':'')+'" onclick="toggleFormSubCat(\''+q(c.id)+'\')">'+esc(c.name)+'</button>';
+      // Underkategoriene folder seg ut når hovedkategorien er valgt
+      if(under.length&&(on||noenUnder)){
+        ut+='<div style="width:100%;display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px 14px">'
+          +under.map(function(x){
+            var uon=valgtS.includes(x.id);
+            return'<button class="chip'+(uon?' on':'')+'" style="font-size:11px;padding:3px 9px" onclick="toggleFormSubCat(\''+q(x.id)+'\')">'+esc(x.name)+'</button>';
+          }).join('')+'</div>';
+      }
+      return ut;
     }).join('');
-    // Tidligere valgte underkategorier (legacy) vises fortsatt
-    evChips+=(f.subCats||[]).filter(function(cid){var c=catById(cid);return c&&c.parentId;}).map(function(cid){
+    // Underkategorier valgt uten at hovedkategorien er synlig i utvalget
+    evChips+=valgtS.filter(function(cid){
+      var c=catById(cid);
+      return c&&c.parentId&&!catPool.some(function(m){return m.id===c.parentId;});
+    }).map(function(cid){
       var c=catById(cid);var pn=(catById(c.parentId)||{}).name||'';
       return'<button class="chip on" onclick="toggleFormSubCat(\''+q(cid)+'\')">'+esc(pn)+' / '+esc(c.name)+'</button>';
     }).join('');
