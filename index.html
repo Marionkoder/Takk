@@ -184,7 +184,8 @@ button.freq-pill:hover{color:var(--red);border-color:var(--red)}
 
 /* Oppsummering */
 .cloud{padding:18px 14px;display:flex;flex-wrap:wrap;gap:12px 16px;align-items:baseline;justify-content:center}
-.cloud.kompakt{padding:10px 12px;gap:2px 10px;line-height:1.1}
+.cloud.kompakt{padding:8px 10px;gap:1px 7px;line-height:1.05}
+.cloud.kompakt .cloud-word{font-size:inherit}
 .cloud-word{background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
 .cloud-word.lv1{color:var(--lv1);opacity:.75}
 .cloud-word.lv2{color:var(--lv2)}
@@ -1110,8 +1111,70 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
   Object.keys(tagCats).forEach(function(t){if(ids.indexOf(tagCats[t])>=0)counts[t]=0;});
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
   var sky=cloudSectionHTML(counts,true,skyNokkel,'Stikkord i '+tittel,true);
-  if(sky)h+=sky;
+
+  // Kommende hendelser — de nærmeste vises ved siden av ordskya
+  var iToday=isoDate(today);
+  var alleEvs=events.filter(function(e){
+    if(e.bday||!inCat(e.cats))return false;
+    if(e.repeat)return true;
+    return(e.year+'-'+pad(e.month)+'-'+pad(e.day||1))>=iToday;
+  }).sort(function(a,b){return(a.month*100+(a.day||0))-(b.month*100+(b.day||0));});
+  var naere=alleEvs.slice(0,5);
+  var naereIds={};naere.forEach(function(e){naereIds[e.id]=1;});
+  var evRad=function(e){
+    return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text" style="font-size:12.5px">'+esc(e.name)+'</div>'
+      +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div></div>';
+  };
+  h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">'
+    +'<div style="flex:1;min-width:0">'+(sky||'<div class="sec-title">Stikkord</div><div class="card"><div class="empty">Ingen enn\u00e5.</div></div>')+'</div>'
+    +'<div style="flex:1;min-width:0">'
+      +'<div class="sec-title">Kommende</div>'
+      +'<div class="card">'+(naere.length?naere.map(evRad).join(''):'<div class="empty">Ingen planer framover.</div>')+'</div>'
+    +'</div>'
+    +'</div>';
   if(ekstra)h+=ekstra;
+
+  // Underkategorier som egne bokser
+  var under=cats.filter(function(c){return c.parentId===cat.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  under.forEach(function(uc){
+    var uInv=inventories.filter(function(iv){
+      return(iv.type||'inventar')==='prosjekt'&&!iv.completedDate
+        &&((iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[])).indexOf(uc.id)>=0);
+    }).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
+    var uRes=results.filter(function(r){return!r.achieved&&catsForResult(r).indexOf(uc.id)>=0;})
+      .sort(function(a,b){return nbSort(resultShortTitle(a),resultShortTitle(b));});
+    var uRts=routines.filter(function(r){return(r.cats||[]).indexOf(uc.id)>=0;})
+      .sort(function(a,b){return nbSort(a.name,b.name);});
+    var uEvs=alleEvs.filter(function(e){return!naereIds[e.id]&&(e.cats||[]).indexOf(uc.id)>=0;});
+    if(!uInv.length&&!uRes.length&&!uRts.length&&!uEvs.length)return;
+    h+='<div class="sec-title">'+esc(uc.name)+'</div><div class="card">';
+    uInv.forEach(function(iv){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(dispName(iv))+'</div>'
+        +'<div class="entry-date">prosjekt'+(iv.endDate?' \u00b7 frist '+fmtDate(iv.endDate):'')+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    uRes.forEach(function(r){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditResult(\''+q(r.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(resultShortTitle(r))+'</div>'
+        +'<div class="entry-date">prosjekt \u00b7 frist '+MND_FULL[r.month-1]+' '+r.year+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    uRts.forEach(function(r){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
+        +'<div class="entry-date">rutine \u00b7 '+esc(freqShort(r))+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    uEvs.forEach(function(e){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
+        +'<div class="entry-date">plan \u00b7 '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    h+='</div>';
+  });
 
   var pInv=inventories.filter(function(iv){
     return(iv.type||'inventar')==='prosjekt'&&inCat(iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[]));
@@ -1147,21 +1210,6 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
       }).join('')+'</div>';
   }
 
-  var iToday=isoDate(today);
-  var evs=events.filter(function(e){
-    if(e.bday||!inCat(e.cats))return false;
-    if(e.repeat)return true;
-    return(e.year+'-'+pad(e.month)+'-'+pad(e.day||1))>=iToday;
-  }).sort(function(a,b){return(a.month*100+(a.day||0))-(b.month*100+(b.day||0));});
-  if(evs.length){
-    h+='<div class="sec-title">Planer framover</div><div class="card">'
-      +evs.map(function(e){
-        return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
-          +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
-          +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
-          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-      }).join('')+'</div>';
-  }
   return h+katSideSlutt();
 }
 function goHelse(){view={kind:'helse'};drawerOpen=false;render();}
@@ -1765,6 +1813,20 @@ function load(){
       if(!exists)cats.push({id:t[0],name:t[1],color:t[2]});
     });
     try{localStorage.setItem(SK+'_seeded3','1');}catch(e){}
+    save();
+  }
+
+  // Underkategorier under Hjem — vises som egne bokser på kategorisiden
+  var hjem1=false;try{hjem1=!!localStorage.getItem(SK+'_hjemunder1');}catch(e){}
+  if(!hjem1){
+    var hjemCat=cats.find(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='hjem';});
+    if(hjemCat){
+      [['c_vedlikehold','Vedlikehold'],['c_oppgradering','Oppgradering'],['c_utleie','Utleie']].forEach(function(t){
+        var finnes=cats.some(function(c){return c.parentId===hjemCat.id&&c.name.toLowerCase()===t[1].toLowerCase();});
+        if(!finnes)cats.push({id:t[0],name:t[1],parentId:hjemCat.id});
+      });
+    }
+    try{localStorage.setItem(SK+'_hjemunder1','1');}catch(e){}
     save();
   }
 
