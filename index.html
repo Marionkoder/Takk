@@ -2174,9 +2174,10 @@ function load(){
     var foreldrelose=results.filter(function(r){return!eid[r.id];});
     var fjern={};
     foreldrelose.forEach(function(fr){
+      // Samme grunnverdi og samme frist regnes som dublett — navnet kan ha
+      // endret seg når prosjektets lange tittel ble redigert
       var lik=eide.some(function(er){
-        return(er.name||'').trim()===(fr.name||'').trim()
-          &&(er.valueId||'')===(fr.valueId||'')
+        return(er.valueId||'')===(fr.valueId||'')
           &&Number(er.month)===Number(fr.month)&&Number(er.year)===Number(fr.year);
       });
       if(lik)fjern[fr.id]=1;
