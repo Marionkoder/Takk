@@ -1003,7 +1003,7 @@ function folkViewHTML(){
   var counts={};
   Object.keys(tagCats).forEach(function(t){if(ids.indexOf(tagCats[t])>=0)counts[t]=0;});
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
-  var sky=cloudSectionHTML(counts,true,'folk','Stikkord i Folk',true);
+  var sky=cloudSectionHTML(counts,true,'folk','Ti på topp',true);
   if(sky)h+=sky;
 
   // Bursdager og planer side om side
@@ -1110,7 +1110,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
   var counts={};
   Object.keys(tagCats).forEach(function(t){if(ids.indexOf(tagCats[t])>=0)counts[t]=0;});
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
-  var sky=cloudSectionHTML(counts,true,skyNokkel,'Stikkord i '+tittel,true);
+  var sky=cloudSectionHTML(counts,true,skyNokkel,'Ti på topp',true);
 
   // Kommende hendelser — de nærmeste vises ved siden av ordskya
   var iToday=isoDate(today);
@@ -3801,7 +3801,9 @@ function cloudSectionHTML(counts,clickable,key,title,kompakt){
   var body=cloudHTML(counts,clickable,open?0:10,kompakt);
   if(!body)return'';
   var h='';
-  if(title)h+='<div class="sec-title">'+title+(!open&&total>10?' <span style="font-weight:400;color:var(--rose)">\u00b7 de ti mest brukte</span>':'')+'</div>';
+  var kortTittel=title==='Ti på topp';
+  if(title)h+='<div class="sec-title">'+(kortTittel&&open?'Alle stikkord':title)
+    +(!kortTittel&&!open&&total>10?' <span style="font-weight:400;color:var(--rose)">\u00b7 de ti mest brukte</span>':'')+'</div>';
   h+=body;
   if(total>10){
     h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="cloudOpen[\''+q(key)+'\']=!cloudOpen[\''+q(key)+'\'];render()">'
@@ -3987,13 +3989,31 @@ function linkChipSection(f){
 
 function catChipSection(f,withMains){
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  var valgt=f.cats||[];
   var h=mains.map(function(m){
-    var on=f.cats.includes(m.id);
-    return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormCat(\''+q(m.id)+'\')">'+esc(m.name)+'</button>';
+    var on=valgt.includes(m.id);
+    var under=cats.filter(function(c){return c.parentId===m.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
+    var noenUnder=under.some(function(c){return valgt.includes(c.id);});
+    var ut='<button class="chip'+(on?' on':'')+'" onclick="toggleFormCat(\''+q(m.id)+'\')">'+esc(m.name)+'</button>';
+    // Underkategoriene vises når hovedkategorien er valgt, så de kan velges direkte
+    if(under.length&&(on||noenUnder)){
+      ut+='<div style="width:100%;display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px 14px">'
+        +under.map(function(c){
+          var uon=valgt.includes(c.id);
+          return'<button class="chip'+(uon?' on':'')+'" style="font-size:11px;padding:3px 9px" onclick="toggleFormCat(\''+q(c.id)+'\')">'+esc(c.name)+'</button>';
+        }).join('')+'</div>';
+    }
+    return ut;
   }).join('');
-  // Tidligere valgte underkategorier vises fortsatt, så de kan fjernes
-  var legacy=(f.cats||[]).filter(function(cid){var c=catById(cid);return c&&c.parentId;});
-  h+=legacy.map(function(cid){
+  // Underkategorier valgt uten at hovedkategorien er det, vises så de kan fjernes
+  var foreldrelose=valgt.filter(function(cid){
+    var c=catById(cid);
+    return c&&c.parentId&&!valgt.includes(c.parentId)&&!cats.some(function(m){return m.id===c.parentId&&valgt.includes(m.id);});
+  });
+  h+=foreldrelose.filter(function(cid){
+    var c=catById(cid);
+    return!cats.some(function(m){return m.id===c.parentId;});
+  }).map(function(cid){
     var c=catById(cid);var pn=(catById(c.parentId)||{}).name||'';
     return'<button class="chip on" onclick="toggleFormCat(\''+q(cid)+'\')">'+esc(pn)+' / '+esc(c.name)+'</button>';
   }).join('');
@@ -4410,8 +4430,19 @@ function modalHTML(){
       +(isProjM
         ?'<label class="field-lbl">Kategori(er)</label>'
          +'<div class="chips">'+cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(c){
-            var on=(f.catIds||[]).indexOf(c.id)>=0;
-            return'<button class="chip'+(on?' on':'')+'" onclick="toggleProjCat(\''+q(c.id)+'\')">'+esc(c.name)+'</button>';
+            var valgtP=f.catIds||[];
+            var on=valgtP.indexOf(c.id)>=0;
+            var under=cats.filter(function(x){return x.parentId===c.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
+            var noenUnder=under.some(function(x){return valgtP.indexOf(x.id)>=0;});
+            var ut='<button class="chip'+(on?' on':'')+'" onclick="toggleProjCat(\''+q(c.id)+'\')">'+esc(c.name)+'</button>';
+            if(under.length&&(on||noenUnder)){
+              ut+='<div style="width:100%;display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px 14px">'
+                +under.map(function(x){
+                  var uon=valgtP.indexOf(x.id)>=0;
+                  return'<button class="chip'+(uon?' on':'')+'" style="font-size:11px;padding:3px 9px" onclick="toggleProjCat(\''+q(x.id)+'\')">'+esc(x.name)+'</button>';
+                }).join('')+'</div>';
+            }
+            return ut;
           }).join('')+'</div>'
          +((f.catIds||[]).length?'':'<div class="hint" style="color:var(--amber)">Prosjektet m\u00e5 kobles til minst \u00e9n kategori \u2014 den gir blant annet fargen i prosjektoversikten.</div>')
          +'<div style="display:flex;gap:10px"><div style="flex:1"><label class="field-lbl">Startdato</label>'
