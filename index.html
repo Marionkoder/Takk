@@ -1147,8 +1147,11 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
     var uRts=routines.filter(function(r){return(r.cats||[]).indexOf(uc.id)>=0;})
       .sort(function(a,b){return nbSort(a.name,b.name);});
     var uEvs=alleEvs.filter(function(e){return!naereIds[e.id]&&(e.cats||[]).indexOf(uc.id)>=0;});
-    if(!uInv.length&&!uRes.length&&!uRts.length&&!uEvs.length)return;
+    // Vises også når den er tom — en nyopprettet underkategori skal synes
     h+='<div class="sec-title">'+esc(uc.name)+'</div><div class="card">';
+    if(!uInv.length&&!uRes.length&&!uRts.length&&!uEvs.length){
+      h+='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt, en rutine eller en plan.</div>';
+    }
     uInv.forEach(function(iv){
       h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
         +'<div class="entry-body"><div class="entry-text">'+esc(dispName(iv))+'</div>'
@@ -1179,7 +1182,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
   var pInv=inventories.filter(function(iv){
     return(iv.type||'inventar')==='prosjekt'&&inCat(iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[]));
   }).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
-  var pRes=results.filter(function(r){return inCat(catsForResult(r));})
+  var pRes=frittResultater().filter(function(r){return inCat(catsForResult(r));})
     .sort(function(a,b){return nbSort(resultShortTitle(a),resultShortTitle(b));});
   if(pInv.length||pRes.length){
     h+='<div class="sec-title">Prosjekter</div><div class="card">';
@@ -1219,7 +1222,7 @@ function goKreativitet(){view={kind:'kreativitet'};drawerOpen=false;render();}
 function kreativitetViewHTML(){
   // Bruker den generiske kategorisiden, med verkstedene lagt inn etter ordskya
   var knitProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';}).length
-    +results.filter(function(r){return r.subtype==='strikk';}).length;
+    +frittResultater().filter(function(r){return r.subtype==='strikk';}).length;
   var verksted='<div class="sec-title">Verksteder</div>'
     +'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goStrikkeverksted()">'
     +'<div class="entry-body"><div class="entry-text">Strikkeverksted</div>'
@@ -1234,7 +1237,7 @@ function strikkeverkstedViewHTML(){
     +'<div class="view-title">Strikkeverksted</div>'
     +'<div class="view-sub">Alt som h\u00f8rer til strikkingen p\u00e5 ett sted.</div>';
   var knitProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';})
-    .concat(results.filter(function(r){return r.subtype==='strikk';}).map(function(r){return{__res:true,id:r.id,name:resultShortTitle(r)};}));
+    .concat(frittResultater().filter(function(r){return r.subtype==='strikk';}).map(function(r){return{__res:true,id:r.id,name:resultShortTitle(r)};}));
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goStrikkeprosjekter()">'
     +'<div class="entry-body"><div class="entry-text">Strikkeprosjekter</div>'
     +'<div class="entry-date">'+knitProjs.length+' prosjekt'+(knitProjs.length===1?'':'er')+'</div></div>'
@@ -1263,7 +1266,7 @@ function strikkeprosjekterViewHTML(){
   h+='<button class="add-btn" onclick="openProjModal();mf().subtype=\'strikk\';render()">+ Nytt strikkeprosjekt</button>';
   var invProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';})
     .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
-  var resProjs=results.filter(function(r){return r.subtype==='strikk';})
+  var resProjs=frittResultater().filter(function(r){return r.subtype==='strikk';})
     .sort(function(a,b){return nbSort(resultShortTitle(a),resultShortTitle(b));});
   if(!invProjs.length&&!resProjs.length){
     h+='<div class="card"><div class="empty">Ingen strikkeprosjekter enn\u00e5.</div></div>';
@@ -2087,6 +2090,53 @@ function load(){
     save();
   }
 
+  // ── Sammenslåing av de to prosjektformene ──
+  // Hvert frittstående resultat får et prosjekt som eier det. Resultatet blir
+  // liggende som den lange beskrivelsen, med tid og penger; prosjektet blir det
+  // du redigerer, og får faser, punktliste og typespesifikke felter.
+  var slaa1=false;try{slaa1=!!localStorage.getItem(SK+'_slasammen1');}catch(e){}
+  if(!slaa1){
+    var eid={};
+    inventories.forEach(function(iv){
+      if((iv.type||'inventar')==='prosjekt')(iv.resultIds||[]).forEach(function(rid){eid[rid]=1;});
+    });
+    var antall=0;
+    results.slice().forEach(function(r){
+      if(eid[r.id])return;
+      var sd=(r.startMonth&&r.startYear)?(r.startYear+'-'+pad(r.startMonth)+'-01'):'';
+      var ed=(r.year&&r.month)?(r.year+'-'+pad(r.month)+'-'+pad(new Date(r.year,r.month,0).getDate())):'';
+      var cat0=(r.subCats&&r.subCats.length)?r.subCats.slice():((goalById(r.valueId)||{}).cats||[]).slice();
+      var nyttInv={
+        id:'i'+Date.now()+Math.random().toString(36).slice(2,6)+antall,
+        name:(r.shortTitle||'').trim()||r.name,
+        type:'prosjekt',
+        subtype:r.subtype||'annet',
+        tags:[].concat(r.tags||[]),
+        startDate:sd,endDate:ed,
+        catId:cat0[0]||'',catIds:cat0,
+        goalIds:r.valueId?[r.valueId]:[],
+        resultIds:[r.id],
+        eventIds:[].concat(r.eventIds||[]),
+        equipmentIds:[].concat(r.equipmentIds||[]),
+        hoursTotal:r.hoursTotal||'',
+        trackHours:r.trackHours!==false,
+        resources:'',
+        completedDate:r.achieved?(ed||isoDate(today)):undefined,
+        fields:[],sections:[],
+        // Milepælene blir punkter på prosjektet, med dato og avhaking i behold
+        items:(r.milestones||[]).map(function(m,i){
+          return{id:'ii'+Date.now()+Math.random().toString(36).slice(2,4)+i,sectionId:null,
+            name:m.name,note:'',date:m.date||'',inCal:!!m.date,values:{},have:!!m.done};
+        })
+      };
+      inventories.push(nyttInv);
+      r.milestones=[];
+      antall++;
+    });
+    try{localStorage.setItem(SK+'_slasammen1','1');}catch(e){}
+    if(antall)save();
+  }
+
   // Sikring: alle faste lister skal finnes uansett hvilke migreringsflagg som
   // alt er satt. Uten denne blir nye lister aldri opprettet for dem som
   // allerede har kjørt en tidligere versjon — det var feilen med Garntyper.
@@ -2358,6 +2408,11 @@ function resultCatMatch(r,entryCats){
 }
 function openResultModal(){modal={step:'result',form:{name:'',shortTitle:'',subtype:'',tags:[],valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'',hoursTotal:'',hoursMode:'total',trackHours:true,invIds:[],equipmentIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
 function openEditResult(id){
+  // Etter sammenslåingen redigeres alt gjennom prosjektet
+  var eier=inventories.find(function(iv){
+    return(iv.type||'inventar')==='prosjekt'&&(iv.resultIds||[]).indexOf(id)>=0;
+  });
+  if(eier)return openEditInv(eier.id);
   var r=resultById(id);if(!r)return;
   var linkedInvs=inventories.filter(function(iv){return(iv.resultIds||[]).includes(id);}).map(function(iv){return iv.id;});
   modal={step:'result_edit',form:{id:id,name:r.name,tags:[].concat(r.tags||[]),shortTitle:r.shortTitle||'',subtype:r.subtype||'',valueId:r.valueId,month:r.month,year:r.year,startMonth:r.startMonth||'',startYear:r.startYear||'',subCats:[].concat(r.subCats||[]),achieved:!!r.achieved,targetAmount:r.targetAmount||'',amountType:r.amountType||'',hoursTotal:r.hoursTotal||'',hoursMode:r.hoursMode||'total',trackHours:r.trackHours!==false,invIds:linkedInvs,equipmentIds:[].concat(r.equipmentIds||[]),budgetCat:'',milestones:JSON.parse(JSON.stringify(r.milestones||[])),_msName:'',_msDate:'',
@@ -3105,8 +3160,9 @@ function markEquipmentUsed(ids,label){
 }
 function toggleProjectDone(invId){
   var inv=invById(invId);if(!inv)return;
-  if(inv.completedDate){delete inv.completedDate;save();render();return;}
+  if(inv.completedDate){delete inv.completedDate;(inv.resultIds||[]).forEach(function(rid){var rr=resultById(rid);if(rr)rr.achieved=false;});save();render();return;}
   inv.completedDate=isoDate(today);
+  (inv.resultIds||[]).forEach(function(rid){var rr=resultById(rid);if(rr)rr.achieved=true;});
   addAchievement('project','proj:'+inv.id,inv.name,inv.goalIds||[],inv.catId?[inv.catId]:[],'');
   playFanfare();
   var ut=findFixedList('utstyr');
@@ -3193,7 +3249,7 @@ function openPakkeModal(){modal={step:'inv',form:{name:'',type:'pakke',startDate
 function blankKnit(){return{shortTitle:'',toWhom:'',pattern:'',needles:[{th:'',len:''}],yarns:[{name:'',mat:'',prod:'',color:'',gram:'',skeins:''}]};}
 function blankSew(){return{shortTitle:'',toWhom:'',pattern:'',notions:'',fabrics:[{name:'',mat:'',prod:'',color:'',meters:''}]};}
 function blankMaint(){return{materials:[{name:'',amount:''}],equipment:[{name:''}]};}
-function openProjModal(){modal={step:'inv',form:{name:'',type:'prosjekt',subtype:'',_lockType:true,tags:[],startDate:'',endDate:'',catId:'',catIds:[],longTitle:'',resources:'',hoursTotal:'',trackHours:true,varValues:{},knit:blankKnit(),sew:blankSew(),maint:blankMaint(),goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
+function openProjModal(){modal={step:'inv',form:{name:'',type:'prosjekt',subtype:'',_lockType:true,tags:[],amountType:'',targetAmount:'',hoursMode:'total',startDate:'',endDate:'',catId:'',catIds:[],longTitle:'',resources:'',hoursTotal:'',trackHours:true,varValues:{},knit:blankKnit(),sew:blankSew(),maint:blankMaint(),goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
 function toggleProjCat(id){var a=mf().catIds||[];mf().catIds=a.indexOf(id)>=0?a.filter(function(x){return x!==id;}):a.concat([id]);render();}
 function addKnitYarn(){mf().knit.yarns.push({name:'',mat:'',prod:'',color:'',gram:'',skeins:''});render();}
 function rmKnitYarn(i){var k=mf().knit;if(k.yarns.length>1)k.yarns.splice(i,1);render();}
@@ -3219,7 +3275,7 @@ function prioritizedTimeItems(){
   var standaloneResults=results.filter(function(r){return!projResultIds[r.id];});
   var items=projRows.map(function(iv){
     var r=(iv.resultIds&&iv.resultIds[0])?resultById(iv.resultIds[0]):null;
-    return{kind:'proj',refId:iv.id,name:dispName(iv),hoursTotal:iv.hoursTotal,hoursMode:'total',trackHours:iv.trackHours!==false,moneyRes:r};
+    return{kind:'proj',refId:iv.id,name:dispName(iv),hoursTotal:iv.hoursTotal,hoursMode:(r&&r.hoursMode==='monthly')?'monthly':'total',trackHours:iv.trackHours!==false,moneyRes:r};
   }).concat(standaloneResults.map(function(r){
     return{kind:'result',refId:r.id,name:resultShortTitle(r),hoursTotal:r.hoursTotal,hoursMode:r.hoursMode==='monthly'?'monthly':'total',trackHours:r.trackHours!==false,moneyRes:r};
   }));
@@ -3345,7 +3401,7 @@ function hoursToday(kind,refId){
 function openEditInv(id){
   var inv=invById(id);if(!inv)return;
   var linkedRes=(inv.resultIds&&inv.resultIds[0])?resultById(inv.resultIds[0]):null;
-  modal={step:'inv_edit',form:{id:id,name:inv.name,tags:[].concat(inv.tags||[]),type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',fixed:inv.fixed||'',qty:!!inv.qty,pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),sew:inv.sew?JSON.parse(JSON.stringify(inv.sew)):blankSew(),maint:inv.maint?JSON.parse(JSON.stringify(inv.maint)):blankMaint(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',catIds:(inv.catIds&&inv.catIds.length?inv.catIds.slice():(inv.catId?[inv.catId]:[])),longTitle:linkedRes?linkedRes.name:'',resources:inv.resources||'',hoursTotal:inv.hoursTotal||'',trackHours:inv.trackHours!==false,varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
+  modal={step:'inv_edit',form:{id:id,name:inv.name,tags:[].concat(inv.tags||[]),type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',fixed:inv.fixed||'',qty:!!inv.qty,pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),sew:inv.sew?JSON.parse(JSON.stringify(inv.sew)):blankSew(),maint:inv.maint?JSON.parse(JSON.stringify(inv.maint)):blankMaint(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',catIds:(inv.catIds&&inv.catIds.length?inv.catIds.slice():(inv.catId?[inv.catId]:[])),longTitle:linkedRes?linkedRes.name:'',amountType:linkedRes?(linkedRes.amountType||''):'',targetAmount:linkedRes?(linkedRes.targetAmount||''):'',hoursMode:linkedRes?(linkedRes.hoursMode||'total'):'total',resources:inv.resources||'',hoursTotal:inv.hoursTotal||'',trackHours:inv.trackHours!==false,varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
 }
 function fieldNumKind(fd){
   var n=(fd.name||'').trim().toLowerCase();
@@ -3380,10 +3436,16 @@ function syncProjectResult(inv,f){
   var r=rid?resultById(rid):null;
   if(r){
     r.name=title;if(valueId)r.valueId=valueId;r.subCats=(inv.catIds||[]).slice();
+    r.amountType=f.amountType||'';r.targetAmount=parseKr(f.targetAmount);
+    r.hoursMode=f.hoursMode==='monthly'?'monthly':'total';
+    r.hoursTotal=numVal(f.hoursTotal)||'';r.trackHours=f.trackHours!==false;
+    r.achieved=!!inv.completedDate;
   } else {
     var newR={id:'x'+Date.now()+Math.random().toString(36).slice(2,6),name:title,valueId:valueId,
       month:inv.endDate?Number(inv.endDate.slice(5,7)):curMonth,year:inv.endDate?Number(inv.endDate.slice(0,4)):curYear+1,
-      subCats:(inv.catIds||[]).slice(),achieved:false,milestones:[],forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]};
+      subCats:(inv.catIds||[]).slice(),achieved:false,milestones:[],forutsetninger:'',risikoer:'',routineIds:[],eventIds:[],
+      subtype:inv.subtype||'annet',amountType:f.amountType||'',targetAmount:parseKr(f.targetAmount),
+      hoursMode:f.hoursMode==='monthly'?'monthly':'total',hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.trackHours!==false};
     results.push(newR);inv.resultIds=[newR.id];
   }
 }
@@ -4471,8 +4533,21 @@ function modalHTML(){
          +'<input class="inp" type="date" value="'+esc(f.endDate||'')+'" oninput="mf().endDate=this.value"></div></div>'
          +'<label class="field-lbl">Timef\u00f8ring</label>'
          +'<div class="chips"><button class="chip'+(f.trackHours!==false?' on':'')+'" onclick="mf().trackHours=!mf().trackHours;render()">'+(f.trackHours!==false?'P\u00e5 \u2014 vises i Tid og penger':'Av \u2014 skjult fra Tid og penger')+'</button></div>'
-         +(f.trackHours!==false?('<label class="field-lbl">Forventet tidsbruk totalt <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 timer</span></label>'
+         +(f.trackHours!==false?('<div class="chips">'
+           +'<button class="chip'+(f.hoursMode!=='monthly'?' on':'')+'" onclick="mf().hoursMode=\'total\';render()">Totalt for prosjektet</button>'
+           +'<button class="chip'+(f.hoursMode==='monthly'?' on':'')+'" onclick="mf().hoursMode=\'monthly\';render()">Fast timetall hver m\u00e5ned</button>'
+           +'</div>'
+         +'<label class="field-lbl">'+(f.hoursMode==='monthly'?'Timer per m\u00e5ned':'Forventet tidsbruk totalt')+' <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 timer</span></label>'
          +'<input class="inp" type="text" inputmode="decimal" style="width:120px" value="'+esc(String(f.hoursTotal||''))+'" placeholder="f.eks. 40" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\').replace(/([.,].*)[.,]/,\'$1\');mf().hoursTotal=this.value">'):'')
+         +'<label class="field-lbl">Pengef\u00f8ring</label>'
+         +'<div class="chips">'
+         +'<button class="chip'+(!f.amountType?' on':'')+'" onclick="mf().amountType=\'\';render()">Av</button>'
+         +[['spar','Sparem\u00e5l'],['in','Inntekt'],['ut','Utgift']].map(function(t){
+            return'<button class="chip'+(f.amountType===t[0]?' on':'')+'" onclick="mf().amountType=mf().amountType===\''+t[0]+'\'?\'\':\''+t[0]+'\';render()">'+t[1]+'</button>';
+          }).join('')
+         +'</div>'
+         +(f.amountType?'<label class="field-lbl">Bel\u00f8p i kr</label>'
+           +'<input class="inp" type="text" inputmode="numeric" style="width:140px" value="'+esc(String(f.targetAmount||''))+'" placeholder="f.eks. 60 000" oninput="mf().targetAmount=this.value">':'')
          +'<label class="field-lbl">N\u00f8dvendige ressurser <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 hva m\u00e5 v\u00e6re p\u00e5 plass?</span></label>'
          +'<textarea class="inp" rows="2" placeholder="F.eks. garn, symaskin, tid alene en kveld i uka \u2026" oninput="mf().resources=this.value">'+esc(f.resources||'')+'</textarea>'
          +knitSection
@@ -6754,6 +6829,10 @@ function lightHex(hex,f){
   var mix=function(a,c){return Math.round(a+(c-a)*f);};
   return'rgb('+mix(r,242)+','+mix(g,238)+','+mix(b,229)+')';
 }
+function frittResultater(){
+  var eid=projResultIdSet();
+  return results.filter(function(r){return!eid[r.id];});
+}
 function projResultIdSet(){
   var s={};
   inventories.forEach(function(iv){if((iv.type||'inventar')==='prosjekt')(iv.resultIds||[]).forEach(function(rid){s[rid]=true;});});
@@ -7731,7 +7810,7 @@ function planleggingViewHTML(){
         +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     }).join('')+'</div>';
   }
-  var aktiveRes=results.filter(function(r){return!r.achieved;});
+  var aktiveRes=frittResultater().filter(function(r){return!r.achieved;});
   if(aktiveRes.length){
     h+='<div class="card">';
     aktiveRes.slice().sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);}).forEach(function(r){
