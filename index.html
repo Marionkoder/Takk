@@ -1151,8 +1151,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
       return(iv.type||'inventar')==='prosjekt'&&!iv.completedDate
         &&((iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[])).indexOf(uc.id)>=0);
     }).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
-    var uRes=results.filter(function(r){return!r.achieved&&catsForResult(r).indexOf(uc.id)>=0;})
-      .sort(function(a,b){return nbSort(resultShortTitle(a),resultShortTitle(b));});
+    var uRes=[];
     var uRts=routines.filter(function(r){return(r.cats||[]).indexOf(uc.id)>=0;})
       .sort(function(a,b){return nbSort(a.name,b.name);});
     // Alt som ikke alt står blant de tre førstkommende
@@ -2163,6 +2162,73 @@ function load(){
     if(antall)save();
   }
 
+  // ── Resultater avvikles: alt flyttes inn i prosjektet ──
+  // Prosjektet har nå kort navn og beskrivelse. Den gamle koblingen der et
+  // prosjekt «eide» et resultat er kilden til dublettene, og fjernes helt.
+  var res0=false;try{res0=!!localStorage.getItem(SK+'_ingenresultat1');}catch(e){}
+  if(!res0){
+    var brukt={};
+    inventories.forEach(function(iv){
+      if((iv.type||'inventar')!=='prosjekt')return;
+      var rid=(iv.resultIds||[])[0];
+      var r=rid?results.find(function(x){return x.id===rid;}):null;
+      if(!r)return;
+      brukt[r.id]=1;
+      // Beskrivelsen er det gamle lange navnet
+      if(!iv.description)iv.description=r.name||'';
+      if(!iv.amountType)iv.amountType=r.amountType||'';
+      if(!iv.targetAmount)iv.targetAmount=r.targetAmount||'';
+      if(!iv.hoursMode)iv.hoursMode=r.hoursMode||'total';
+      if(!iv.hoursTotal&&r.hoursTotal)iv.hoursTotal=r.hoursTotal;
+      if(iv.trackHours===undefined)iv.trackHours=r.trackHours!==false;
+      if(!iv.forutsetninger)iv.forutsetninger=r.forutsetninger||'';
+      if(!iv.risikoer)iv.risikoer=r.risikoer||'';
+      if(!(iv.routineIds||[]).length)iv.routineIds=[].concat(r.routineIds||[]);
+      if(!(iv.tags||[]).length)iv.tags=[].concat(r.tags||[]);
+      if(!iv.subtype)iv.subtype=r.subtype||'annet';
+      // Milepæler som ennå ikke er flyttet
+      if((r.milestones||[]).length){
+        iv.items=(iv.items||[]).concat((r.milestones||[]).map(function(m,i){
+          return{id:'ii'+Date.now()+Math.random().toString(36).slice(2,4)+i,sectionId:null,
+            name:m.name,note:'',date:m.date||'',inCal:!!m.date,values:{},have:!!m.done};
+        }));
+      }
+      delete iv.resultIds;
+    });
+    // Resultater uten prosjekt blir egne prosjekter
+    results.filter(function(r){return!brukt[r.id];}).forEach(function(r,i){
+      var sd=(r.startMonth&&r.startYear)?(r.startYear+'-'+pad(r.startMonth)+'-01'):'';
+      var ed=(r.year&&r.month)?(r.year+'-'+pad(r.month)+'-'+pad(new Date(r.year,r.month,0).getDate())):'';
+      var cat0=(r.subCats&&r.subCats.length)?r.subCats.slice():((goalById(r.valueId)||{}).cats||[]).slice();
+      inventories.push({
+        id:'i'+Date.now()+Math.random().toString(36).slice(2,6)+i,
+        name:(r.shortTitle||'').trim()||r.name,
+        description:r.name||'',
+        type:'prosjekt',subtype:r.subtype||'annet',
+        tags:[].concat(r.tags||[]),
+        startDate:sd,endDate:ed,
+        catId:cat0[0]||'',catIds:cat0,
+        goalIds:r.valueId?[r.valueId]:[],
+        eventIds:[].concat(r.eventIds||[]),
+        routineIds:[].concat(r.routineIds||[]),
+        equipmentIds:[].concat(r.equipmentIds||[]),
+        amountType:r.amountType||'',targetAmount:r.targetAmount||'',
+        hoursTotal:r.hoursTotal||'',hoursMode:r.hoursMode||'total',
+        trackHours:r.trackHours!==false,
+        forutsetninger:r.forutsetninger||'',risikoer:r.risikoer||'',
+        completedDate:r.achieved?(ed||isoDate(today)):undefined,
+        fields:[],sections:[],
+        items:(r.milestones||[]).map(function(m,k){
+          return{id:'ii'+Date.now()+Math.random().toString(36).slice(2,4)+k,sectionId:null,
+            name:m.name,note:'',date:m.date||'',inCal:!!m.date,values:{},have:!!m.done};
+        })
+      });
+    });
+    results=[];
+    try{localStorage.setItem(SK+'_ingenresultat1','1');}catch(e){}
+    save();
+  }
+
   // Rydd bort foreldreløse resultater som er dubletter av et prosjekts eget.
   // Kjøres hver gang, siden dubletter kan oppstå ved uheldige redigeringer.
   (function(){
@@ -2425,6 +2491,10 @@ function resultHasRoutine(id){
   return routines.some(function(rt){return(rt.resultIds||[]).includes(id);});
 }
 function resultById(id){return results.find(function(r){return r.id===id;});}
+// Alle prosjekter ligger nå i inventories
+function alleProsjekter(){return inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});}
+function prosjekterForGrunnverdi(gid){return alleProsjekter().filter(function(iv){return(iv.goalIds||[]).indexOf(gid)>=0;});}
+function prosjektFrist(iv){return iv.endDate||'';}
 function resultsFor(goalId){return results.filter(function(r){return r.valueId===goalId;}).sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);});}
 function monthsLeft(r){return(r.year-curYear)*12+(r.month-curMonth);}
 function resultDeadlineHTML(r){
@@ -3303,7 +3373,7 @@ function sendRestmateriale(){
 }
 function invValid(f){
   if(!(f.name||'').trim())return false;
-  if(f.type==='prosjekt')return(f.catIds||[]).length>0&&(f.goalIds||[]).length>0&&!!(f.longTitle||'').trim()&&!!f.subtype;
+  if(f.type==='prosjekt')return(f.catIds||[]).length>0&&(f.goalIds||[]).length>0&&!!(f.description||'').trim()&&!!f.subtype;
   if(f.type==='pakke')return f.pakkeFast||(f.eventIds||[]).length>0;
   if(f.fixed)return true; // faste lister er alltid gyldige
   return!!f.catId; // inventarliste
@@ -3313,7 +3383,7 @@ function openPakkeModal(){modal={step:'inv',form:{name:'',type:'pakke',startDate
 function blankKnit(){return{shortTitle:'',toWhom:'',pattern:'',needles:[{th:'',len:''}],yarns:[{name:'',mat:'',prod:'',color:'',gram:'',skeins:''}]};}
 function blankSew(){return{shortTitle:'',toWhom:'',pattern:'',notions:'',fabrics:[{name:'',mat:'',prod:'',color:'',meters:''}]};}
 function blankMaint(){return{materials:[{name:'',amount:''}],equipment:[{name:''}]};}
-function openProjModal(){modal={step:'inv',form:{name:'',type:'prosjekt',subtype:'',_lockType:true,tags:[],amountType:'',targetAmount:'',hoursMode:'total',startDate:'',endDate:'',catId:'',catIds:[],longTitle:'',resources:'',hoursTotal:'',trackHours:true,varValues:{},knit:blankKnit(),sew:blankSew(),maint:blankMaint(),goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
+function openProjModal(){modal={step:'inv',form:{name:'',type:'prosjekt',subtype:'',_lockType:true,tags:[],amountType:'',targetAmount:'',hoursMode:'total',startDate:'',endDate:'',catId:'',catIds:[],description:'',resources:'',hoursTotal:'',trackHours:true,varValues:{},knit:blankKnit(),sew:blankSew(),maint:blankMaint(),goalIds:[],resultIds:[],eventIds:[],fields:[],_newField:''}};render();}
 function toggleProjCat(id){var a=mf().catIds||[];mf().catIds=a.indexOf(id)>=0?a.filter(function(x){return x!==id;}):a.concat([id]);render();}
 function addKnitYarn(){mf().knit.yarns.push({name:'',mat:'',prod:'',color:'',gram:'',skeins:''});render();}
 function rmKnitYarn(i){var k=mf().knit;if(k.yarns.length>1)k.yarns.splice(i,1);render();}
@@ -3333,18 +3403,13 @@ function dispName(iv){
 function resultShortTitle(r){return(r.shortTitle||'').trim()||r.name;}
 // Prioriterte prosjekter (aktive) og frittstående prosjekter (ikke i kø, ikke eid av et prosjekt) — delt mellom forsida og Tid og penger
 function prioritizedTimeItems(){
-  var projRows=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&!iv.completedDate;});
-  var projResultIds={};
-  projRows.forEach(function(iv){(iv.resultIds||[]).forEach(function(rid){projResultIds[rid]=true;});});
-  var standaloneResults=results.filter(function(r){return!projResultIds[r.id];});
-  var items=projRows.map(function(iv){
-    var r=(iv.resultIds&&iv.resultIds[0])?resultById(iv.resultIds[0]):null;
-    return{kind:'proj',refId:iv.id,name:dispName(iv),hoursTotal:iv.hoursTotal,hoursMode:(r&&r.hoursMode==='monthly')?'monthly':'total',trackHours:iv.trackHours!==false,moneyRes:r};
-  }).concat(standaloneResults.map(function(r){
-    return{kind:'result',refId:r.id,name:resultShortTitle(r),hoursTotal:r.hoursTotal,hoursMode:r.hoursMode==='monthly'?'monthly':'total',trackHours:r.trackHours!==false,moneyRes:r};
-  }));
-  return items.sort(function(a,b){return nbSort(a.name,b.name);});
+  return alleProsjekter().filter(function(iv){return!iv.completedDate;}).map(function(iv){
+    return{kind:'proj',refId:iv.id,name:dispName(iv),hoursTotal:iv.hoursTotal,
+      hoursMode:iv.hoursMode==='monthly'?'monthly':'total',
+      trackHours:iv.trackHours!==false,moneyRes:iv};
+  }).sort(function(a,b){return nbSort(a.name,b.name);});
 }
+
 function itemDeadlineYM(it){
   if(it.kind==='proj'){
     var iv=invById(it.refId);
@@ -3465,7 +3530,7 @@ function hoursToday(kind,refId){
 function openEditInv(id){
   var inv=invById(id);if(!inv)return;
   var linkedRes=(inv.resultIds&&inv.resultIds[0])?resultById(inv.resultIds[0]):null;
-  modal={step:'inv_edit',form:{id:id,name:inv.name,tags:[].concat(inv.tags||[]),type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',fixed:inv.fixed||'',qty:!!inv.qty,pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),sew:inv.sew?JSON.parse(JSON.stringify(inv.sew)):blankSew(),maint:inv.maint?JSON.parse(JSON.stringify(inv.maint)):blankMaint(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',catIds:(inv.catIds&&inv.catIds.length?inv.catIds.slice():(inv.catId?[inv.catId]:[])),longTitle:linkedRes?linkedRes.name:'',amountType:linkedRes?(linkedRes.amountType||''):'',targetAmount:linkedRes?(linkedRes.targetAmount||''):'',hoursMode:linkedRes?(linkedRes.hoursMode||'total'):'total',resources:inv.resources||'',hoursTotal:inv.hoursTotal||'',trackHours:inv.trackHours!==false,varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
+  modal={step:'inv_edit',form:{id:id,name:inv.name,tags:[].concat(inv.tags||[]),type:inv.type||'inventar',subtype:inv.subtype||'',_lockType:(inv.type||'inventar')==='prosjekt',fixed:inv.fixed||'',qty:!!inv.qty,pakkeFast:!!inv.pakkeFast,knit:inv.knit?JSON.parse(JSON.stringify(inv.knit)):blankKnit(),sew:inv.sew?JSON.parse(JSON.stringify(inv.sew)):blankSew(),maint:inv.maint?JSON.parse(JSON.stringify(inv.maint)):blankMaint(),startDate:inv.startDate||'',endDate:inv.endDate||'',catId:inv.catId||'',catIds:(inv.catIds&&inv.catIds.length?inv.catIds.slice():(inv.catId?[inv.catId]:[])),description:inv.description||'',amountType:inv.amountType||'',targetAmount:inv.targetAmount||'',hoursMode:inv.hoursMode||'total',forutsetninger:inv.forutsetninger||'',risikoer:inv.risikoer||'',resources:inv.resources||'',hoursTotal:inv.hoursTotal||'',trackHours:inv.trackHours!==false,varValues:Object.assign({},inv.varValues||{}),goalIds:[].concat(inv.goalIds||[]),resultIds:[].concat(inv.resultIds||[]),eventIds:[].concat(inv.eventIds||[]),fields:JSON.parse(JSON.stringify(inv.fields||[])),_newField:''}};render();
 }
 function fieldNumKind(fd){
   var n=(fd.name||'').trim().toLowerCase();
@@ -3492,33 +3557,13 @@ function addInvField(){
 }
 function removeInvField(fid){mf().fields=(mf().fields||[]).filter(function(x){return x.id!==fid;});render();}
 // Et prosjekt eier alltid nøyaktig ett prosjekt, som er prosjektets lange tittel
-function syncProjectResult(inv,f){
-  if((inv.type||'inventar')!=='prosjekt')return;
-  var title=(f.longTitle||'').trim();if(!title)return;
-  var valueId=(f.goalIds||[])[0]||'';
-  var rid=(inv.resultIds||[])[0];
-  var r=rid?resultById(rid):null;
-  if(r){
-    r.name=title;if(valueId)r.valueId=valueId;r.subCats=(inv.catIds||[]).slice();
-    r.amountType=f.amountType||'';r.targetAmount=parseKr(f.targetAmount);
-    r.hoursMode=f.hoursMode==='monthly'?'monthly':'total';
-    r.hoursTotal=numVal(f.hoursTotal)||'';r.trackHours=f.trackHours!==false;
-    r.achieved=!!inv.completedDate;
-  } else {
-    var newR={id:'x'+Date.now()+Math.random().toString(36).slice(2,6),name:title,valueId:valueId,
-      month:inv.endDate?Number(inv.endDate.slice(5,7)):curMonth,year:inv.endDate?Number(inv.endDate.slice(0,4)):curYear+1,
-      subCats:(inv.catIds||[]).slice(),achieved:false,milestones:[],forutsetninger:'',risikoer:'',routineIds:[],eventIds:[],
-      subtype:inv.subtype||'annet',amountType:f.amountType||'',targetAmount:parseKr(f.targetAmount),
-      hoursMode:f.hoursMode==='monthly'?'monthly':'total',hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.trackHours!==false};
-    results.push(newR);inv.resultIds=[newR.id];
-  }
-}
+
 function submitInv(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var catIds=f.type==='prosjekt'?(f.catIds||[]):[];
-  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,tags:f.tags||[],type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,sew:f.subtype==='sy'?f.sew:undefined,maint:(f.subtype==='vedlikehold'||f.subtype==='oppussing')?f.maint:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.type==='prosjekt'?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.type==='prosjekt'?f.trackHours!==false:undefined,varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:f.type==='pakke'?JSON.parse(JSON.stringify(PAKKE_DEFAULT_SEKSJONER)):[],items:[]};
-  syncProjectResult(inv,f);
+  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,tags:f.tags||[],description:(f.description||'').trim(),amountType:f.amountType||'',targetAmount:parseKr(f.targetAmount),hoursMode:f.hoursMode==='monthly'?'monthly':'total',type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,sew:f.subtype==='sy'?f.sew:undefined,maint:(f.subtype==='vedlikehold'||f.subtype==='oppussing')?f.maint:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.type==='prosjekt'?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.type==='prosjekt'?f.trackHours!==false:undefined,varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:f.type==='pakke'?JSON.parse(JSON.stringify(PAKKE_DEFAULT_SEKSJONER)):[],items:[]};
+  
   inventories.push(inv);save();closeModal();goInventar(inv.id);
 }
 function saveEditInv(){
@@ -3526,8 +3571,7 @@ function saveEditInv(){
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var inv=invById(f.id);if(!inv)return;
   var catIds=f.type==='prosjekt'?(f.catIds||[]):[];
-  inv.name=name;inv.tags=f.tags||[];inv.type=f.type||'inventar';inv.subtype=f.subtype||'';inv.pakkeFast=f.type==='pakke'?!!f.pakkeFast:undefined;if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;if(f.subtype==='sy')inv.sew=f.sew;else delete inv.sew;if(f.subtype==='vedlikehold'||f.subtype==='oppussing')inv.maint=f.maint;else delete inv.maint;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=f.type==='prosjekt'?(catIds[0]||''):(f.catId||'');inv.catIds=catIds;if(f.type==='prosjekt')inv.resources=(f.resources||'').trim();inv.hoursTotal=numVal(f.hoursTotal)||'';if(f.type==='prosjekt')inv.trackHours=f.trackHours!==false;inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
-  syncProjectResult(inv,f);
+  inv.name=name;inv.tags=f.tags||[];inv.description=(f.description||'').trim();inv.amountType=f.amountType||'';inv.targetAmount=parseKr(f.targetAmount);inv.hoursMode=f.hoursMode==='monthly'?'monthly':'total';inv.forutsetninger=(f.forutsetninger||'').trim();inv.risikoer=(f.risikoer||'').trim();inv.type=f.type||'inventar';inv.subtype=f.subtype||'';inv.pakkeFast=f.type==='pakke'?!!f.pakkeFast:undefined;if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;if(f.subtype==='sy')inv.sew=f.sew;else delete inv.sew;if(f.subtype==='vedlikehold'||f.subtype==='oppussing')inv.maint=f.maint;else delete inv.maint;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=f.type==='prosjekt'?(catIds[0]||''):(f.catId||'');inv.catIds=catIds;if(f.type==='prosjekt')inv.resources=(f.resources||'').trim();inv.hoursTotal=numVal(f.hoursTotal)||'';if(f.type==='prosjekt')inv.trackHours=f.trackHours!==false;inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
   save();closeModal();
 }
 function deleteInv(id){
@@ -4651,9 +4695,9 @@ function modalHTML(){
             return'<button class="chip'+(on?' on':'')+'" onclick="mf().goalIds=[\''+q(g.id)+'\'];render()">'+esc(g.name)+'</button>';
           }).join('')+'</div>'
          +((f.goalIds||[]).length?'':'<div class="hint" style="color:var(--amber)">Et prosjekt m\u00e5 kobles til en grunnverdi \u2014 det skal vise hvordan du vil leve.</div>')
-         +'<label class="field-lbl">Prosjekt \u2013 lang tittel <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 brukes i planleggingsoversikten</span></label>'
-         +'<input class="inp" type="text" value="'+esc(f.longTitle||'')+'" placeholder="F.eks. Jeg strikker et gr\u00f8nt sjal til Jenny \u2026" oninput="mf().longTitle=this.value;updateSaveBtn()">'
-         +(f.longTitle?'':'<div class="hint" style="color:var(--amber)">Prosjektet m\u00e5 ha en lang tittel \u2014 det blir prosjektet knyttet til prosjektet.</div>')
+         +'<label class="field-lbl">Beskrivelse <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 hva skal v\u00e6re oppn\u00e5dd?</span></label>'
+         +'<textarea class="inp" rows="2" placeholder="F.eks. Jeg strikker et gr\u00f8nt sjal til Jenny \u2026" oninput="mf().description=this.value;updateSaveBtn()">'+esc(f.description||'')+'</textarea>'
+         +(f.description?'':'<div class="hint" style="color:var(--amber)">Prosjektet m\u00e5 ha en beskrivelse.</div>')
         :f.type==='pakke'
         ?(f.pakkeFast?''
           :'<label class="field-lbl">Hendelse <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 minst \u00e9n</span></label>'
@@ -5501,8 +5545,8 @@ function oversiktViewHTML(){
   if(!vals.length)return h+'<div class="card"><div class="empty">Ingen grunnverdier ennå. Legg inn en grunnverdi først, så vokser oversikten fram.</div></div>';
   var rows=[];
   vals.forEach(function(v){
-    var res=results.filter(function(r){return r.valueId===v.id;}).sort(function(a,b){
-      return (Number(a.year)-Number(b.year))||(Number(a.month)-Number(b.month))||nbSort(a.name,b.name);});
+    var res=prosjekterForGrunnverdi(v.id).sort(function(a,b){
+      return((a.endDate||'9999')<(b.endDate||'9999')?-1:(a.endDate||'9999')>(b.endDate||'9999')?1:0)||nbSort(a.name,b.name);});
     var resIds={};res.forEach(function(r){resIds[r.id]=1;});
     var linkedToRes=function(x){return (x.resultIds||[]).some(function(rid){return resIds[rid];});};
     var vRows=[];
@@ -6910,10 +6954,7 @@ function lightHex(hex,f){
   var mix=function(a,c){return Math.round(a+(c-a)*f);};
   return'rgb('+mix(r,242)+','+mix(g,238)+','+mix(b,229)+')';
 }
-function frittResultater(){
-  var eid=projResultIdSet();
-  return results.filter(function(r){return!eid[r.id];});
-}
+function frittResultater(){return [];}
 function projResultIdSet(){
   var s={};
   inventories.forEach(function(iv){if((iv.type||'inventar')==='prosjekt')(iv.resultIds||[]).forEach(function(rid){s[rid]=true;});});
@@ -6925,16 +6966,6 @@ function ganttRows(){
     rows.push({id:iv.id,kind:'proj',name:dispName(iv),subtype:iv.subtype||'annet',startDate:iv.startDate||iv.endDate,endDate:iv.endDate||iv.startDate,
       catId:iv.catId||null,cats:(iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[])),
       done:!!iv.completedDate,sections:iv.sections||[],click:'goInventar(\''+q(iv.id)+'\')'});
-  });
-  var owned=projResultIdSet();
-  results.filter(function(r){return!owned[r.id];}).forEach(function(r){
-    var sd=(r.startMonth&&r.startYear)?(r.startYear+'-'+pad(r.startMonth)+'-01'):null;
-    var ed=(r.year&&r.month)?(r.year+'-'+pad(r.month)+'-'+pad(new Date(r.year,r.month,0).getDate())):null;
-    if(!sd&&!ed)return;
-    if(!sd)sd=ed;if(!ed)ed=sd;
-    rows.push({id:r.id,kind:'result',name:resultShortTitle(r),subtype:r.subtype||'annet',startDate:sd,endDate:ed,
-      catId:(r.subCats||[])[0]||null,cats:catsForResult(r),
-      done:!!r.achieved,sections:[],click:'openEditResult(\''+q(r.id)+'\')'});
   });
   return rows;
 }
@@ -7473,7 +7504,7 @@ function catUsage(catId){
   var n;
   n=goals.filter(function(g){return(g.cats||[]).includes(catId);}).length;
   if(n)u.push(n+' grunnverdi'+(n>1?'er':''));
-  n=results.filter(function(r){return(r.subCats||[]).includes(catId);}).length;
+  n=alleProsjekter().filter(function(iv){return(iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[])).includes(catId);}).length;
   if(n)u.push(n+' prosjekt'+(n>1?'er':''));
   n=routines.filter(function(r){return(r.cats||[]).includes(catId);}).length;
   if(n)u.push(n+' rutine'+(n>1?'r':''));
