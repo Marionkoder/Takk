@@ -1232,6 +1232,22 @@ function goHelse(){view={kind:'helse'};drawerOpen=false;render();}
 function goMatDrikke(){view={kind:'matdrikke'};drawerOpen=false;render();}
 function goHjem2(){view={kind:'hjemkat'};drawerOpen=false;render();}
 function goKompetanse(){view={kind:'kompetanse'};drawerOpen=false;render();}
+function goNatur(){view={kind:'natur'};drawerOpen=false;render();}
+function goKultur(){view={kind:'kultur'};drawerOpen=false;render();}
+function goOkonomiKat(){view={kind:'okonomikat'};drawerOpen=false;render();}
+function goBeredskapKat(){view={kind:'beredskapkat'};drawerOpen=false;render();}
+function goUtstyrKat(){view={kind:'utstyrkat'};drawerOpen=false;render();}
+// Kort som lenker videre til en fast liste — brukes på kategorisidene
+function listeKortHTML(key,tittel,undertekst,fn){
+  var inv=findFixedList(key);
+  if(!inv)return'';
+  var c=invCounts(inv);
+  return'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="'+fn+'()">'
+    +'<div class="entry-body"><div class="entry-text">'+esc(tittel)+'</div>'
+    +'<div class="entry-date">'+esc(undertekst)+' \u00b7 '+c.have+' av '+c.total
+    +(c.missing?' \u00b7 <span style="color:var(--amber)">mangler '+c.missing+'</span>':'')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+}
 function goKreativitet(){view={kind:'kreativitet'};drawerOpen=false;render();}
 function kreativitetViewHTML(){
   // Bruker den generiske kategorisiden, med verkstedene lagt inn etter ordskya
@@ -1841,6 +1857,18 @@ function load(){
       cats.push({id:'c_kompetanse',name:'Kompetanse',color:'marine'});
     }
     try{localStorage.setItem(SK+'_kompetanse1','1');}catch(e){}
+    save();
+  }
+
+  // Beredskap og Utstyr blir kategorier, slik at alt kan ligge på kategorisider
+  var bu1=false;try{bu1=!!localStorage.getItem(SK+'_beredutstyrkat1');}catch(e){}
+  if(!bu1){
+    [['c_beredskapkat','Beredskap','teglstein'],['c_utstyrkat','Utstyr','varmgraa']].forEach(function(t){
+      if(!cats.some(function(c){return!c.parentId&&(c.name||'').toLowerCase()===t[1].toLowerCase();})){
+        cats.push({id:t[0],name:t[1],color:t[2]});
+      }
+    });
+    try{localStorage.setItem(SK+'_beredutstyrkat1','1');}catch(e){}
     save();
   }
 
@@ -5470,7 +5498,12 @@ function sidebarHTML(){
    {vis:showHelse,navn:'Helse',fn:'goHelse()',kat:'helse',kinds:['helse']},
    {vis:showMat,navn:'Mat og drikke',fn:'goMatDrikke()',kat:'mat og drikke',kinds:['matdrikke']},
    {vis:showHjem,navn:'Hjem',fn:'goHjem2()',kat:'hjem',kinds:['hjemkat']},
-   {vis:showKomp,navn:'Kompetanse',fn:'goKompetanse()',kat:'kompetanse',kinds:['kompetanse']}]
+   {vis:showKomp,navn:'Kompetanse',fn:'goKompetanse()',kat:'kompetanse',kinds:['kompetanse']},
+   {vis:true,navn:'Natur',fn:'goNatur()',kat:'natur',kinds:['natur']},
+   {vis:true,navn:'Kultur',fn:'goKultur()',kat:'kultur',kinds:['kultur']},
+   {vis:true,navn:'\u00d8konomi',fn:'goOkonomiKat()',kat:'\u00f8konomi',kinds:['okonomikat','okonomi','budsjett']},
+   {vis:true,navn:'Beredskap',fn:'goBeredskapKat()',kat:'beredskap',kinds:['beredskapkat','beredskap']},
+   {vis:true,navn:'Utstyr',fn:'goUtstyrKat()',kat:'utstyr',kinds:['utstyrkat','utstyr','forbruksvarer']}]
   .filter(function(k){return k.vis;})
   .sort(function(a,b){return nbSort(a.navn,b.navn);})
   .forEach(function(k){
@@ -5481,7 +5514,6 @@ function sidebarHTML(){
       +'border-radius:8px;padding-left:10px;margin:2px 0'+(paa?';color:var(--red)':'')+'" onclick="'+k.fn+'">'
       +'<span class="s-arrow"></span>'+esc(k.navn)+'</div>';
   });
-  h+='<div class="side-month'+(view.kind==='utstyr'?'" style="color:var(--red)':'')+'" onclick="goUtstyr()"><span class="s-arrow"></span>Utstyr</div>';
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
   return h;
 }
@@ -8118,6 +8150,19 @@ function render(){
   else if(view.kind==='matdrikke')content=katSideHTML('mat og drikke','Mat og drikke','kat_mat');
   else if(view.kind==='hjemkat')content=katSideHTML('hjem','Hjem','kat_hjem');
   else if(view.kind==='kompetanse')content=katSideHTML('kompetanse','Kompetanse','kat_komp');
+  else if(view.kind==='natur')content=katSideHTML('natur','Natur','kat_natur');
+  else if(view.kind==='kultur')content=katSideHTML('kultur','Kultur','kat_kultur');
+  else if(view.kind==='okonomikat')content=katSideHTML('\u00f8konomi','\u00d8konomi','kat_okonomi',
+    '<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBudsjett()">'
+    +'<div class="entry-body"><div class="entry-text">Tid og penger</div>'
+    +'<div class="entry-date">timebudsjett og pengeoversikt</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>'
+    +listeKortHTML('anskaffelser','Prioriterte innkj\u00f8p','det du planlegger \u00e5 kj\u00f8pe','goOkonomi'));
+  else if(view.kind==='beredskapkat')content=katSideHTML('beredskap','Beredskap','kat_beredskap',
+    listeKortHTML('beredskap','Beredskapslista','det du trenger for \u00e5 klare deg selv en uke','goBeredskap'));
+  else if(view.kind==='utstyrkat')content=katSideHTML('utstyr','Utstyr','kat_utstyr',
+    listeKortHTML('utstyr','Utstyrslista','ting du eier, ordnet etter bruk og plassering','goUtstyr')
+    +listeKortHTML('forbruksvarer','Forbruksvarer','det som brukes opp og m\u00e5 fylles p\u00e5','goForbruksvarer'));
   else if(view.kind==='grupper')content=grupperViewHTML();
   else if(view.kind==='gruppe')content=gruppeViewHTML();
   else if(view.kind==='strikkeverksted')content=strikkeverkstedViewHTML();
