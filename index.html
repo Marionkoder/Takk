@@ -359,6 +359,7 @@ var showHelse=true;
 var showMat=true;
 var showHjem=true;
 var showKomp=true;
+var showReiser=true;
 // Original seiersfanfare — syntetisert, ingen lydfiler. Stigende treklang som lander
 // på oktaven, med en varm messinglignende klang (sagtann + mykt filter).
 var _audioCtx=null;
@@ -1237,6 +1238,21 @@ function goKultur(){view={kind:'kultur'};drawerOpen=false;render();}
 function goOkonomiKat(){view={kind:'okonomikat'};drawerOpen=false;render();}
 function goBeredskapKat(){view={kind:'beredskapkat'};drawerOpen=false;render();}
 function goUtstyrKat(){view={kind:'utstyrkat'};drawerOpen=false;render();}
+function goReiser(){view={kind:'reiser'};drawerOpen=false;render();}
+function pakkelisteKortHTML(){
+  var packs=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')==='pakke';})
+    .sort(function(a,b){return nbSort(a.name,b.name);});
+  var h='<div class="sec-title">Pakkelister</div>';
+  h+='<div style="padding:0 12px 4px"><button class="icon-btn" style="font-size:11px" onclick="openPakkeModal()">+ Ny pakkeliste</button></div>';
+  if(!packs.length)return h+'<div class="card"><div class="empty">Ingen pakkelister enn\u00e5.</div></div>';
+  return h+'<div class="card">'+packs.map(function(inv){
+    var c=invCounts(inv);
+    return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+(inv.pakkeFast?' <span style="font-size:10px;color:var(--rose)">\u00b7 fast</span>':'')+'</div>'
+      +'<div class="entry-date">'+c.have+' av '+c.total+' pakket'+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+  }).join('')+'</div>';
+}
 // Kort som lenker videre til en fast liste — brukes på kategorisidene
 function listeKortHTML(key,tittel,undertekst,fn){
   var inv=findFixedList(key);
@@ -1803,6 +1819,7 @@ function load(){
   try{showMat=localStorage.getItem(SK+'_matmeny')!=='0';}catch(e){showMat=true;}
   try{showHjem=localStorage.getItem(SK+'_hjemmeny')!=='0';}catch(e){showHjem=true;}
   try{showKomp=localStorage.getItem(SK+'_kompmeny')!=='0';}catch(e){showKomp=true;}
+  try{showReiser=localStorage.getItem(SK+'_reisermeny')!=='0';}catch(e){showReiser=true;}
   try{places=JSON.parse(localStorage.getItem(SK+'_places')||'{"l1":[],"l2":[],"l3":[]}');}catch(e){places={l1:[],l2:[],l3:[]};}
   try{achievements=JSON.parse(localStorage.getItem(SK+'_ach')||'[]');}catch(e){achievements=[];}
   try{achDismissed=JSON.parse(localStorage.getItem(SK+'_achdis')||'[]');}catch(e){achDismissed=[];}
@@ -1842,7 +1859,7 @@ function load(){
   // Tredje runde: kategorier som har fått egne sider i appen
   var seeded3=false;try{seeded3=!!localStorage.getItem(SK+'_seeded3');}catch(e){}
   if(!seeded3){
-    [['c_kreativitet','Kreativitet','aubergine'],['c_matdrikke','Mat og drikke','rust'],['c_kompetanse','Kompetanse','marine']].forEach(function(t){
+    [['c_kreativitet','Kreativitet','aubergine'],['c_matdrikke','Mat og drikke','rust'],['c_kompetanse','Kompetanse','lyseblaa']].forEach(function(t){
       var exists=cats.some(function(c){return!c.parentId&&c.name.toLowerCase()===t[1].toLowerCase();});
       if(!exists)cats.push({id:t[0],name:t[1],color:t[2]});
     });
@@ -1854,16 +1871,25 @@ function load(){
   var komp1=false;try{komp1=!!localStorage.getItem(SK+'_kompetanse1');}catch(e){}
   if(!komp1){
     if(!cats.some(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='kompetanse';})){
-      cats.push({id:'c_kompetanse',name:'Kompetanse',color:'marine'});
+      cats.push({id:'c_kompetanse',name:'Kompetanse',color:'lyseblaa'});
     }
     try{localStorage.setItem(SK+'_kompetanse1','1');}catch(e){}
+    save();
+  }
+
+  // Kompetanse fikk en lysere blåtone
+  var kf1=false;try{kf1=!!localStorage.getItem(SK+'_kompfarge1');}catch(e){}
+  if(!kf1){
+    var kc=cats.find(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='kompetanse';});
+    if(kc&&kc.color==='marine')kc.color='lyseblaa';
+    try{localStorage.setItem(SK+'_kompfarge1','1');}catch(e){}
     save();
   }
 
   // Beredskap og Utstyr blir kategorier, slik at alt kan ligge på kategorisider
   var bu1=false;try{bu1=!!localStorage.getItem(SK+'_beredutstyrkat1');}catch(e){}
   if(!bu1){
-    [['c_beredskapkat','Beredskap','teglstein'],['c_utstyrkat','Utstyr','varmgraa']].forEach(function(t){
+    [['c_beredskapkat','Beredskap','teglstein'],['c_utstyrkat','Utstyr','varmgraa'],['c_reiser','Reiser','mose']].forEach(function(t){
       if(!cats.some(function(c){return!c.parentId&&(c.name||'').toLowerCase()===t[1].toLowerCase();})){
         cats.push({id:t[0],name:t[1],color:t[2]});
       }
@@ -2330,6 +2356,7 @@ function save(){
   try{localStorage.setItem(SK+'_matmeny',showMat?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_hjemmeny',showHjem?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_kompmeny',showKomp?'1':'0');}catch(e){}
+  try{localStorage.setItem(SK+'_reisermeny',showReiser?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_places',JSON.stringify(places));}catch(e){}
   try{localStorage.setItem(SK+'_ach',JSON.stringify(achievements));}catch(e){}
   try{localStorage.setItem(SK+'_achdis',JSON.stringify(achDismissed));}catch(e){}
@@ -3069,6 +3096,11 @@ function toggleHelseMeny(){
   if(!showHelse&&view.kind==='helse')view={kind:'personlig'};
   save();render();
 }
+function toggleReiserMeny(){
+  showReiser=!showReiser;
+  if(!showReiser&&view.kind==='reiser')view={kind:'personlig'};
+  save();render();
+}
 function toggleKompMeny(){
   showKomp=!showKomp;
   if(!showKomp&&view.kind==='kompetanse')view={kind:'personlig'};
@@ -3171,6 +3203,12 @@ function personligViewHTML(){
     +'<div style="flex:1"><div class="entry-text">Kompetanse</div>'
     +'<div class="entry-date">prosjekter, rutiner og stikkord for kategorien</div></div>'
     +'<button class="chip'+(showKomp?' on':'')+'" onclick="toggleKompMeny()">'+(showKomp?'P\u00e5':'Av')+'</button>'
+    +'</div></div>'
+    +'<div class="card" style="padding:12px 14px">'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="flex:1"><div class="entry-text">Reiser</div>'
+    +'<div class="entry-date">pakkelister, prosjekter og planer</div></div>'
+    +'<button class="chip'+(showReiser?' on':'')+'" onclick="toggleReiserMeny()">'+(showReiser?'P\u00e5':'Av')+'</button>'
     +'</div></div>';
   // Min bursdag
   var myb=myBirthday();
@@ -3612,7 +3650,7 @@ function deleteInv(id){
   var wasPakke=wasInv&&(wasInv.type||'inventar')==='pakke';
   inventories=inventories.filter(function(i){return i.id!==id;});
   save();closeModal();
-  if(wasPakke){planTab='pakkelister';view={kind:'planlegging'};drawerOpen=false;render();}
+  if(wasPakke){goReiser();}
   else goVaretelling();
 }
 var utstyrDrill=[];
@@ -5500,6 +5538,7 @@ function sidebarHTML(){
    {vis:showHjem,navn:'Hjem',fn:'goHjem2()',kat:'hjem',kinds:['hjemkat']},
    {vis:showKomp,navn:'Kompetanse',fn:'goKompetanse()',kat:'kompetanse',kinds:['kompetanse']},
    {vis:true,navn:'Natur',fn:'goNatur()',kat:'natur',kinds:['natur']},
+   {vis:showReiser,navn:'Reiser',fn:'goReiser()',kat:'reiser',kinds:['reiser']},
    {vis:true,navn:'Kultur',fn:'goKultur()',kat:'kultur',kinds:['kultur']},
    {vis:true,navn:'\u00d8konomi',fn:'goOkonomiKat()',kat:'\u00f8konomi',kinds:['okonomikat','okonomi','budsjett']},
    {vis:true,navn:'Beredskap',fn:'goBeredskapKat()',kat:'beredskap',kinds:['beredskapkat','beredskap']},
@@ -5510,8 +5549,8 @@ function sidebarHTML(){
     var c=katVedNavn(k.kat);
     var col=c?catColor(c.id):null;
     var paa=k.kinds.indexOf(view.kind)>=0;
-    h+='<div class="side-month" style="'+(col?'background:'+lightHex(col,0.8)+';':'')
-      +'border-radius:8px;padding-left:10px;margin:2px 0'+(paa?';color:var(--red)':'')+'" onclick="'+k.fn+'">'
+    h+='<div class="side-month" style="'+(col?'background:'+col+';color:#F2EEE5;':'')
+      +'border-radius:8px;padding-left:10px;margin:2px 0'+(paa?';font-weight:800':'')+'" onclick="'+k.fn+'">'
       +'<span class="s-arrow"></span>'+esc(k.navn)+'</div>';
   });
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
@@ -5800,7 +5839,7 @@ function boxToggleEvent(id,occYear){
 var planTab='verdier';
 var oversiktSub='sammenheng';
 function goPlanleggingProsjekt(){planTab='oversikt';oversiktSub='tidslinje';view={kind:'planlegging'};drawerOpen=false;render();}
-function goPlanleggingPakke(){planTab='pakkelister';view={kind:'planlegging'};drawerOpen=false;render();}
+function goPlanleggingPakke(){goReiser();}
 function toggleQuickCat(id){
   var a=quickForm.cats;
   quickForm.cats=a.includes(id)?a.filter(function(x){return x!==id;}):[].concat(a,[id]);
@@ -7859,7 +7898,7 @@ function budsjettViewHTML(){
 function planleggingViewHTML(){
   var h='<div class="view-title">Planlegger</div>'
     +'<div class="view-sub">Grunnverdier er slik du vil leve («Jeg tar vare på helsa»). Prosjekter er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['oversikt','Oversikt'],['verdier','Grunnverdier'],['prosjekter','Prosjekter'],['pakkelister','Pakkelister'],['rutiner','Rutiner'],['hendelser','Hendelser']];
+  var ptabs=[['oversikt','Oversikt'],['verdier','Grunnverdier'],['prosjekter','Prosjekter'],['rutiner','Rutiner'],['hendelser','Hendelser']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
@@ -7997,22 +8036,6 @@ function planleggingViewHTML(){
     h+='</div>';
   }
 
-  }
-  if(planTab==='pakkelister'){
-  h+='<div class="sec-title">Pakkelister</div>';
-  h+='<button class="add-btn" onclick="openPakkeModal()">+ Ny pakkeliste</button>';
-  var packs=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')==='pakke';}).sort(function(a,b){return nbSort(a.name,b.name);});
-  if(!packs.length){
-    h+='<div class="card"><div class="empty">Ingen pakkelister enn\u00e5.</div></div>';
-  } else {
-    h+='<div class="card">'+packs.map(function(inv){
-      var c=invCounts(inv);
-      return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+(inv.pakkeFast?' <span style="font-size:10px;color:var(--rose)">\u00b7 fast</span>':'')+'</div>'
-        +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    }).join('')+'</div>';
-  }
   }
   if(planTab==='rutiner'){
   h+='<div class="sec-title">Rutiner</div>';
@@ -8152,6 +8175,7 @@ function render(){
   else if(view.kind==='kompetanse')content=katSideHTML('kompetanse','Kompetanse','kat_komp');
   else if(view.kind==='natur')content=katSideHTML('natur','Natur','kat_natur');
   else if(view.kind==='kultur')content=katSideHTML('kultur','Kultur','kat_kultur');
+  else if(view.kind==='reiser')content=katSideHTML('reiser','Reiser','kat_reiser',pakkelisteKortHTML());
   else if(view.kind==='okonomikat')content=katSideHTML('\u00f8konomi','\u00d8konomi','kat_okonomi',
     '<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBudsjett()">'
     +'<div class="entry-body"><div class="entry-text">Tid og penger</div>'
