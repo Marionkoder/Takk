@@ -853,6 +853,59 @@ function garnmatchViewHTML(){
 // ── Kategoriside: Folk ──
 // Ikke en ny beholder, men et utsnitt av det som alt finnes, filtrert på kategorien.
 // Kategorien eier ingenting — derfor tåler den å skrus av uten at data forsvinner.
+function nyKatProsjekt(catId){openProjModal();mf().catIds=[catId];render();}
+function nyKatRutine(catId){openRoutineModal();mf().cats=[catId];render();}
+function nyKatHendelse(catId){openEventModal();mf().cats=[catId];render();}
+// Underkategoriene som egne bokser — delt mellom Folk og de generiske kategorisidene.
+// alleEvs/naereIds er hendelsene siden allerede har bestemt hva som vises andre steder,
+// så en hendelse ikke dukker opp både i «Kommende» og i sin egen boks.
+function katUnderBokserHTML(cat,alleEvs,naereIds){
+  var under=cats.filter(function(c){return c.parentId===cat.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  var h='';
+  under.forEach(function(uc){
+    var uInv=inventories.filter(function(iv){
+      return(iv.type||'inventar')==='prosjekt'&&!iv.completedDate
+        &&((iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[])).indexOf(uc.id)>=0);
+    }).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
+    var uRts=routines.filter(function(r){return(r.cats||[]).indexOf(uc.id)>=0;})
+      .sort(function(a,b){return nbSort(a.name,b.name);});
+    var uEvs=alleEvs.filter(function(e){return!naereIds[e.id]&&(e.cats||[]).indexOf(uc.id)>=0;});
+    // Faste lister knyttet til denne underkategorien — f.eks. et lager
+    var uLager=inventories.filter(function(iv){return iv.fixed&&iv.catId===uc.id;});
+    h+='<div class="sec-title">'+esc(uc.name)+'</div><div class="card">';
+    if(!uInv.length&&!uRts.length&&!uEvs.length&&!uLager.length){
+      h+='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt, en rutine eller en plan.</div>';
+    }
+    uLager.forEach(function(iv){
+      var c=invCounts(iv);
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(iv.name)+'</div>'
+        +'<div class="entry-date">liste \u00b7 '+c.total+' oppf\u00f8ring'+(c.total===1?'':'er')+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    uInv.forEach(function(iv){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(dispName(iv))+'</div>'
+        +'<div class="entry-date">prosjekt'+(iv.endDate?' \u00b7 frist '+fmtDate(iv.endDate):'')+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    uRts.forEach(function(r){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
+        +'<div class="entry-date">rutine \u00b7 '+esc(freqShort(r))+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    uEvs.forEach(function(e){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
+        +'<div class="entry-date">plan \u00b7 '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    h+='</div>';
+  });
+  h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openNySubCat(\''+q(cat.id)+'\')">+ Ny underkategori</button></div>';
+  return h;
+}
 function katVedNavn(navn){
   return cats.filter(function(c){return!c.parentId;}).find(function(c){
     return(c.name||'').trim().toLowerCase()===navn;
@@ -1025,8 +1078,10 @@ function folkViewHTML(){
     var y=e.repeat?(((e.month*100+(e.day||31))<(curMonth*100+today.getDate()))?curYear+1:curYear):e.year;
     return y+'-'+pad(e.month)+'-'+pad(e.day||1);
   };
+  var underIdsFolk=cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;});
   var evs=events.filter(function(e){
     if(e.bday||!inCat(e.cats))return false;
+    if((e.cats||[]).some(function(cid){return underIdsFolk.indexOf(cid)>=0;}))return false;
     if(e.repeat)return true;
     return planDato(e)>=iToday;
   }).sort(function(a,b){return planDato(a)<planDato(b)?-1:1;});
@@ -1086,6 +1141,13 @@ function folkViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Grupper</div>'
     +'<div class="entry-date">'+(antG?antG+' gruppe'+(antG===1?'':'r'):'ingen grupper enn\u00e5')+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+
+  h+='<div style="padding:2px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="nyKatProsjekt(\''+q(cat.id)+'\')">+ Nytt prosjekt</button> '
+    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatRutine(\''+q(cat.id)+'\')">+ Ny rutine</button> '
+    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatHendelse(\''+q(cat.id)+'\')">+ Ny plan</button></div>';
+
+  // Underkategorier som egne bokser — samme mønster som de andre kategorisidene
+  h+=katUnderBokserHTML(cat,evs,{});
   return h+katSideSlutt();
 }
 // Generisk kategoriside — grunnverdi, ordsky, og det kategorien inneholder.
@@ -1145,49 +1207,12 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
 
   if(ekstra)h+=ekstra;
 
+  h+='<div style="padding:2px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="nyKatProsjekt(\''+q(cat.id)+'\')">+ Nytt prosjekt</button> '
+    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatRutine(\''+q(cat.id)+'\')">+ Ny rutine</button> '
+    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatHendelse(\''+q(cat.id)+'\')">+ Ny plan</button></div>';
+
   // Underkategorier som egne bokser
-  var under=cats.filter(function(c){return c.parentId===cat.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
-  under.forEach(function(uc){
-    var uInv=inventories.filter(function(iv){
-      return(iv.type||'inventar')==='prosjekt'&&!iv.completedDate
-        &&((iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[])).indexOf(uc.id)>=0);
-    }).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
-    var uRes=[];
-    var uRts=routines.filter(function(r){return(r.cats||[]).indexOf(uc.id)>=0;})
-      .sort(function(a,b){return nbSort(a.name,b.name);});
-    // Alt som ikke alt står blant de tre førstkommende
-    var uEvs=alleEvs.filter(function(e){return!naereIds[e.id]&&(e.cats||[]).indexOf(uc.id)>=0;});
-    // Vises også når den er tom — en nyopprettet underkategori skal synes
-    h+='<div class="sec-title">'+esc(uc.name)+'</div><div class="card">';
-    if(!uInv.length&&!uRes.length&&!uRts.length&&!uEvs.length){
-      h+='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt, en rutine eller en plan.</div>';
-    }
-    uInv.forEach(function(iv){
-      h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(dispName(iv))+'</div>'
-        +'<div class="entry-date">prosjekt'+(iv.endDate?' \u00b7 frist '+fmtDate(iv.endDate):'')+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    });
-    uRes.forEach(function(r){
-      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditResult(\''+q(r.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(resultShortTitle(r))+'</div>'
-        +'<div class="entry-date">prosjekt \u00b7 frist '+MND_FULL[r.month-1]+' '+r.year+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    });
-    uRts.forEach(function(r){
-      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
-        +'<div class="entry-date">rutine \u00b7 '+esc(freqShort(r))+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    });
-    uEvs.forEach(function(e){
-      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
-        +'<div class="entry-date">plan \u00b7 '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    });
-    h+='</div>';
-  });
+  h+=katUnderBokserHTML(cat,alleEvs,naereIds);
 
   // Det som hører til en underkategori vises bare i sin egen boks
   var underIdsAlle=cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;});
@@ -1292,7 +1317,7 @@ function strikkeverkstedViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Hva kan jeg strikke n\u00e5?</div>'
     +'<div class="entry-date">garnlageret matchet mot oppskriftene</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  [['garnlager','goGarnlager'],['garntyper','goGarntyper'],['strikkeoppskrifter','goStrikkeoppskrifter'],['strikkeutstyr','goStrikkeutstyr']].forEach(function(t){
+  [['garntyper','goGarntyper'],['strikkeoppskrifter','goStrikkeoppskrifter'],['strikkeutstyr','goStrikkeutstyr']].forEach(function(t){
     var inv=findFixedList(t[0]);if(!inv)return;
     var c=invCounts(inv);
     h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="'+t[1]+'()">'
@@ -1883,6 +1908,23 @@ function load(){
     var kc=cats.find(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='kompetanse';});
     if(kc&&kc.color==='marine')kc.color='lyseblaa';
     try{localStorage.setItem(SK+'_kompfarge1','1');}catch(e){}
+    save();
+  }
+
+  // Garnlageret flyttes til Kreativitet, under underkategorien «På lager»
+  var gl2=false;try{gl2=!!localStorage.getItem(SK+'_garnlagerkat1');}catch(e){}
+  if(!gl2){
+    var kreCat=cats.find(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='kreativitet';});
+    if(kreCat){
+      var paLager=cats.find(function(c){return c.parentId===kreCat.id&&(c.name||'').toLowerCase()==='p\u00e5 lager';});
+      if(!paLager){
+        paLager={id:'c_palager_kreativitet',name:'P\u00e5 lager',parentId:kreCat.id};
+        cats.push(paLager);
+      }
+      var glInv=inventories.find(function(iv){return iv.fixed==='garnlager';});
+      if(glInv)glInv.catId=paLager.id;
+    }
+    try{localStorage.setItem(SK+'_garnlagerkat1','1');}catch(e){}
     save();
   }
 
@@ -5550,7 +5592,7 @@ function sidebarHTML(){
     var col=c?catColor(c.id):null;
     var paa=k.kinds.indexOf(view.kind)>=0;
     h+='<div class="side-month" style="'+(col?'background:'+col+';color:#F2EEE5;':'')
-      +'border-radius:8px;padding-left:10px;margin:2px 0'+(paa?';font-weight:800':'')+'" onclick="'+k.fn+'">'
+      +'padding-left:10px'+(paa?';font-weight:800':'')+'" onclick="'+k.fn+'">'
       +'<span class="s-arrow"></span>'+esc(k.navn)+'</div>';
   });
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
@@ -7983,7 +8025,7 @@ function planleggingViewHTML(){
   }
   if(planTab==='prosjekter'){
   h+='<div class="sec-title">Prosjekter <span style="font-weight:400;color:var(--rose)">\u00b7 m\u00e5lbare, med frist</span></div>';
-  h+='<button class="add-btn" onclick="openProjModal()">+ Nytt prosjekt</button>';
+  h+='<div class="view-sub" style="padding-top:0">Nye prosjekter opprettes fra den kategorien de h\u00f8rer til.</div>';
   // Prosjekter med egen liste — samme sted som de enklere, så ingenting er skjult
   var pInvs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&!iv.completedDate;})
     .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
@@ -8039,7 +8081,7 @@ function planleggingViewHTML(){
   }
   if(planTab==='rutiner'){
   h+='<div class="sec-title">Rutiner</div>';
-  h+='<button class="add-btn" onclick="openRoutineModal()">+ Ny rutine</button>';
+  h+='<div class="view-sub" style="padding-top:0">Nye rutiner opprettes fra den kategorien de h\u00f8rer til.</div>';
   if(!routines.length){
     h+='<div class="card"><div class="empty">Ingen rutiner ennå.</div></div>';
   } else {
@@ -8079,7 +8121,7 @@ function planleggingViewHTML(){
   }
   if(planTab==='hendelser'){
   h+='<div class="sec-title">Hendelser</div>';
-  h+='<button class="add-btn" onclick="openEventModal()">+ Ny hendelse</button>';
+  h+='<div class="view-sub" style="padding-top:0">Nye hendelser opprettes fra den kategorien de h\u00f8rer til.</div>';
   if(!events.length){
     h+='<div class="card"><div class="empty">Ingen hendelser ennå.</div></div>';
   } else {
