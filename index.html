@@ -2498,6 +2498,11 @@ function prosjektFrist(iv){return iv.endDate||'';}
 function resultsFor(goalId){return results.filter(function(r){return r.valueId===goalId;}).sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);});}
 function monthsLeft(r){return(r.year-curYear)*12+(r.month-curMonth);}
 function resultDeadlineHTML(r){
+  if(r&&r.endDate){
+    var d=new Date(r.endDate+'T00:00:00');
+    var sd=r.startDate?('starter '+MND_FULL[Number(r.startDate.slice(5,7))-1]+' '+r.startDate.slice(0,4)+' \u00b7 '):'';
+    return' <span style="font-size:11px;color:var(--muted)">\u00b7 '+sd+'frist '+MND_FULL[d.getMonth()]+' '+d.getFullYear()+'</span>';
+  }
   var saveTxt='';
   if(r.targetAmount){
     var sv=savedFor(r.id);
@@ -5524,12 +5529,10 @@ function routineStatusStyle(r){
 }
 function resultStatus(r){
   if(!r)return null;
-  if(r.achieved)return'maintained';
-  if(r.startMonth&&r.startYear){
-    var todayYM=today.getFullYear()*12+today.getMonth();
-    var startYM=Number(r.startYear)*12+(Number(r.startMonth)-1);
-    if(startYM>todayYM)return'queued';
-  }
+  // Leser nå prosjektets felter: ferdigstilt og startdato
+  if(r.completedDate||r.achieved)return'maintained';
+  var sd=r.startDate||((r.startMonth&&r.startYear)?(r.startYear+'-'+pad(r.startMonth)+'-01'):'');
+  if(sd&&sd>isoDate(today))return'queued';
   return'active';
 }
 function resultStatusStyle(status){
@@ -5584,7 +5587,16 @@ function oversiktViewHTML(){
     if(r.resRender){
       var resSt=r.res?resultStatusStyle(resultStatus(r.res)):'';
       t+='<td rowspan="'+r.resSpan+'" style="'+cellS+';'+topB+resSt+';'+(r.res?'cursor:pointer':'')+'"'+(r.res?' onclick="openEditResult(\''+q(r.res.id)+'\')"':'')+'>'
-        +(r.res?esc(r.res.name)+'<div style="font-size:10px;color:var(--muted)">'+(r.res.startMonth&&r.res.startYear?MND_FULL[r.res.startMonth-1].slice(0,3)+' '+r.res.startYear+' \u2013 ':'')+MND_FULL[r.res.month-1].slice(0,3)+' '+r.res.year+((r.res.milestones||[]).length?' \u00b7 '+(r.res.milestones||[]).filter(function(m){return m.done;}).length+'/'+(r.res.milestones||[]).length+' milepæler':'')+'</div>':'<span style="color:var(--muted)">\u2013</span>')
+        +(r.res?esc(r.res.name)+'<div style="font-size:10px;color:var(--muted)">'
+          +(function(){
+            var p2=r.res;
+            var fra=p2.startDate?MND_FULL[Number(p2.startDate.slice(5,7))-1].slice(0,3)+' '+p2.startDate.slice(0,4)+' \u2013 ':'';
+            var til=p2.endDate?MND_FULL[Number(p2.endDate.slice(5,7))-1].slice(0,3)+' '+p2.endDate.slice(0,4):'ingen frist';
+            var ms=(p2.items||[]).filter(function(x){return x.date;});
+            var antDone=ms.filter(function(x){return x.have;}).length;
+            return fra+til+(ms.length?' \u00b7 '+antDone+'/'+ms.length+' milep\u00e6ler':'');
+          })()
+          +'</div>':'')
         +'</td>';
     }
     var rtSt=r.rt?routineStatusStyle(r.rt):'';
