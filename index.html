@@ -765,24 +765,32 @@ function oppskrifterForGarn(g){
   var k=garnKey(g);
   return oppskriftItems().filter(function(op){return!!garnMatch(k,garnKey(op));});
 }
+// Fargene på garnposene som matcher oppskriften — det brukeren faktisk trenger å vite
+function garnFargerTxt(hits){
+  var f=hits.map(function(h){return((h.item.values||{}).__farge||'').trim();}).filter(Boolean);
+  f=f.filter(function(v,i,a){return a.indexOf(v)===i;});
+  return f.length?' \u00b7 '+f.map(esc).join(', '):'';
+}
 function garnStatusHTML(op){
   var sizes=oppskriftSizes(op);
   if(sizes.length){
     var any=garnForOppskrift(op,sizes[0]);
     if(!any.hits.length)return'<span style="color:var(--muted)">ingen passende garn i lageret</span>';
+    var fTxt=garnFargerTxt(any.hits);
     return sizes.map(function(sz){
       var rr=garnForOppskrift(op,sz);
       if(rr.enough)return'<span style="color:var(--red);font-weight:700">'+sz+' \u2713</span>';
       if(rr.unknown)return'<span style="color:var(--amber)">'+sz+' ?</span>';
       return'<span style="color:var(--amber)">'+sz+' \u2212'+rr.short+' g</span>';
-    }).join(' \u00b7 ')+' <span style="color:var(--muted)">(har '+any.have+' g)</span>';
+    }).join(' \u00b7 ')+' <span style="color:var(--muted)">(har '+any.have+' g'+fTxt+')</span>';
   }
   var r=garnForOppskrift(op);
   if(!r.hits.length)return'<span style="color:var(--muted)">ingen passende garn i lageret</span>';
-  if(!r.need)return'<span style="color:var(--muted)">'+r.have+' g passende garn \u2014 oppskriften mangler mengde</span>';
-  if(r.unknown&&!r.enough)return'<span style="color:var(--amber)">'+r.have+' av '+r.need+' g \u2014 noe garn mangler gram per n\u00f8ste</span>';
-  if(r.enough)return'<span style="color:var(--red);font-weight:700">\u2713 nok garn \u00b7 '+r.have+' av '+r.need+' g</span>';
-  return'<span style="color:var(--amber)">mangler '+r.short+' g \u00b7 har '+r.have+' av '+r.need+' g</span>';
+  var fTxt=garnFargerTxt(r.hits);
+  if(!r.need)return'<span style="color:var(--muted)">'+r.have+' g passende garn'+fTxt+' \u2014 oppskriften mangler mengde</span>';
+  if(r.unknown&&!r.enough)return'<span style="color:var(--amber)">'+r.have+' av '+r.need+' g'+fTxt+' \u2014 noe garn mangler gram per n\u00f8ste</span>';
+  if(r.enough)return'<span style="color:var(--red);font-weight:700">\u2713 nok garn \u00b7 '+r.have+' av '+r.need+' g</span><span style="color:var(--muted)">'+fTxt+'</span>';
+  return'<span style="color:var(--amber)">mangler '+r.short+' g \u00b7 har '+r.have+' av '+r.need+' g'+fTxt+'</span>';
 }
 function fyllFraGarntype(id){
   var reg=findFixedList('garntyper');if(!reg)return;
@@ -1306,16 +1314,6 @@ function strikkeverkstedViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Strikkeverksted</div>'
     +'<div class="view-sub">Alt som h\u00f8rer til strikkingen p\u00e5 ett sted.</div>';
-  var knitProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';})
-    .concat(frittResultater().filter(function(r){return r.subtype==='strikk';}).map(function(r){return{__res:true,id:r.id,name:resultShortTitle(r)};}));
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goStrikkeprosjekter()">'
-    +'<div class="entry-body"><div class="entry-text">Strikkeprosjekter</div>'
-    +'<div class="entry-date">'+knitProjs.length+' prosjekt'+(knitProjs.length===1?'':'er')+'</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goGarnmatch()">'
-    +'<div class="entry-body"><div class="entry-text">Hva kan jeg strikke n\u00e5?</div>'
-    +'<div class="entry-date">garnlageret matchet mot oppskriftene</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   [['garntyper','goGarntyper'],['strikkeoppskrifter','goStrikkeoppskrifter'],['strikkeutstyr','goStrikkeutstyr']].forEach(function(t){
     var inv=findFixedList(t[0]);if(!inv)return;
     var c=invCounts(inv);
@@ -1445,9 +1443,9 @@ function fixedListHubHTML(key,title,sub){
   if(sub)h+='<div class="view-sub">'+sub+'</div>';
   if(!inv)return h+'<div class="card"><div class="empty">Lista finnes ikke.</div></div>';
   var c=invCounts(inv);
-  var lex=key==='garntyper';
-  // Garnleksikonet har ingen plassering og ingenting å hake av — bare selve lista
-  if(!lex){
+  var noOversikt=key==='garntyper'||key==='strikkeoppskrifter';
+  // Garnleksikonet og oppskriftene har ingen plassering — bare selve lista
+  if(!noOversikt){
     h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goListOversikt(\''+q(inv.id)+'\')">'
       +'<div class="entry-body"><div class="entry-text">Oversikt</div>'
       +'<div class="entry-date">hvor tingene er \u2014 ordnet etter plassering</div></div>'
@@ -1455,7 +1453,7 @@ function fixedListHubHTML(key,title,sub){
   }
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
     +'<div class="entry-body"><div class="entry-text">Liste</div>'
-    +'<div class="entry-date">'+(lex?c.total+' garntype'+(c.total===1?'':'r'):c.have+' av '+c.total+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':''))+'</div></div>'
+    +'<div class="entry-date">'+(key==='garntyper'?c.total+' garntype'+(c.total===1?'':'r'):key==='strikkeoppskrifter'?c.total+' oppskrift'+(c.total===1?'':'er'):c.have+' av '+c.total+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':''))+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   return h;
 }
@@ -4952,7 +4950,8 @@ function modalHTML(){
             :'');
       }
       var fx=invT?(invT.fixed||''):'';
-      var noTilstand=['garnlager','garntyper','strikkeoppskrifter','strikkeutstyr'].indexOf(fx)>=0;
+      var noTilstand=['garnlager','garntyper','strikkeoppskrifter','strikkeutstyr'].indexOf(fx)>=0
+        ||(invT&&(invT.type||'inventar')==='prosjekt');
       var isLeksikon=fx==='garntyper';
       // Garn: type og leverandør — brukes både på oppskrifter og i garnlageret
       var garnSection='';
@@ -5056,7 +5055,7 @@ function modalHTML(){
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="'+(invT.fixed==='garntyper'?'F.eks. Finull, Peer Gynt \u2026':'F.eks. f\u00f4rede vinterst\u00f8vletter til penbruk \u2026')+'" oninput="mf().name=this.value;updateSaveBtn()">'
       +((function(){
         var t=invT.type||'inventar';
-        if(t==='pakke'||t==='prosjekt'||invT.fixed==='garntyper')return'';
+        if(t==='pakke'||t==='prosjekt'||invT.fixed==='garntyper'||invT.fixed==='strikkeoppskrifter')return'';
         return'<label class="field-lbl">Status</label>'
           +'<div class="chips">'
           +'<button class="chip'+(f.have?' on':'')+'" onclick="mf().have=true;render()">P\u00e5 plass</button>'
@@ -7466,11 +7465,11 @@ function inventarViewHTML(){
       dRow.push(dvv.__matVaier?esc(dvv.__matPinner||'?')+'/'+esc(dvv.__matVaier):esc(dvv.__matPinner));
     }
     if(dvv.__merke)dRow.push(esc(dvv.__merke));
-    if(dvv.__tilstand)dRow.push('<span style="color:'+(dvv.__tilstand==='M\u00e5 erstattes'?'var(--red)':dvv.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(dvv.__tilstand)+'</span>');
+    if(dvv.__tilstand&&(inv.type||'inventar')!=='prosjekt')dRow.push('<span style="color:'+(dvv.__tilstand==='M\u00e5 erstattes'?'var(--red)':dvv.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(dvv.__tilstand)+'</span>');
     if(listHasDetails(inv)&&dvv.__kjopt)dRow.push('kj\u00f8pt '+esc(dvv.__kjopt));
     var twoBtn=listHasDetails(inv);
     var bBg=beredBg(it);
-    var isLex=inv.fixed==='garntyper';
+    var isLex=inv.fixed==='garntyper'||inv.fixed==='strikkeoppskrifter';
     // «På plass / Mangler» i stedet for avhaking — gjelder alle inventarlister.
     // Pakkelister og prosjekter beholder haken, der betyr den pakket / milepæl nådd.
     var showState=!twoBtn&&!isLex&&!isPack&&!isProj;
