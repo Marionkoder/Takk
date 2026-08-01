@@ -636,7 +636,7 @@ function plasseringViewHTML(){
   return h;
 }
 function administrerHubViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Administrer</div>';
   h+='<div class="chips" style="padding:8px 12px 0">'
     +[['kategorier','Kategorier og utstyrstyper'],['plassering','Plassering'],['hashtagger','Hashtagger']].map(function(t){
@@ -678,7 +678,7 @@ function rrTabsHTML(){
 function goVaretelling(){view={kind:'varetelling'};drawerOpen=false;render();}
 function varetellingHubViewHTML(){
   var h='<div class="view-title">Varetelling</div>'
-    +'<div class="view-sub">Utstyr, forbruksvarer og andre lister du teller opp.</div>';
+    +'<div class="view-sub">Forbruksvarer, beredskap og andre lister du teller opp. Utstyr har f\u00e5tt sin egen side.</div>';
   var fixedRow=function(key,goFn){
     var inv=findFixedList(key);
     if(!inv)return'';
@@ -688,7 +688,6 @@ function varetellingHubViewHTML(){
       +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   };
-  h+=fixedRow('utstyr','goUtstyr');
   h+=fixedRow('forbruksvarer','goForbruksvarer');
   h+=fixedRow('beredskap','goBeredskap');
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goVenteliste()">'
@@ -817,7 +816,7 @@ function lagreSomGarntype(){
 function goGarntyper(){view={kind:'garntyper'};drawerOpen=false;render();}
 function goGarnmatch(){view={kind:'garnmatch'};drawerOpen=false;render();}
 function garnmatchViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goStrikkeverksted()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Hva kan jeg strikke n\u00e5?</div>'
     +'<div class="view-sub">Sammenligner garnet i lageret med oppskriftene dine. Treff p\u00e5 garnnavn, eller p\u00e5 type og fiber.</div>';
   var ops=oppskriftItems();
@@ -939,7 +938,7 @@ function goGrupper(){view={kind:'grupper'};drawerOpen=false;render();}
 function grupperViewHTML(){
   var g=alleGruppeMedlemmer();
   var navn=Object.keys(g).sort(nbSort);
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goFolk()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Grupper</div>'
     +'<div class="view-sub">Grupper samler folk. De henter ikke innlegg til personsidene \u2014 det gj\u00f8r bare de personlige hashtaggene.</div>';
   if(!navn.length){
@@ -965,7 +964,7 @@ function gruppeMedlemmer(tag){
 function gruppeViewHTML(){
   var tag=normTag(view.tag||'');
   var medl=gruppeMedlemmer(tag);
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goGrupper()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">'+esc(tag)+'</div>'
     +'<div class="view-sub">'+medl.length+' person'+(medl.length===1?'':'er')+' i denne gruppen</div>';
 
@@ -1304,7 +1303,7 @@ function kreativitetViewHTML(){
 function goStrikkeverksted(){view={kind:'strikkeverksted'};drawerOpen=false;render();}
 function goStrikkeprosjekter(){view={kind:'strikkeprosjekter'};drawerOpen=false;render();}
 function strikkeverkstedViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goKreativitet()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Strikkeverksted</div>'
     +'<div class="view-sub">Alt som h\u00f8rer til strikkingen p\u00e5 ett sted.</div>';
   var knitProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';})
@@ -1331,7 +1330,7 @@ function goGarnlager(){view={kind:'garnlager'};drawerOpen=false;render();}
 function goStrikkeoppskrifter(){view={kind:'strikkeoppskrifter'};drawerOpen=false;render();}
 function goStrikkeutstyr(){view={kind:'strikkeutstyr'};drawerOpen=false;render();}
 function strikkeprosjekterViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goStrikkeverksted()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Strikkeprosjekter</div>'
     +'<div class="view-sub">Vises ogs\u00e5 i prosjektoversiktene under Oversikt.</div>';
   h+='<button class="add-btn" onclick="openProjModal();mf().subtype=\'strikk\';render()">+ Nytt strikkeprosjekt</button>';
@@ -1440,7 +1439,7 @@ function printOversikt(invId){
 function fixedListHubHTML(key,title,sub){
   var inv=findFixedList(key);
   var knitKeys=['garnlager','garntyper','strikkeoppskrifter','strikkeutstyr'];
-  var backFn=knitKeys.indexOf(key)>=0?'goStrikkeverksted()':key==='utstyr'?'':'goVaretelling()';
+  var backFn='goBack()';
   var h=backFn?'<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+backFn+'">\u2039</button></div>':'';
   h+='<div class="view-title">'+esc(title)+'</div>';
   if(sub)h+='<div class="view-sub">'+sub+'</div>';
@@ -1462,7 +1461,7 @@ function fixedListHubHTML(key,title,sub){
 }
 function listOversiktViewHTML(){
   var inv=invById(view.invId);
-  var back=inv&&inv.fixed==='utstyr'?'goUtstyr()':inv&&inv.fixed==='forbruksvarer'?'goForbruksvarer()':'goBeredskap()';
+  var back='goBack()';
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+back+'">\u2039</button></div>'
     +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
     +'<div class="view-title" style="padding:0;flex:1;font-size:17px;line-height:1.2">Oversikt over det som er p\u00e5 plass</div>'
@@ -1682,7 +1681,7 @@ function goBursdagsliste(){view={kind:'bursdagsliste'};drawerOpen=false;render()
 function goGaver(){view={kind:'gaver'};drawerOpen=false;render();}
 function bursdagerHubHTML(){
   var bdays=events.filter(function(e){return e.bday;});
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goFolk()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Bursdagsbok</div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBursdagsliste()">'
     +'<div class="entry-body"><div class="entry-text">Bursdagsliste</div>'
@@ -1706,7 +1705,7 @@ function bursdagslisteViewHTML(){
     return ab-aa||nbSort(a.name,b.name);
   });
   else bdays.sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goFolk()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Bursdagsliste <span style="font-size:12px;font-weight:400;color:var(--rose)">\u00b7 '+bdays.length+' av '+BDAY_MAX+'</span></div>';
   h+='<div class="chips" style="padding:8px 12px 0">'
     +[['dato','Dato'],['navn','Alfabetisk'],['alder','Alder']].map(function(t){
@@ -1817,6 +1816,20 @@ function personEntryCountSince(person,fromIso){
 }
 var dOpenMonth={},dOpenSec={};
 var view={kind:'hjem',month:curMonth,year:curYear};
+var navHistory=[];
+// Generisk tilbakeknapp: går til den faktiske forrige siden, uansett hvordan
+// brukeren kom til denne. Faller tilbake til forsida hvis historikken er tom
+// (f.eks. rett etter at appen åpnes på nytt).
+function goBack(){
+  drawerOpen=false;
+  if(navHistory.length){
+    window._goingBack=true;
+    view=navHistory.pop();
+    render();
+  } else {
+    goHjem();
+  }
+}
 var selectedTag=null;
 var searchQuery='';
 
@@ -2939,7 +2952,7 @@ function giftMatrixHTML(entries,names,clickable){
 }
 function gaverViewHTML(){
   var people=giftPeople();
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goFolk()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Gavelogg</div>';
   h+='<button class="add-btn" onclick="openGiftModal(\'\')">+ Ny gave eller idé</button>';
   h+='<button class="add-btn" style="margin-top:6px" onclick="openReceivedGiftModal(\'\')">+ Gave jeg har f\u00e5tt</button>';
@@ -2995,7 +3008,7 @@ function gavePersonViewHTML(){
   if(bd&&bd.day){
     titleName+=', '+bd.day+'. '+MND_FULL[bd.month-1]+(Number(bd.sinceYear)>0?' '+bd.sinceYear:'');
   }
-  var backTo=view._from==='gaver'?'goGaver()':view._from==='folk'?'goFolk()':'goBursdagsliste()';
+  var backTo='goBack()';
   var h='<div style="padding:12px 12px 0"><button class="icon-btn" onclick="'+backTo+'">\u2039</button></div>'
     +'<div style="display:flex;align-items:flex-start;gap:8px;padding:2px 12px 0">'
     +'<div class="view-title" style="padding:0;flex:1;min-width:0">'+titleName+'</div>'
@@ -3171,7 +3184,7 @@ function toggleStrikkMeny(){
 function goPersonlig(){view={kind:'personlig'};drawerOpen=false;render();}
 function personligViewHTML(){
   var cur=currentBgTone();
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goInnstillinger()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Personlig</div>';
   // Visuell profil
   var pid=currentProfile();
@@ -7307,7 +7320,7 @@ function inventarViewHTML(){
 
   var isPack=(inv.type||'inventar')==='pakke';
   var isProj=(inv.type||'inventar')==='prosjekt';
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+(isProj?'goPlanleggingProsjekt()':isPack&&!inv.fixed?'goPlanleggingPakke()':inv.fixed==='beredskap'?'goBeredskap()':inv.fixed==='utstyr'?'goUtstyr()':inv.fixed==='forbruksvarer'?'goForbruksvarer()':inv.fixed==='garnlager'?'goGarnlager()':inv.fixed==='garntyper'?'goGarntyper()':inv.fixed==='strikkeoppskrifter'?'goStrikkeoppskrifter()':inv.fixed==='strikkeutstyr'?'goStrikkeutstyr()':inv.fixed==='anskaffelser'?'goOkonomi()':'goVaretelling()')+'">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
     +'<button class="icon-btn" style="order:9;flex-shrink:0;font-size:11px" onclick="printList(\''+q(inv.id)+'\')">Skriv ut</button>'
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
@@ -7790,7 +7803,7 @@ function budsjettViewHTML(){
   var m=scope==='m'?(view.month||curMonth):null;
   var periodLabel=scope==='m'?(MND_FULL[m-1]+' '+y):String(y);
 
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goOkonomi()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Tid og penger</div>'
     +'<div class="view-sub">Det som er disponibelt av tid og penger til p\u00e5g\u00e5ende prosjekter og prosjekter \u2014 ikke hele privat\u00f8konomien.</div>';
 
@@ -8139,7 +8152,7 @@ function planleggingViewHTML(){
   return h;
 }
 function ventelisteViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goVaretelling()">\u2039</button></div>'
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Venteliste</div>'
     +'<div class="view-sub">Ting som venter p\u00e5 riktig tidspunkt. Innkj\u00f8p h\u00e5ndteres i innkj\u00f8pslista under Ressursbruk.</div>';
   h+='<button class="add-btn" onclick="openLaterModal()">+ Sett p\u00e5 vent</button>';
@@ -8172,7 +8185,16 @@ function render(){
   var prevMain=document.querySelector('.main');
   var scrollPos=prevMain?prevMain.scrollTop:0;
   var sameView=window._lastRenderViewKind===(view?view.kind:null);
+  // Naviger tilbake til der brukeren faktisk kom fra, ikke et fast overordnet nivå.
+  // Hopper over når selve goBack() nettopp har hentet en side fra historikken,
+  // ellers ville forrige side blitt lagt rett tilbake i køen (frem-og-tilbake-loop).
+  if(!sameView&&!window._goingBack&&window._lastRenderView){
+    navHistory.push(window._lastRenderView);
+    if(navHistory.length>40)navHistory.shift();
+  }
+  window._goingBack=false;
   window._lastRenderViewKind=view?view.kind:null;
+  window._lastRenderView=view?Object.assign({},view):null;
 
   var topbar='<div class="topbar">'
     +'<div class="topbar-row">'
