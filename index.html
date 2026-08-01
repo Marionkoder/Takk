@@ -1333,7 +1333,7 @@ function goStrikkeutstyr(){view={kind:'strikkeutstyr'};drawerOpen=false;render()
 function strikkeprosjekterViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goStrikkeverksted()">\u2039</button></div>'
     +'<div class="view-title">Strikkeprosjekter</div>'
-    +'<div class="view-sub">Vises ogs\u00e5 i prosjektoversiktene under Planlegger.</div>';
+    +'<div class="view-sub">Vises ogs\u00e5 i prosjektoversiktene under Oversikt.</div>';
   h+='<button class="add-btn" onclick="openProjModal();mf().subtype=\'strikk\';render()">+ Nytt strikkeprosjekt</button>';
   var invProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';})
     .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
@@ -4265,14 +4265,14 @@ function updateSaveBtn(){
 function catById(id){return cats.find(function(c){return c.id===id;});}
 
 function goalChipSection(f){
-  if(!goals.length)return'<div class="hint">Ingen grunnverdier ennå — legg til under Planlegger.</div>';
+  if(!goals.length)return'<div class="hint">Ingen grunnverdier ennå — legg til under Oversikt.</div>';
   return goals.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(g){
     var on=(f.goalIds||[]).includes(g.id);
     return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormGoal(\''+q(g.id)+'\')">'+esc(g.name)+'</button>';
   }).join('');
 }
 function linkChipSection(f){
-  if(!goals.length)return'<div class="hint">Ingen grunnverdier ennå — legg til under Planlegger.</div>';
+  if(!goals.length)return'<div class="hint">Ingen grunnverdier ennå — legg til under Oversikt.</div>';
   return goals.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(g){
     var on=(f.goalIds||[]).includes(g.id);
     var h='<button class="chip'+(on?' on':'')+'" style="font-weight:700" onclick="toggleFormGoal(\''+q(g.id)+'\')">'+esc(g.name)+'</button>';
@@ -5289,7 +5289,7 @@ function modalHTML(){
       })()
       +(isEditX&&resultById(f.id)&&resultById(f.id).targetAmount?(function(){
         var deps=deposits.filter(function(d){return d.resultId===f.id;}).sort(function(a,b){return a.date<b.date?1:-1;});
-        if(!deps.length)return'<div class="hint">Ingen innbetalinger ennå — registrer dem fra Planlegger eller budsjettvisningen.</div>';
+        if(!deps.length)return'<div class="hint">Ingen innbetalinger ennå — registrer dem fra Oversikt eller budsjettvisningen.</div>';
         return'<label class="field-lbl">Innbetalinger</label>'+deps.map(function(d){
           return'<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 0">'
             +'<span style="flex:1">'+d.date+' · '+fmtKr(d.amount)+' kr'+(d.note?' <span style="color:var(--muted);font-style:italic">'+esc(d.note)+'</span>':'')+'</span>'
@@ -5570,7 +5570,7 @@ function entryRowHTML(e){
 function sidebarHTML(){
   var h='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
   h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='administrer'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
-  h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Planlegger</div>';
+  h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
   h+='<div class="side-month'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   // Kategorisidene: alfabetisk, hver med sin egen kategorifarge — som stripene ellers
   [{vis:showFolk,navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
@@ -5592,7 +5592,7 @@ function sidebarHTML(){
     var col=c?catColor(c.id):null;
     var paa=k.kinds.indexOf(view.kind)>=0;
     h+='<div class="side-month" style="'+(col?'background:'+col+';color:#F2EEE5;':'')
-      +'padding-left:10px'+(paa?';font-weight:800':'')+'" onclick="'+k.fn+'">'
+      +'padding-left:10px;text-transform:uppercase;letter-spacing:.03em'+(paa?';font-weight:800':'')+'" onclick="'+k.fn+'">'
       +'<span class="s-arrow"></span>'+esc(k.navn)+'</div>';
   });
   h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
@@ -5879,8 +5879,7 @@ function boxToggleEvent(id,occYear){
   toggleEvent(id,occYear);
 }
 var planTab='verdier';
-var oversiktSub='sammenheng';
-function goPlanleggingProsjekt(){planTab='oversikt';oversiktSub='tidslinje';view={kind:'planlegging'};drawerOpen=false;render();}
+function goPlanleggingProsjekt(){planTab='tidslinje';view={kind:'planlegging'};drawerOpen=false;render();}
 function goPlanleggingPakke(){goReiser();}
 function toggleQuickCat(id){
   var a=quickForm.cats;
@@ -6749,7 +6748,7 @@ function rapportViewHTML(){
     +'</div></div>';
 
   if(!goals.length){
-    h+='<div class="card"><div class="empty">Ingen grunnverdier enn\u00e5. Legg til under Planlegger, s\u00e5 bygges rapporten rundt dem.</div></div>';
+    h+='<div class="card"><div class="empty">Ingen grunnverdier enn\u00e5. Legg til under Oversikt, s\u00e5 bygges rapporten rundt dem.</div></div>';
     return h;
   }
 
@@ -6813,7 +6812,7 @@ function rapportViewHTML(){
 
     if(!(g.cats||[]).length){
       h+=secLbl('Takknemlighet')
-        +secNote('Koble grunnverdien til hovedkategorier (via \u270e under Planlegger) for \u00e5 se takknemligheten den gir.');
+        +secNote('Koble grunnverdien til hovedkategorier (via \u270e under Oversikt) for \u00e5 se takknemligheten den gir.');
     } else {
       h+=secLbl('Takknemlighet \u00b7 '+gent.length);
       h+=gent.length?gent.map(entryRowHTML).join(''):secNote('Ingen innlegg i tilknyttede kategorier denne m\u00e5neden.');
@@ -6912,7 +6911,7 @@ function arsrapportViewHTML(){
       +'</div></div>';
   }
   if(!goals.length){
-    h+='<div class="card"><div class="empty">Ingen grunnverdier enn\u00e5. Legg til under Planlegger, s\u00e5 bygges rapporten rundt dem.</div></div>';
+    h+='<div class="card"><div class="empty">Ingen grunnverdier enn\u00e5. Legg til under Oversikt, s\u00e5 bygges rapporten rundt dem.</div></div>';
   } else {
     var rows=goals.map(function(g){
       var resIdSet=resultsFor(g.id).map(function(x){return x.id;});
@@ -6984,7 +6983,7 @@ function arsrapportViewHTML(){
 
       if(!(g.cats||[]).length){
         h+=secLbl('Takknemlighet')
-          +secNote('Koble grunnverdien til hovedkategorier (via \u270e under Planlegger) for \u00e5 se takknemligheten den gir.');
+          +secNote('Koble grunnverdien til hovedkategorier (via \u270e under Oversikt) for \u00e5 se takknemligheten den gir.');
       } else {
         h+=secLbl('Takknemlighet \u00b7 '+row.gent.length);
         if(row.gent.length){
@@ -7938,20 +7937,15 @@ function budsjettViewHTML(){
 }
 
 function planleggingViewHTML(){
-  var h='<div class="view-title">Planlegger</div>'
+  var h='<div class="view-title">Oversikt</div>'
     +'<div class="view-sub">Grunnverdier er slik du vil leve («Jeg tar vare på helsa»). Prosjekter er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['oversikt','Oversikt'],['verdier','Grunnverdier'],['prosjekter','Prosjekter'],['rutiner','Rutiner'],['hendelser','Hendelser']];
+  var ptabs=[['tidslinje','Tidslinje'],['sammenheng','Sammenhenger'],['verdier','Grunnverdier'],['prosjekter','Prosjekter'],['rutiner','Rutiner'],['hendelser','Hendelser']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
 
-  if(planTab==='oversikt'){
-    h+='<div class="chips" style="padding:8px 12px 0">'
-      +'<button class="chip'+(oversiktSub==='tidslinje'?' on':'')+'" onclick="oversiktSub=\'tidslinje\';render()">Tidslinje for prosjekter</button>'
-      +'<button class="chip'+(oversiktSub!=='tidslinje'?' on':'')+'" onclick="oversiktSub=\'sammenheng\';render()">Tabell med sammenhenger</button>'
-      +'</div>';
-    h+=(oversiktSub==='tidslinje')?prosjektTidslinjeHTML():oversiktViewHTML();
-  }
+  if(planTab==='tidslinje')h+=prosjektTidslinjeHTML();
+  if(planTab==='sammenheng')h+=oversiktViewHTML();
   if(planTab==='verdier'){
   h+='<div class="sec-title">Grunnverdier</div>';
   h+='<button class="add-btn" onclick="openGoalModal()">+ Ny grunnverdi</button>';
