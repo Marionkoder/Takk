@@ -322,7 +322,7 @@ var curMonth=today.getMonth()+1;
    routines: {id,name,cats:[subIds],months:[1-12] (tom=alle),log:['YYYY-MM']}
    events:   {id,name,cats:[subIds],year,month,done}
 */
-var entries=[],cats=[],routines=[],events=[],goals=[],laters=[],results=[],inventories=[],budgetRows=[],deposits=[],timeLogs=[],mens=[];
+var entries=[],cats=[],routines=[],events=[],goals=[],laters=[],results=[],inventories=[],budgetRows=[],deposits=[],timeLogs=[],mens=[],mensDag=[];
 var invShowMissing=false;
 var openGoals={};
 var editMode=false;
@@ -1518,7 +1518,9 @@ function listOversiktViewHTML(){
 }
 function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 // ── Menstruasjonstracker ──
-// Datamodell: {id, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|'', note:''}
+// Datamodell: {id, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|'', note:'', intensity:1-4|null}
+var MENS_NIVAA=[[1,'Litt'],[2,'Moderat'],[3,'Kraftig'],[4,'Uvanlig kraftig']];
+function mensDraaper(n){return Array(Number(n)||0).fill('\ud83e\ude78').join('');}
 function mensSorted(){return mens.slice().sort(function(a,b){return a.start<b.start?1:-1;});} // nyeste først
 function mensSiste(){var s=mensSorted();return s.length?s[0]:null;}
 function mensSykluslengder(){
@@ -1586,6 +1588,32 @@ function mensViewHTML(){
   h+='<span>Snitt syklus: '+(snittS?snittS+' dager':'ikke nok data enn\u00e5')+'</span>';
   h+='<span>Snitt varighet: '+(snittL?snittL+' dager':'ikke nok data enn\u00e5')+'</span>';
   h+='</div></div>';
+
+  // Hurtigmerking for i dag — to gjensidig utelukkende par, ett trykk
+  var iDag=isoDate(today);
+  var radIDag=mensDagFor(iDag)||{energi:'',fokus:''};
+  h+='<div class="sec-title">I dag</div><div class="card" style="padding:10px 14px">'
+    +'<div class="chips" style="margin-bottom:6px">'
+    +'<button class="chip'+(radIDag.energi==='slapp'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'energi\',\'slapp\')">Slapp</button>'
+    +'<button class="chip'+(radIDag.energi==='energisk'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'energi\',\'energisk\')">Energisk</button>'
+    +'</div>'
+    +'<div class="chips">'
+    +'<button class="chip'+(radIDag.fokus==='fokusert'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'fokus\',\'fokusert\')">Fokusert</button>'
+    +'<button class="chip'+(radIDag.fokus==='ufokusert'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'fokus\',\'ufokusert\')">Ufokusert</button>'
+    +'</div></div>';
+
+  // Siste merkede dager, med syklusdag — så mønsteret etter hvert blir synlig
+  var sisteDager=mensDag.slice().sort(function(a,b){return a.date<b.date?1:-1;}).slice(0,14);
+  if(sisteDager.length){
+    h+='<div class="sec-title">Siste merkede dager</div><div class="card">'+sisteDager.map(function(r){
+      var sd=mensSyklusdagForDato(r.date);
+      var merker=[r.energi==='slapp'?'slapp':r.energi==='energisk'?'energisk':'',
+                  r.fokus==='fokusert'?'fokusert':r.fokus==='ufokusert'?'ufokusert':''].filter(Boolean).join(' \u00b7 ');
+      return'<div class="entry-row"><div class="entry-body"><div class="entry-text" style="font-size:13px">'+fmtDate(r.date)+(sd?' <span style="font-size:11px;color:var(--muted)">\u00b7 syklusdag '+sd+'</span>':'')+'</div>'
+        +(merker?'<div class="entry-date">'+esc(merker)+'</div>':'')+'</div></div>';
+    }).join('')+'</div>';
+  }
+
   h+='<button class="add-btn" onclick="openMensModal()">+ Registrer</button>';
   var sorted=mensSorted();
   if(!sorted.length){
@@ -1595,29 +1623,46 @@ function mensViewHTML(){
   h+='<div class="card">'+sorted.map(function(m){
     var lengde=m.end&&m.end>=m.start?Math.round((new Date(m.end)-new Date(m.start))/86400000)+1:null;
     return'<div class="entry-row" style="cursor:pointer" onclick="openEditMens(\''+q(m.id)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+fmtDate(m.start)+(m.end?' \u2013 '+fmtDate(m.end):'')+(lengde?' <span style="font-size:11px;color:var(--muted)">\u00b7 '+lengde+' dager</span>':'')+'</div>'
+      +'<div class="entry-body"><div class="entry-text">'+fmtDate(m.start)+(m.end?' \u2013 '+fmtDate(m.end):'')+(lengde?' <span style="font-size:11px;color:var(--muted)">\u00b7 '+lengde+' dager</span>':'')+(m.intensity?' '+mensDraaper(m.intensity):'')+'</div>'
       +(m.note?'<div class="entry-date">'+esc(m.note)+'</div>':'')+'</div>'
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
   }).join('')+'</div>';
   return h;
 }
-function openMensModal(){modal={step:'mens',form:{start:isoDate(today),end:'',note:''}};render();}
+function openMensModal(){modal={step:'mens',form:{start:isoDate(today),end:'',note:'',intensity:''}};render();}
 function openEditMens(id){
   var m=mens.find(function(x){return x.id===id;});if(!m)return;
-  modal={step:'mens_edit',form:{id:id,start:m.start,end:m.end||'',note:m.note||''}};render();
+  modal={step:'mens_edit',form:{id:id,start:m.start,end:m.end||'',note:m.note||'',intensity:m.intensity||''}};render();
 }
 function submitMens(){
   var f=mf();if(!f.start)return;
-  mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:f.start,end:f.end||'',note:(f.note||'').trim()});
+  mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:f.start,end:f.end||'',note:(f.note||'').trim(),intensity:f.intensity||''});
   save();closeModal();
 }
 function saveEditMens(){
   var f=mf();if(!f.start)return;
   var m=mens.find(function(x){return x.id===f.id;});if(!m)return;
-  m.start=f.start;m.end=f.end||'';m.note=(f.note||'').trim();
+  m.start=f.start;m.end=f.end||'';m.note=(f.note||'').trim();m.intensity=f.intensity||'';
   save();closeModal();
 }
 function deleteMens(id){mens=mens.filter(function(x){return x.id!==id;});save();closeModal();}
+// Dagsmerker — energi og fokus, to gjensidig utelukkende par du kan sette med ett trykk
+// når du kjenner det, uten å måtte vurdere det hver dag.
+function mensDagFor(dato){return mensDag.find(function(x){return x.date===dato;})||null;}
+function mensSettDag(dato,felt,verdi){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:''};mensDag.push(rad);}
+  rad[felt]=rad[felt]===verdi?'':verdi;
+  if(!rad.energi&&!rad.fokus)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+// Syklusdag for en vilk\u00e5rlig dato, ikke bare i dag — brukes til \u00e5 se merkene i sammenheng med syklusen
+function mensSyklusdagForDato(dato){
+  var forrige=mens.filter(function(m){return m.start&&m.start<=dato;}).sort(function(a,b){return a.start<b.start?1:-1;})[0];
+  if(!forrige)return null;
+  var d=Math.round((new Date(dato)-new Date(forrige.start))/86400000)+1;
+  return d>0?d:null;
+}
 function commitNewUnit(){
   var f=mf();var u=addCustomUnit(f._newUnit||'');
   if(u){f.values=f.values||{};f.values.__unit=u;f.__unitSel=u;}
@@ -1947,6 +1992,7 @@ function load(){
   try{deposits=JSON.parse(localStorage.getItem(SK+'_deposits')||'[]');}catch(e){deposits=[];}
   try{timeLogs=JSON.parse(localStorage.getItem(SK+'_timelogs')||'[]');}catch(e){timeLogs=[];}
   try{mens=JSON.parse(localStorage.getItem(SK+'_mens')||'[]');}catch(e){mens=[];}
+  try{mensDag=JSON.parse(localStorage.getItem(SK+'_mensdag')||'[]');}catch(e){mensDag=[];}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
@@ -2503,6 +2549,7 @@ function save(){
   try{localStorage.setItem(SK+'_deposits',JSON.stringify(deposits));}catch(e){}
   try{localStorage.setItem(SK+'_timelogs',JSON.stringify(timeLogs));}catch(e){}
   try{localStorage.setItem(SK+'_mens',JSON.stringify(mens));}catch(e){}
+  try{localStorage.setItem(SK+'_mensdag',JSON.stringify(mensDag));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
@@ -4003,7 +4050,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -4022,7 +4069,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -4471,6 +4518,10 @@ function modalHTML(){
       +'<input class="inp" type="date" value="'+esc(f.start||'')+'" oninput="mf().start=this.value;updateSaveBtn()">'
       +'<label class="field-lbl">Sluttdato <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="date" value="'+esc(f.end||'')+'" oninput="mf().end=this.value">'
+      +'<label class="field-lbl">Bl\u00f8dningsmengde <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<div class="chips">'+MENS_NIVAA.map(function(n){
+          return'<button class="chip'+(Number(f.intensity)===n[0]?' on':'')+'" onclick="mf().intensity=mf().intensity==='+n[0]+'?\'\':'+n[0]+';render()">'+mensDraaper(n[0])+' '+n[1]+'</button>';
+        }).join('')+'</div>'
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<textarea class="inp" rows="2" oninput="mf().note=this.value">'+esc(f.note||'')+'</textarea>'
       +'<button class="save-btn" onclick="'+(isEditM?'saveEditMens()':'submitMens()')+'" '+(f.start?'':'disabled')+'>Lagre</button>'
