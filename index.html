@@ -357,6 +357,7 @@ var showStrikk=true;
 var showFolk=true;
 var showHelse=true;
 var showMens=true;
+var mensManuellSyklus=null,mensManuellVarighet=null;
 var showMat=true;
 var showHjem=true;
 var showKomp=true;
@@ -1535,7 +1536,8 @@ function mensSykluslengder(){
   return out;
 }
 function mensSnittSyklus(){
-  var l=mensSykluslengder();if(!l.length)return null;
+  var l=mensSykluslengder();
+  if(!l.length)return mensManuellSyklus||null;
   var siste=l.slice(-6);
   return Math.round(siste.reduce(function(a,b){return a+b;},0)/siste.length);
 }
@@ -1543,7 +1545,7 @@ function mensSnittLengde(){
   var l=mens.filter(function(m){return m.start&&m.end&&m.end>=m.start;})
     .map(function(m){return Math.round((new Date(m.end)-new Date(m.start))/86400000)+1;})
     .filter(function(d){return d>0&&d<20;});
-  if(!l.length)return null;
+  if(!l.length)return mensManuellVarighet||null;
   var siste=l.slice(-6);
   return Math.round(siste.reduce(function(a,b){return a+b;},0)/siste.length*10)/10;
 }
@@ -1577,51 +1579,60 @@ function mensKortHTML(){
     +'<div class="entry-date">'+esc(tekst)+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
 }
+// Dagsmerker for en vilkårlig dato — brukt både på mens-siden (for i dag) og
+// som «tvilling» på Dag-siden i Loggføring, så begge alltid viser samme greie.
+function mensDagMerkerHTML(dato,tittel){
+  var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:''};
+  return'<div class="sec-title">'+esc(tittel)+'</div><div class="card" style="padding:10px 14px">'
+    +'<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
+        return'<button class="chip'+(Number(rad.intensity)===n[0]?' on':'')+'" onclick="mensSettDagIntensity(\''+dato+'\','+n[0]+')">'+mensDraaper(n[0])+' '+n[1]+'</button>';
+      }).join('')+'</div>'
+    +'<div class="chips" style="margin-bottom:6px">'+MENS_SMERTE.map(function(n){
+        var lyn=mensLyn(n[0]);
+        return'<button class="chip'+(Number(rad.smerte)===n[0]?' on':'')+'" onclick="mensSettDagSmerte(\''+dato+'\','+n[0]+')">'+(lyn?lyn+' ':'')+n[1]+'</button>';
+      }).join('')+'</div>'
+    +'<div class="chips" style="margin-bottom:6px">'
+    +'<button class="chip'+(rad.energi==='slapp'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'energi\',\'slapp\')">Slapp</button>'
+    +'<button class="chip'+(rad.energi==='energisk'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'energi\',\'energisk\')">Energisk</button>'
+    +'</div>'
+    +'<div class="chips">'
+    +'<button class="chip'+(rad.fokus==='fokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'fokusert\')">Fokusert</button>'
+    +'<button class="chip'+(rad.fokus==='ufokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'ufokusert\')">Ufokusert</button>'
+    +'</div></div>';
+}
 function mensViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Menstruasjon</div>';
   var dag=mensDagIDag(),dager=mensDagerTilNeste(),snittS=mensSnittSyklus(),snittL=mensSnittLengde();
+  var ektSyklus=mensSykluslengder().length>0,ektVarighet=mens.some(function(m){return m.start&&m.end&&m.end>=m.start;});
   h+='<div class="card" style="padding:12px 14px">';
   h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">';
   h+='<span>I dag: <b>'+(dag?'dag '+dag:'\u2013')+'</b></span>';
   h+='<span>Neste ventet: <b>'+(mensNesteDato()?fmtDate(mensNesteDato())+(dager!=null?' ('+(dager<0?'forsinket '+Math.abs(dager):'om '+dager)+' dag'+(Math.abs(dager)===1?'':'er')+')':''):'\u2013')+'</b></span>';
   h+='</div>';
-  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px">';
-  h+='<span>Snitt syklus: '+(snittS?snittS+' dager':'ikke nok data enn\u00e5')+'</span>';
-  h+='<span>Snitt varighet: '+(snittL?snittL+' dager':'ikke nok data enn\u00e5')+'</span>';
-  h+='</div></div>';
+  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px;align-items:center">';
+  h+='<span>Snitt syklus: '+(ektSyklus?'<b style="color:var(--ink)">'+snittS+' dager</b>'
+      :'<input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(mensManuellSyklus||'')+'" placeholder="?" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="mensManuellSyklus=Number(this.value)||null;save();render()"> dager (ditt anslag)')+'</span>';
+  h+='<span>Snitt varighet: '+(ektVarighet?'<b style="color:var(--ink)">'+snittL+' dager</b>'
+      :'<input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(mensManuellVarighet||'')+'" placeholder="?" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="mensManuellVarighet=Number(this.value)||null;save();render()"> dager (ditt anslag)')+'</span>';
+  h+='</div>'
+    +(!ektSyklus||!ektVarighet?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Egne anslag brukes til \u00e5 regne ut neste ventet, helt til det finnes nok logget data \u2014 da tar de faktiske tallene over av seg selv.</div>':'')
+    +'</div>';
 
-  // Hurtigmerking for i dag — to gjensidig utelukkende par, ett trykk
-  var iDag=isoDate(today);
-  var radIDag=mensDagFor(iDag)||{energi:'',fokus:'',intensity:'',smerte:''};
-  h+='<div class="sec-title">I dag</div><div class="card" style="padding:10px 14px">'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
-        return'<button class="chip'+(Number(radIDag.intensity)===n[0]?' on':'')+'" onclick="mensSettDagIntensity(\''+iDag+'\','+n[0]+')">'+mensDraaper(n[0])+' '+n[1]+'</button>';
-      }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_SMERTE.map(function(n){
-        var lyn=mensLyn(n[0]);
-        return'<button class="chip'+(Number(radIDag.smerte)===n[0]?' on':'')+'" onclick="mensSettDagSmerte(\''+iDag+'\','+n[0]+')">'+(lyn?lyn+' ':'')+n[1]+'</button>';
-      }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'
-    +'<button class="chip'+(radIDag.energi==='slapp'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'energi\',\'slapp\')">Slapp</button>'
-    +'<button class="chip'+(radIDag.energi==='energisk'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'energi\',\'energisk\')">Energisk</button>'
-    +'</div>'
-    +'<div class="chips">'
-    +'<button class="chip'+(radIDag.fokus==='fokusert'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'fokus\',\'fokusert\')">Fokusert</button>'
-    +'<button class="chip'+(radIDag.fokus==='ufokusert'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'fokus\',\'ufokusert\')">Ufokusert</button>'
-    +'</div></div>';
+  h+=mensDagMerkerHTML(isoDate(today),'I dag');
 
-  // Siste merkede dager, med syklusdag — så mønsteret etter hvert blir synlig
+  // Siste merkede dager, med syklusdag — trykk for å rette en dag i etterkant
   var sisteDager=mensDag.slice().sort(function(a,b){return a.date<b.date?1:-1;}).slice(0,14);
   if(sisteDager.length){
-    h+='<div class="sec-title">Siste merkede dager</div><div class="card">'+sisteDager.map(function(r){
+    h+='<div class="sec-title">Siste merkede dager <span style="font-weight:400;color:var(--rose)">\u00b7 trykk for \u00e5 rette</span></div><div class="card">'+sisteDager.map(function(r){
       var sd=mensSyklusdagForDato(r.date);
       var merker=[r.intensity?mensDraaper(r.intensity):'',
                   r.smerte?(mensLyn(r.smerte)?mensLyn(r.smerte)+' ':'')+MENS_SMERTE[r.smerte-1][1]:'',
                   r.energi==='slapp'?'slapp':r.energi==='energisk'?'energisk':'',
                   r.fokus==='fokusert'?'fokusert':r.fokus==='ufokusert'?'ufokusert':''].filter(Boolean).join(' \u00b7 ');
-      return'<div class="entry-row"><div class="entry-body"><div class="entry-text" style="font-size:13px">'+fmtDate(r.date)+(sd?' <span style="font-size:11px;color:var(--muted)">\u00b7 syklusdag '+sd+'</span>':'')+'</div>'
-        +(merker?'<div class="entry-date">'+esc(merker)+'</div>':'')+'</div></div>';
+      return'<div class="entry-row" style="cursor:pointer" onclick="goDag(\''+r.date+'\')"><div class="entry-body"><div class="entry-text" style="font-size:13px">'+fmtDate(r.date)+(sd?' <span style="font-size:11px;color:var(--muted)">\u00b7 syklusdag '+sd+'</span>':'')+'</div>'
+        +(merker?'<div class="entry-date">'+esc(merker)+'</div>':'')+'</div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     }).join('')+'</div>';
   }
 
@@ -2027,6 +2038,8 @@ function load(){
   try{showFolk=localStorage.getItem(SK+'_folkmeny')!=='0';}catch(e){showFolk=true;}
   try{showHelse=localStorage.getItem(SK+'_helsemeny')!=='0';}catch(e){showHelse=true;}
   try{showMens=localStorage.getItem(SK+'_mensmeny')!=='0';}catch(e){showMens=true;}
+  try{mensManuellSyklus=Number(localStorage.getItem(SK+'_menssyklus'))||null;}catch(e){mensManuellSyklus=null;}
+  try{mensManuellVarighet=Number(localStorage.getItem(SK+'_mensvarighet'))||null;}catch(e){mensManuellVarighet=null;}
   try{showMat=localStorage.getItem(SK+'_matmeny')!=='0';}catch(e){showMat=true;}
   try{showHjem=localStorage.getItem(SK+'_hjemmeny')!=='0';}catch(e){showHjem=true;}
   try{showKomp=localStorage.getItem(SK+'_kompmeny')!=='0';}catch(e){showKomp=true;}
@@ -2600,6 +2613,8 @@ function save(){
   try{localStorage.setItem(SK+'_folkmeny',showFolk?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_helsemeny',showHelse?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_mensmeny',showMens?'1':'0');}catch(e){}
+  try{localStorage.setItem(SK+'_menssyklus',String(mensManuellSyklus||''));}catch(e){}
+  try{localStorage.setItem(SK+'_mensvarighet',String(mensManuellVarighet||''));}catch(e){}
   try{localStorage.setItem(SK+'_matmeny',showMat?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_hjemmeny',showHjem?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_kompmeny',showKomp?'1':'0');}catch(e){}
@@ -6570,6 +6585,8 @@ function dagViewHTML(){
     +(dayMs.length?' '+dayMs.map(milestoneBtnHTML).join(' '):'')
     +'</div></div></div>';
 
+  if(showMens)h+=mensDagMerkerHTML(view.d,isToday?'Menstruasjon \u2014 i dag':'Menstruasjon \u2014 denne dagen');
+
   // Daglige rutiner
   var dtodo=periodTodoItems({wk:weekNum(d),wKey:'w'+weekYear(d)+'-'+pad(weekNum(d)),ym:dy+'-'+pad(dm),m:dm,y:dy,daily:view.d,onlyGroup:'daily'});
   h+='<div class="sec-title">Daglige rutiner <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>';
@@ -6657,6 +6674,33 @@ function ukeViewHTML(){
   h+=routineTimeLogRowsHTML(wtodo.items);
   return h;
 }
+var MENS_ROSA=['#FCE4E9','#F6B9C6','#EE8CA0','#D65372']; // lys \u2192 m\u00f8rk, nivå 1\u20134
+var MENS_LAVENDEL='#E7E1F0';
+function mensDagErFaktisk(dato){
+  var iToday2=isoDate(today);
+  return mens.some(function(m){
+    if(!m.start||dato<m.start)return false;
+    var slutt=m.end||(m.start<=iToday2?iToday2:m.start); // pågående periode: regnes til og med i dag
+    return dato<=slutt;
+  });
+}
+// Projiserer de neste 12 forventede periodene ut fra snittsyklus og -varighet,
+// slik at gradering vises riktig uansett hvilket \u00e5r i kalenderen som er \u00e5pen
+function mensForventedeSett(){
+  var snitt=mensSnittSyklus();var siste=mensSiste();
+  if(!snitt||!siste)return{};
+  var lengde=Math.max(1,Math.round(mensSnittLengde()||5));
+  var sett={};
+  var d=new Date(siste.start+'T00:00:00');
+  for(var i=1;i<=12;i++){
+    d.setDate(d.getDate()+snitt);
+    for(var k=0;k<lengde;k++){
+      var dd=new Date(d);dd.setDate(dd.getDate()+k);
+      sett[isoDate(dd)]=true;
+    }
+  }
+  return sett;
+}
 function miniMonthHTML(m,y){
   var byDay={};
   var daysInM=new Date(y,m,0).getDate();
@@ -6669,12 +6713,24 @@ function miniMonthHTML(m,y){
   var first=dow(new Date(y,m-1,1));
   var cells='';
   for(var i=0;i<first;i++)cells+='<span></span>';
+  var forventetSett=showMens?mensForventedeSett():{};
   for(var d=1;d<=daysIn;d++){
     var isT=(y===curYear&&m===curMonth&&d===today.getDate());
     var dots=(byDay[d]||[]).slice(0,3).map(function(e){
       return'<i style="background:'+(itemColor(e.cats)||'var(--sel-line)')+'"></i>';
     }).join('');
-    cells+='<span class="mm-d'+(isT?' today':'')+'">'+d+(dots?'<span class="mm-dots">'+dots+'</span>':'<span class="mm-dots"></span>')+'</span>';
+    var mensBg='';
+    if(showMens){
+      var datoD=y+'-'+pad(m)+'-'+pad(d);
+      if(mensDagErFaktisk(datoD)){
+        var radD=mensDagFor(datoD);
+        var nivaD=radD&&radD.intensity?Number(radD.intensity):1;
+        mensBg=MENS_ROSA[nivaD-1];
+      } else if(forventetSett[datoD]){
+        mensBg=MENS_LAVENDEL;
+      }
+    }
+    cells+='<span class="mm-d'+(isT?' today':'')+'"'+(mensBg?' style="background:'+mensBg+';border-radius:4px"':'')+'>'+d+(dots?'<span class="mm-dots">'+dots+'</span>':'<span class="mm-dots"></span>')+'</span>';
   }
   return'<button class="mm" onclick="goRutiner('+m+',null,'+y+')">'
     +'<span class="mm-t">'+cap(MND_FULL[m-1])+'</span>'
@@ -6692,6 +6748,7 @@ function kalenderViewHTML(){
   h+='<div class="kal-grid">';
   for(var m=1;m<=12;m++)h+=miniMonthHTML(m,y);
   h+='</div>';
+  if(showMens)h+='<div style="padding:4px 12px 0;font-size:10.5px;color:var(--muted)">Rosa = faktiske mensdager, m\u00f8rkere ved kraftigere bl\u00f8dning \u00b7 lavendel = forventede mensdager</div>';
 
   // Årlige rutiner
   var ytodo=periodTodoItems({wk:1,wKey:'',ym:'',m:curMonth,y:y,includeUndated:true,onlyGroup:'yearly'});
