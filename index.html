@@ -881,9 +881,17 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     var uEvs=alleEvs.filter(function(e){return!naereIds[e.id]&&(e.cats||[]).indexOf(uc.id)>=0;});
     // Faste lister knyttet til denne underkategorien — f.eks. et lager
     var uLager=inventories.filter(function(iv){return iv.fixed&&iv.catId===uc.id;});
+    // Menstruasjonstrackeren hører hjemme i «Vitale data», ikke i noen liste
+    var erVitale=showMens&&(uc.name||'').toLowerCase()==='vitale data';
     h+='<div class="sec-title">'+esc(uc.name)+'</div><div class="card">';
-    if(!uInv.length&&!uRts.length&&!uEvs.length&&!uLager.length){
+    if(!uInv.length&&!uRts.length&&!uEvs.length&&!uLager.length&&!erVitale){
       h+='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt, en rutine eller en plan.</div>';
+    }
+    if(erVitale){
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goMens()">'
+        +'<div class="entry-body"><div class="entry-text">Menstruasjon</div>'
+        +'<div class="entry-date">'+esc(mensKortTekst())+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     }
     uLager.forEach(function(iv){
       var c=invCounts(iv);
@@ -1536,16 +1544,20 @@ function mensSykluslengder(){
   return out;
 }
 function mensSnittSyklus(){
+  // Et kjent, langvarig snitt er mer p\u00e5litelig enn et par nylogg\u00e9de sykluser i denne
+  // appen \u2014 s\u00e5 det kjente tallet f\u00e5r styre helt til brukeren selv sier noe annet.
+  if(mensManuellSyklus)return mensManuellSyklus;
   var l=mensSykluslengder();
-  if(!l.length)return mensManuellSyklus||null;
+  if(!l.length)return null;
   var siste=l.slice(-6);
   return Math.round(siste.reduce(function(a,b){return a+b;},0)/siste.length);
 }
 function mensSnittLengde(){
+  if(mensManuellVarighet)return mensManuellVarighet;
   var l=mens.filter(function(m){return m.start&&m.end&&m.end>=m.start;})
     .map(function(m){return Math.round((new Date(m.end)-new Date(m.start))/86400000)+1;})
     .filter(function(d){return d>0&&d<20;});
-  if(!l.length)return mensManuellVarighet||null;
+  if(!l.length)return null;
   var siste=l.slice(-6);
   return Math.round(siste.reduce(function(a,b){return a+b;},0)/siste.length*10)/10;
 }
@@ -1565,18 +1577,19 @@ function mensDagerTilNeste(){
   return Math.round((new Date(neste)-new Date(isoDate(today)))/86400000);
 }
 function goMens(){view={kind:'mens'};drawerOpen=false;render();}
-function mensKortHTML(){
+function mensKortTekst(){
   var dag=mensDagIDag();
   var dager=mensDagerTilNeste();
-  var tekst;
-  if(!dag)tekst='ingen registrert enn\u00e5';
-  else if(dager==null)tekst='dag '+dag;
-  else if(dager<0)tekst='dag '+dag+' \u00b7 neste ventet, '+Math.abs(dager)+' dag'+(Math.abs(dager)===1?'':'er')+' forsinket';
-  else if(dager===0)tekst='dag '+dag+' \u00b7 neste ventet i dag';
-  else tekst='dag '+dag+' \u00b7 neste ventet om '+dager+' dag'+(dager===1?'':'er');
+  if(!dag)return'ingen registrert enn\u00e5';
+  if(dager==null)return'dag '+dag;
+  if(dager<0)return'dag '+dag+' \u00b7 neste ventet, '+Math.abs(dager)+' dag'+(Math.abs(dager)===1?'':'er')+' forsinket';
+  if(dager===0)return'dag '+dag+' \u00b7 neste ventet i dag';
+  return'dag '+dag+' \u00b7 neste ventet om '+dager+' dag'+(dager===1?'':'er');
+}
+function mensKortHTML(){
   return'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goMens()">'
     +'<div class="entry-body"><div class="entry-text">Menstruasjon</div>'
-    +'<div class="entry-date">'+esc(tekst)+'</div></div>'
+    +'<div class="entry-date">'+esc(mensKortTekst())+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
 }
 // Dagsmerker for en vilkårlig dato — brukt både på mens-siden (for i dag) og
@@ -1604,20 +1617,29 @@ function mensViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Menstruasjon</div>';
   var dag=mensDagIDag(),dager=mensDagerTilNeste(),snittS=mensSnittSyklus(),snittL=mensSnittLengde();
-  var ektSyklus=mensSykluslengder().length>0,ektVarighet=mens.some(function(m){return m.start&&m.end&&m.end>=m.start;});
+  var beregnetSyklus=(function(){var l=mensSykluslengder();return l.length?Math.round(l.slice(-6).reduce(function(a,b){return a+b;},0)/l.slice(-6).length):null;})();
+  var beregnetVarighet=(function(){
+    var l=mens.filter(function(m){return m.start&&m.end&&m.end>=m.start;}).map(function(m){return Math.round((new Date(m.end)-new Date(m.start))/86400000)+1;}).filter(function(d){return d>0&&d<20;});
+    return l.length?Math.round(l.slice(-6).reduce(function(a,b){return a+b;},0)/l.slice(-6).length*10)/10:null;
+  })();
+  var antSykluser=mensSykluslengder().length;
   h+='<div class="card" style="padding:12px 14px">';
   h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">';
   h+='<span>I dag: <b>'+(dag?'dag '+dag:'\u2013')+'</b></span>';
   h+='<span>Neste ventet: <b>'+(mensNesteDato()?fmtDate(mensNesteDato())+(dager!=null?' ('+(dager<0?'forsinket '+Math.abs(dager):'om '+dager)+' dag'+(Math.abs(dager)===1?'':'er')+')':''):'\u2013')+'</b></span>';
   h+='</div>';
   h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px;align-items:center">';
-  h+='<span>Snitt syklus: '+(ektSyklus?'<b style="color:var(--ink)">'+snittS+' dager</b>'
-      :'<input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(mensManuellSyklus||'')+'" placeholder="?" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="mensManuellSyklus=Number(this.value)||null;save();render()"> dager (ditt anslag)')+'</span>';
-  h+='<span>Snitt varighet: '+(ektVarighet?'<b style="color:var(--ink)">'+snittL+' dager</b>'
-      :'<input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(mensManuellVarighet||'')+'" placeholder="?" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="mensManuellVarighet=Number(this.value)||null;save();render()"> dager (ditt anslag)')+'</span>';
+  h+='<span>Kjent snitt syklus \u2013 <input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(mensManuellSyklus||'')+'" placeholder="'+(beregnetSyklus||'?')+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="mensManuellSyklus=Number(this.value)||null;save();render()"> dager</span>';
+  h+='<span>Kjent varighet \u2013 <input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(mensManuellVarighet||'')+'" placeholder="'+(beregnetVarighet||'?')+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="mensManuellVarighet=Number(this.value)||null;save();render()"> dager</span>';
   h+='</div>'
-    +(!ektSyklus||!ektVarighet?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Egne anslag brukes til \u00e5 regne ut neste ventet, helt til det finnes nok logget data \u2014 da tar de faktiske tallene over av seg selv.</div>':'')
-    +'</div>';
+    +'<div style="font-size:11px;color:var(--muted);margin-top:4px">Disse to styrer \u00abneste ventet\u00bb og kalenderen. Skriv inn det du selv vet fra f\u00f8r \u2014 det overstyres aldri automatisk av det appen logger.</div>';
+  if(antSykluser>0&&(mensManuellSyklus||mensManuellVarighet)){
+    h+='<div style="font-size:11px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)">'
+      +'Appens egen utregning s\u00e5 langt: '+(beregnetSyklus?beregnetSyklus+' dagers syklus':'')+(beregnetSyklus&&beregnetVarighet?', ':'')+(beregnetVarighet?beregnetVarighet+' dagers varighet':'')+' (basert p\u00e5 '+antSykluser+' logget'+(antSykluser===1?'':'e')+' syklus'+(antSykluser===1?'':'er')+')'
+      +' <button class="icon-btn" style="font-size:10px;padding:0 6px" onclick="mensManuellSyklus=null;mensManuellVarighet=null;save();render()">Bruk appens tall i stedet</button>'
+      +'</div>';
+  }
+  h+='</div>';
 
   h+=mensDagMerkerHTML(isoDate(today),'I dag');
 
@@ -2124,6 +2146,17 @@ function load(){
       if(glInv)glInv.catId=paLager.id;
     }
     try{localStorage.setItem(SK+'_garnlagerkat1','1');}catch(e){}
+    save();
+  }
+
+  // Vitale data opprettes som underkategori under Helse, og menstruasjon flyttes dit
+  var vd1=false;try{vd1=!!localStorage.getItem(SK+'_vitaledata1');}catch(e){}
+  if(!vd1){
+    var helseCat=cats.find(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='helse';});
+    if(helseCat&&!cats.some(function(c){return c.parentId===helseCat.id&&(c.name||'').toLowerCase()==='vitale data';})){
+      cats.push({id:'c_vitaledata_helse',name:'Vitale data',parentId:helseCat.id});
+    }
+    try{localStorage.setItem(SK+'_vitaledata1','1');}catch(e){}
     save();
   }
 
@@ -8502,7 +8535,7 @@ function render(){
   else if(view.kind==='varetelling')content=varetellingHubViewHTML();
   else if(view.kind==='folk')content=folkViewHTML();
   else if(view.kind==='kreativitet')content=kreativitetViewHTML();
-  else if(view.kind==='helse')content=katSideHTML('helse','Helse','kat_helse',showMens?mensKortHTML():'');
+  else if(view.kind==='helse')content=katSideHTML('helse','Helse','kat_helse');
   else if(view.kind==='mens')content=showMens?mensViewHTML():
     ('<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goHelse()">\u2039</button></div>'
     +'<div class="card"><div class="empty">Menstruasjonstrackeren er sl\u00e5tt av. Skru den p\u00e5 igjen under Innstillinger \u2192 Personlig.</div></div>');
