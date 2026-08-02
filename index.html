@@ -1520,6 +1520,8 @@ function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 // ── Menstruasjonstracker ──
 // Datamodell: {id, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|'', note:'', intensity:1-4|null}
 var MENS_NIVAA=[[1,'Litt'],[2,'Moderat'],[3,'Kraftig'],[4,'Uvanlig kraftig']];
+var MENS_SMERTE=[[1,'Ingen'],[2,'Til \u00e5 leve med'],[3,'Plagsomme'],[4,'Ille']];
+function mensLyn(n){return Array(Math.max(0,(Number(n)||0)-1)).fill('\u26a1').join('');}
 function mensDraaper(n){return Array(Number(n)||0).fill('\ud83e\ude78').join('');}
 function mensSorted(){return mens.slice().sort(function(a,b){return a.start<b.start?1:-1;});} // nyeste først
 function mensSiste(){var s=mensSorted();return s.length?s[0]:null;}
@@ -1591,8 +1593,15 @@ function mensViewHTML(){
 
   // Hurtigmerking for i dag — to gjensidig utelukkende par, ett trykk
   var iDag=isoDate(today);
-  var radIDag=mensDagFor(iDag)||{energi:'',fokus:''};
+  var radIDag=mensDagFor(iDag)||{energi:'',fokus:'',intensity:'',smerte:''};
   h+='<div class="sec-title">I dag</div><div class="card" style="padding:10px 14px">'
+    +'<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
+        return'<button class="chip'+(Number(radIDag.intensity)===n[0]?' on':'')+'" onclick="mensSettDagIntensity(\''+iDag+'\','+n[0]+')">'+mensDraaper(n[0])+' '+n[1]+'</button>';
+      }).join('')+'</div>'
+    +'<div class="chips" style="margin-bottom:6px">'+MENS_SMERTE.map(function(n){
+        var lyn=mensLyn(n[0]);
+        return'<button class="chip'+(Number(radIDag.smerte)===n[0]?' on':'')+'" onclick="mensSettDagSmerte(\''+iDag+'\','+n[0]+')">'+(lyn?lyn+' ':'')+n[1]+'</button>';
+      }).join('')+'</div>'
     +'<div class="chips" style="margin-bottom:6px">'
     +'<button class="chip'+(radIDag.energi==='slapp'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'energi\',\'slapp\')">Slapp</button>'
     +'<button class="chip'+(radIDag.energi==='energisk'?' on':'')+'" onclick="mensSettDag(\''+iDag+'\',\'energi\',\'energisk\')">Energisk</button>'
@@ -1607,7 +1616,9 @@ function mensViewHTML(){
   if(sisteDager.length){
     h+='<div class="sec-title">Siste merkede dager</div><div class="card">'+sisteDager.map(function(r){
       var sd=mensSyklusdagForDato(r.date);
-      var merker=[r.energi==='slapp'?'slapp':r.energi==='energisk'?'energisk':'',
+      var merker=[r.intensity?mensDraaper(r.intensity):'',
+                  r.smerte?(mensLyn(r.smerte)?mensLyn(r.smerte)+' ':'')+MENS_SMERTE[r.smerte-1][1]:'',
+                  r.energi==='slapp'?'slapp':r.energi==='energisk'?'energisk':'',
                   r.fokus==='fokusert'?'fokusert':r.fokus==='ufokusert'?'ufokusert':''].filter(Boolean).join(' \u00b7 ');
       return'<div class="entry-row"><div class="entry-body"><div class="entry-text" style="font-size:13px">'+fmtDate(r.date)+(sd?' <span style="font-size:11px;color:var(--muted)">\u00b7 syklusdag '+sd+'</span>':'')+'</div>'
         +(merker?'<div class="entry-date">'+esc(merker)+'</div>':'')+'</div></div>';
@@ -1623,26 +1634,26 @@ function mensViewHTML(){
   h+='<div class="card">'+sorted.map(function(m){
     var lengde=m.end&&m.end>=m.start?Math.round((new Date(m.end)-new Date(m.start))/86400000)+1:null;
     return'<div class="entry-row" style="cursor:pointer" onclick="openEditMens(\''+q(m.id)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+fmtDate(m.start)+(m.end?' \u2013 '+fmtDate(m.end):'')+(lengde?' <span style="font-size:11px;color:var(--muted)">\u00b7 '+lengde+' dager</span>':'')+(m.intensity?' '+mensDraaper(m.intensity):'')+'</div>'
+      +'<div class="entry-body"><div class="entry-text">'+fmtDate(m.start)+(m.end?' \u2013 '+fmtDate(m.end):'')+(lengde?' <span style="font-size:11px;color:var(--muted)">\u00b7 '+lengde+' dager</span>':'')+'</div>'
       +(m.note?'<div class="entry-date">'+esc(m.note)+'</div>':'')+'</div>'
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
   }).join('')+'</div>';
   return h;
 }
-function openMensModal(){modal={step:'mens',form:{start:isoDate(today),end:'',note:'',intensity:''}};render();}
+function openMensModal(){modal={step:'mens',form:{start:isoDate(today),end:'',note:''}};render();}
 function openEditMens(id){
   var m=mens.find(function(x){return x.id===id;});if(!m)return;
-  modal={step:'mens_edit',form:{id:id,start:m.start,end:m.end||'',note:m.note||'',intensity:m.intensity||''}};render();
+  modal={step:'mens_edit',form:{id:id,start:m.start,end:m.end||'',note:m.note||''}};render();
 }
 function submitMens(){
   var f=mf();if(!f.start)return;
-  mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:f.start,end:f.end||'',note:(f.note||'').trim(),intensity:f.intensity||''});
+  mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:f.start,end:f.end||'',note:(f.note||'').trim()});
   save();closeModal();
 }
 function saveEditMens(){
   var f=mf();if(!f.start)return;
   var m=mens.find(function(x){return x.id===f.id;});if(!m)return;
-  m.start=f.start;m.end=f.end||'';m.note=(f.note||'').trim();m.intensity=f.intensity||'';
+  m.start=f.start;m.end=f.end||'';m.note=(f.note||'').trim();
   save();closeModal();
 }
 function deleteMens(id){mens=mens.filter(function(x){return x.id!==id;});save();closeModal();}
@@ -1651,9 +1662,23 @@ function deleteMens(id){mens=mens.filter(function(x){return x.id!==id;});save();
 function mensDagFor(dato){return mensDag.find(function(x){return x.date===dato;})||null;}
 function mensSettDag(dato,felt,verdi){
   var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:''};mensDag.push(rad);}
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad[felt]=rad[felt]===verdi?'':verdi;
-  if(!rad.energi&&!rad.fokus)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagIntensity(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
+  rad.intensity=Number(rad.intensity)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagSmerte(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
+  rad.smerte=Number(rad.smerte)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 // Syklusdag for en vilk\u00e5rlig dato, ikke bare i dag — brukes til \u00e5 se merkene i sammenheng med syklusen
@@ -2086,6 +2111,22 @@ function load(){
       if(glInv)glInv.catId=paLager.id;
     }
     try{localStorage.setItem(SK+'_garnlagerkat1','1');}catch(e){}
+    save();
+  }
+
+  // Blødningsmengde hørte først til hele perioden — flyttes til startdagen som et dagsmerke,
+  // siden mengden i praksis varierer gjennom mensen
+  var mi1=false;try{mi1=!!localStorage.getItem(SK+'_mensintensitet1');}catch(e){}
+  if(!mi1){
+    mens.forEach(function(m){
+      if(m.intensity){
+        var rad=mensDag.find(function(x){return x.date===m.start;});
+        if(!rad){rad={date:m.start,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
+        if(!rad.intensity)rad.intensity=m.intensity;
+        delete m.intensity;
+      }
+    });
+    try{localStorage.setItem(SK+'_mensintensitet1','1');}catch(e){}
     save();
   }
 
@@ -4518,12 +4559,9 @@ function modalHTML(){
       +'<input class="inp" type="date" value="'+esc(f.start||'')+'" oninput="mf().start=this.value;updateSaveBtn()">'
       +'<label class="field-lbl">Sluttdato <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<input class="inp" type="date" value="'+esc(f.end||'')+'" oninput="mf().end=this.value">'
-      +'<label class="field-lbl">Bl\u00f8dningsmengde <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-      +'<div class="chips">'+MENS_NIVAA.map(function(n){
-          return'<button class="chip'+(Number(f.intensity)===n[0]?' on':'')+'" onclick="mf().intensity=mf().intensity==='+n[0]+'?\'\':'+n[0]+';render()">'+mensDraaper(n[0])+' '+n[1]+'</button>';
-        }).join('')+'</div>'
       +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
       +'<textarea class="inp" rows="2" oninput="mf().note=this.value">'+esc(f.note||'')+'</textarea>'
+      +'<div class="hint">Bl\u00f8dningsmengde logges dag for dag under \u00abI dag\u00bb, siden den som regel endrer seg gjennom mensen.</div>'
       +'<button class="save-btn" onclick="'+(isEditM?'saveEditMens()':'submitMens()')+'" '+(f.start?'':'disabled')+'>Lagre</button>'
       +(isEditM?'<button class="del-full-btn" onclick="deleteMens(\''+q(f.id)+'\')">Slett</button>':'');
 
