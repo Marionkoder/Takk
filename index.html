@@ -322,7 +322,7 @@ var curMonth=today.getMonth()+1;
    routines: {id,name,cats:[subIds],months:[1-12] (tom=alle),log:['YYYY-MM']}
    events:   {id,name,cats:[subIds],year,month,done}
 */
-var entries=[],cats=[],routines=[],events=[],goals=[],laters=[],results=[],inventories=[],budgetRows=[],deposits=[],timeLogs=[];
+var entries=[],cats=[],routines=[],events=[],goals=[],laters=[],results=[],inventories=[],budgetRows=[],deposits=[],timeLogs=[],mens=[];
 var invShowMissing=false;
 var openGoals={};
 var editMode=false;
@@ -356,6 +356,7 @@ var soundOn=true;
 var showStrikk=true;
 var showFolk=true;
 var showHelse=true;
+var showMens=true;
 var showMat=true;
 var showHjem=true;
 var showKomp=true;
@@ -1516,6 +1517,107 @@ function listOversiktViewHTML(){
   return h;
 }
 function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
+// ── Menstruasjonstracker ──
+// Datamodell: {id, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|'', note:''}
+function mensSorted(){return mens.slice().sort(function(a,b){return a.start<b.start?1:-1;});} // nyeste først
+function mensSiste(){var s=mensSorted();return s.length?s[0]:null;}
+function mensSykluslengder(){
+  var s=mens.slice().sort(function(a,b){return a.start<b.start?-1:1;}).map(function(m){return m.start;});
+  var out=[];
+  for(var i=1;i<s.length;i++){
+    var d=Math.round((new Date(s[i])-new Date(s[i-1]))/86400000);
+    if(d>0&&d<90)out.push(d); // filtrerer bort urimelige hopp, f.eks. feilregistreringer
+  }
+  return out;
+}
+function mensSnittSyklus(){
+  var l=mensSykluslengder();if(!l.length)return null;
+  var siste=l.slice(-6);
+  return Math.round(siste.reduce(function(a,b){return a+b;},0)/siste.length);
+}
+function mensSnittLengde(){
+  var l=mens.filter(function(m){return m.start&&m.end&&m.end>=m.start;})
+    .map(function(m){return Math.round((new Date(m.end)-new Date(m.start))/86400000)+1;})
+    .filter(function(d){return d>0&&d<20;});
+  if(!l.length)return null;
+  var siste=l.slice(-6);
+  return Math.round(siste.reduce(function(a,b){return a+b;},0)/siste.length*10)/10;
+}
+function mensDagIDag(){
+  var siste=mensSiste();if(!siste)return null;
+  var d=Math.round((new Date(isoDate(today))-new Date(siste.start))/86400000)+1;
+  return d>0?d:null;
+}
+function mensNesteDato(){
+  var siste=mensSiste();if(!siste)return null;
+  var snitt=mensSnittSyklus();if(!snitt)return null;
+  var d=new Date(siste.start+'T00:00:00');d.setDate(d.getDate()+snitt);
+  return isoDate(d);
+}
+function mensDagerTilNeste(){
+  var neste=mensNesteDato();if(!neste)return null;
+  return Math.round((new Date(neste)-new Date(isoDate(today)))/86400000);
+}
+function goMens(){view={kind:'mens'};drawerOpen=false;render();}
+function mensKortHTML(){
+  var dag=mensDagIDag();
+  var dager=mensDagerTilNeste();
+  var tekst;
+  if(!dag)tekst='ingen registrert enn\u00e5';
+  else if(dager==null)tekst='dag '+dag;
+  else if(dager<0)tekst='dag '+dag+' \u00b7 neste ventet, '+Math.abs(dager)+' dag'+(Math.abs(dager)===1?'':'er')+' forsinket';
+  else if(dager===0)tekst='dag '+dag+' \u00b7 neste ventet i dag';
+  else tekst='dag '+dag+' \u00b7 neste ventet om '+dager+' dag'+(dager===1?'':'er');
+  return'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goMens()">'
+    +'<div class="entry-body"><div class="entry-text">Menstruasjon</div>'
+    +'<div class="entry-date">'+esc(tekst)+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+}
+function mensViewHTML(){
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div class="view-title">Menstruasjon</div>';
+  var dag=mensDagIDag(),dager=mensDagerTilNeste(),snittS=mensSnittSyklus(),snittL=mensSnittLengde();
+  h+='<div class="card" style="padding:12px 14px">';
+  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">';
+  h+='<span>I dag: <b>'+(dag?'dag '+dag:'\u2013')+'</b></span>';
+  h+='<span>Neste ventet: <b>'+(mensNesteDato()?fmtDate(mensNesteDato())+(dager!=null?' ('+(dager<0?'forsinket '+Math.abs(dager):'om '+dager)+' dag'+(Math.abs(dager)===1?'':'er')+')':''):'\u2013')+'</b></span>';
+  h+='</div>';
+  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px">';
+  h+='<span>Snitt syklus: '+(snittS?snittS+' dager':'ikke nok data enn\u00e5')+'</span>';
+  h+='<span>Snitt varighet: '+(snittL?snittL+' dager':'ikke nok data enn\u00e5')+'</span>';
+  h+='</div></div>';
+  h+='<button class="add-btn" onclick="openMensModal()">+ Registrer</button>';
+  var sorted=mensSorted();
+  if(!sorted.length){
+    h+='<div class="card"><div class="empty">Ingen registreringer enn\u00e5.</div></div>';
+    return h;
+  }
+  h+='<div class="card">'+sorted.map(function(m){
+    var lengde=m.end&&m.end>=m.start?Math.round((new Date(m.end)-new Date(m.start))/86400000)+1:null;
+    return'<div class="entry-row" style="cursor:pointer" onclick="openEditMens(\''+q(m.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+fmtDate(m.start)+(m.end?' \u2013 '+fmtDate(m.end):'')+(lengde?' <span style="font-size:11px;color:var(--muted)">\u00b7 '+lengde+' dager</span>':'')+'</div>'
+      +(m.note?'<div class="entry-date">'+esc(m.note)+'</div>':'')+'</div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+  }).join('')+'</div>';
+  return h;
+}
+function openMensModal(){modal={step:'mens',form:{start:isoDate(today),end:'',note:''}};render();}
+function openEditMens(id){
+  var m=mens.find(function(x){return x.id===id;});if(!m)return;
+  modal={step:'mens_edit',form:{id:id,start:m.start,end:m.end||'',note:m.note||''}};render();
+}
+function submitMens(){
+  var f=mf();if(!f.start)return;
+  mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:f.start,end:f.end||'',note:(f.note||'').trim()});
+  save();closeModal();
+}
+function saveEditMens(){
+  var f=mf();if(!f.start)return;
+  var m=mens.find(function(x){return x.id===f.id;});if(!m)return;
+  m.start=f.start;m.end=f.end||'';m.note=(f.note||'').trim();
+  save();closeModal();
+}
+function deleteMens(id){mens=mens.filter(function(x){return x.id!==id;});save();closeModal();}
 function commitNewUnit(){
   var f=mf();var u=addCustomUnit(f._newUnit||'');
   if(u){f.values=f.values||{};f.values.__unit=u;f.__unitSel=u;}
@@ -1844,6 +1946,7 @@ function load(){
   try{budgetRows=JSON.parse(localStorage.getItem(SK+'_budget')||'[]');}catch(e){budgetRows=[];}
   try{deposits=JSON.parse(localStorage.getItem(SK+'_deposits')||'[]');}catch(e){deposits=[];}
   try{timeLogs=JSON.parse(localStorage.getItem(SK+'_timelogs')||'[]');}catch(e){timeLogs=[];}
+  try{mens=JSON.parse(localStorage.getItem(SK+'_mens')||'[]');}catch(e){mens=[];}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
@@ -1852,6 +1955,7 @@ function load(){
   try{showStrikk=localStorage.getItem(SK+'_strikkmeny')!=='0';}catch(e){showStrikk=true;}
   try{showFolk=localStorage.getItem(SK+'_folkmeny')!=='0';}catch(e){showFolk=true;}
   try{showHelse=localStorage.getItem(SK+'_helsemeny')!=='0';}catch(e){showHelse=true;}
+  try{showMens=localStorage.getItem(SK+'_mensmeny')!=='0';}catch(e){showMens=true;}
   try{showMat=localStorage.getItem(SK+'_matmeny')!=='0';}catch(e){showMat=true;}
   try{showHjem=localStorage.getItem(SK+'_hjemmeny')!=='0';}catch(e){showHjem=true;}
   try{showKomp=localStorage.getItem(SK+'_kompmeny')!=='0';}catch(e){showKomp=true;}
@@ -2398,6 +2502,7 @@ function save(){
   try{localStorage.setItem(SK+'_budget',JSON.stringify(budgetRows));}catch(e){}
   try{localStorage.setItem(SK+'_deposits',JSON.stringify(deposits));}catch(e){}
   try{localStorage.setItem(SK+'_timelogs',JSON.stringify(timeLogs));}catch(e){}
+  try{localStorage.setItem(SK+'_mens',JSON.stringify(mens));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
@@ -2406,6 +2511,7 @@ function save(){
   try{localStorage.setItem(SK+'_strikkmeny',showStrikk?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_folkmeny',showFolk?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_helsemeny',showHelse?'1':'0');}catch(e){}
+  try{localStorage.setItem(SK+'_mensmeny',showMens?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_matmeny',showMat?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_hjemmeny',showHjem?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_kompmeny',showKomp?'1':'0');}catch(e){}
@@ -3149,6 +3255,11 @@ function toggleHelseMeny(){
   if(!showHelse&&view.kind==='helse')view={kind:'personlig'};
   save();render();
 }
+function toggleMensMeny(){
+  showMens=!showMens;
+  if(!showMens&&view.kind==='mens')view={kind:'personlig'};
+  save();render();
+}
 function toggleReiserMeny(){
   showReiser=!showReiser;
   if(!showReiser&&view.kind==='reiser')view={kind:'personlig'};
@@ -3238,6 +3349,12 @@ function personligViewHTML(){
     +'<div style="flex:1"><div class="entry-text">Helse</div>'
     +'<div class="entry-date">prosjekter, rutiner og stikkord for kategorien</div></div>'
     +'<button class="chip'+(showHelse?' on':'')+'" onclick="toggleHelseMeny()">'+(showHelse?'P\u00e5':'Av')+'</button>'
+    +'</div></div>'
+    +'<div class="card" style="padding:12px 14px">'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="flex:1"><div class="entry-text">Menstruasjonstracker</div>'
+    +'<div class="entry-date">kortet p\u00e5 Helse-siden</div></div>'
+    +'<button class="chip'+(showMens?' on':'')+'" onclick="toggleMensMeny()">'+(showMens?'P\u00e5':'Av')+'</button>'
     +'</div></div>'
     +'<div class="card" style="padding:12px 14px">'
     +'<div style="display:flex;align-items:center;gap:8px">'
@@ -3886,7 +4003,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -3905,7 +4022,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -4261,6 +4378,7 @@ function updateSaveBtn(){
   if(step==='cat_new'){
     enabled=(mf()._newMain||'').trim().length>0;
   }
+  if(step==='mens'||step==='mens_edit')enabled=!!(mf().start||'').trim();
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId&&!!mf().subtype;
   if(step==='invsec'||step==='invsec_edit')enabled=(mf().name||'').trim().length>0;
@@ -4346,7 +4464,19 @@ function modalHTML(){
   if(!modal)return'';
   var f=mf(),step=modal.step,body='';
 
-  if(step==='persontags'){
+  if(step==='mens'||step==='mens_edit'){
+    var isEditM=step==='mens_edit';
+    body='<div class="modal-title">'+(isEditM?'Rediger registrering':'Registrer menstruasjon')+'</div>'
+      +'<label class="field-lbl">Startdato</label>'
+      +'<input class="inp" type="date" value="'+esc(f.start||'')+'" oninput="mf().start=this.value;updateSaveBtn()">'
+      +'<label class="field-lbl">Sluttdato <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<input class="inp" type="date" value="'+esc(f.end||'')+'" oninput="mf().end=this.value">'
+      +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<textarea class="inp" rows="2" oninput="mf().note=this.value">'+esc(f.note||'')+'</textarea>'
+      +'<button class="save-btn" onclick="'+(isEditM?'saveEditMens()':'submitMens()')+'" '+(f.start?'':'disabled')+'>Lagre</button>'
+      +(isEditM?'<button class="del-full-btn" onclick="deleteMens(\''+q(f.id)+'\')">Slett</button>':'');
+
+  } else if(step==='persontags'){
     var suggested=Object.keys(allTags()).filter(function(t){return (f.tags||[]).map(normTag).indexOf(normTag(t))<0;}).sort(function(a,b){return allTags()[b]-allTags()[a]||nbSort(a,b);}).slice(0,10);
     body='<div class="modal-title">'+((f.tags||[]).length?'Rediger hashtagger':'Tilknytt hashtagger')+'</div>'
       +'<div class="hint" style="line-height:1.6">Velg hvilke stikkord som handler om '+esc(f.person)+'. Innlegg i takknemlighetsboka med disse stikkordene vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og folk med samme navn holdes fra hverandre.</div>'
@@ -5587,7 +5717,7 @@ function sidebarHTML(){
   // Kategorisidene: alfabetisk, hver med sin egen kategorifarge — som stripene ellers
   [{vis:showFolk,navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
    {vis:showStrikk,navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
-   {vis:showHelse,navn:'Helse',fn:'goHelse()',kat:'helse',kinds:['helse']},
+   {vis:showHelse,navn:'Helse',fn:'goHelse()',kat:'helse',kinds:['helse','mens']},
    {vis:showMat,navn:'Mat og drikke',fn:'goMatDrikke()',kat:'mat og drikke',kinds:['matdrikke']},
    {vis:showHjem,navn:'Hjem',fn:'goHjem2()',kat:'hjem',kinds:['hjemkat']},
    {vis:showKomp,navn:'Kompetanse',fn:'goKompetanse()',kat:'kompetanse',kinds:['kompetanse']},
@@ -8226,7 +8356,10 @@ function render(){
   else if(view.kind==='varetelling')content=varetellingHubViewHTML();
   else if(view.kind==='folk')content=folkViewHTML();
   else if(view.kind==='kreativitet')content=kreativitetViewHTML();
-  else if(view.kind==='helse')content=katSideHTML('helse','Helse','kat_helse');
+  else if(view.kind==='helse')content=katSideHTML('helse','Helse','kat_helse',showMens?mensKortHTML():'');
+  else if(view.kind==='mens')content=showMens?mensViewHTML():
+    ('<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goHelse()">\u2039</button></div>'
+    +'<div class="card"><div class="empty">Menstruasjonstrackeren er sl\u00e5tt av. Skru den p\u00e5 igjen under Innstillinger \u2192 Personlig.</div></div>');
   else if(view.kind==='matdrikke')content=katSideHTML('mat og drikke','Mat og drikke','kat_mat');
   else if(view.kind==='hjemkat')content=katSideHTML('hjem','Hjem','kat_hjem');
   else if(view.kind==='kompetanse')content=katSideHTML('kompetanse','Kompetanse','kat_komp');
