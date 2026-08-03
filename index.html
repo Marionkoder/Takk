@@ -668,9 +668,13 @@ function goInnkjop(){var iv=findFixedList('anskaffelser');if(iv)goInventar(iv.id
 // sett er ting man eier, i likhet med selve utstyrslista.
 function egneListerHTML(){
   var h='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
-  var invs=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')==='inventar';}).sort(function(a,b){return nbSort(a.name,b.name);});
+  // Lister uten kategori havner her — de med kategori vises nå på sin egen kategoriside
+  var invs=inventories.filter(function(iv){
+    var ic=iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[]);
+    return!iv.fixed&&(iv.type||'inventar')==='inventar'&&!ic.length;
+  }).sort(function(a,b){return nbSort(a.name,b.name);});
   if(invs.length){
-    h+='<div class="sec-title">Egne lister</div><div class="card">'
+    h+='<div class="sec-title">Egne lister <span style="font-weight:400;color:var(--rose)">\u00b7 uten kategori</span></div><div class="card">'
       +invs.map(function(inv){
         var c=invCounts(inv);
         return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
@@ -850,6 +854,7 @@ function garnmatchViewHTML(){
 function nyKatProsjekt(catId){openProjModal();mf().catIds=[catId];render();}
 function nyKatRutine(catId){openRoutineModal();mf().cats=[catId];render();}
 function nyKatHendelse(catId){openEventModal();mf().cats=[catId];render();}
+function nyKatListe(catId){openInvModal();mf().catIds=[catId];render();}
 // Underkategoriene som egne bokser — delt mellom Folk og de generiske kategorisidene.
 // alleEvs/naereIds er hendelsene siden allerede har bestemt hva som vises andre steder,
 // så en hendelse ikke dukker opp både i «Kommende» og i sin egen boks.
@@ -866,10 +871,15 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     var uEvs=alleEvs.filter(function(e){return!naereIds[e.id]&&(e.cats||[]).indexOf(uc.id)>=0;});
     // Faste lister knyttet til denne underkategorien — f.eks. et lager
     var uLager=inventories.filter(function(iv){return iv.fixed&&iv.catId===uc.id;});
+    // Egne, ikke-faste lister merket med underkategorien
+    var uListe=inventories.filter(function(iv){
+      var ic=iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[]);
+      return!iv.fixed&&(iv.type||'inventar')==='inventar'&&ic.indexOf(uc.id)>=0;
+    }).sort(function(a,b){return nbSort(a.name,b.name);});
     // Menstruasjonstrackeren hører hjemme i «Vitale data», ikke i noen liste
     var erVitale=showMens&&(uc.name||'').toLowerCase()==='vitale data';
     h+='<div class="sec-title">'+esc(uc.name)+'</div><div class="card">';
-    if(!uInv.length&&!uRts.length&&!uEvs.length&&!uLager.length&&!erVitale){
+    if(!uInv.length&&!uRts.length&&!uEvs.length&&!uLager.length&&!uListe.length&&!erVitale){
       h+='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt, en rutine eller en plan.</div>';
     }
     if(erVitale){
@@ -878,11 +888,11 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
         +'<div class="entry-date">'+esc(mensKortTekst())+'</div></div>'
         +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     }
-    uLager.forEach(function(iv){
+    uLager.concat(uListe).forEach(function(iv){
       var c=invCounts(iv);
       h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
         +'<div class="entry-body"><div class="entry-text">'+esc(iv.name)+'</div>'
-        +'<div class="entry-date">liste \u00b7 '+c.total+' oppf\u00f8ring'+(c.total===1?'':'er')+'</div></div>'
+        +'<div class="entry-date">liste \u00b7 '+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
         +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     });
     uInv.forEach(function(iv){
@@ -1146,7 +1156,8 @@ function folkViewHTML(){
 
   h+='<div style="padding:2px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="nyKatProsjekt(\''+q(cat.id)+'\')">+ Nytt prosjekt</button> '
     +'<button class="icon-btn" style="font-size:11px" onclick="nyKatRutine(\''+q(cat.id)+'\')">+ Ny rutine</button> '
-    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatHendelse(\''+q(cat.id)+'\')">+ Ny plan</button></div>';
+    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatHendelse(\''+q(cat.id)+'\')">+ Ny plan</button> '
+    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatListe(\''+q(cat.id)+'\')">+ Ny liste</button></div>';
 
   // Underkategorier som egne bokser — samme mønster som de andre kategorisidene
   h+=katUnderBokserHTML(cat,evs,{});
@@ -1211,7 +1222,8 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
 
   h+='<div style="padding:2px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="nyKatProsjekt(\''+q(cat.id)+'\')">+ Nytt prosjekt</button> '
     +'<button class="icon-btn" style="font-size:11px" onclick="nyKatRutine(\''+q(cat.id)+'\')">+ Ny rutine</button> '
-    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatHendelse(\''+q(cat.id)+'\')">+ Ny plan</button></div>';
+    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatHendelse(\''+q(cat.id)+'\')">+ Ny plan</button> '
+    +'<button class="icon-btn" style="font-size:11px" onclick="nyKatListe(\''+q(cat.id)+'\')">+ Ny liste</button></div>';
 
   // Underkategorier som egne bokser
   h+=katUnderBokserHTML(cat,alleEvs,naereIds);
@@ -1250,6 +1262,21 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
         return'<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
           +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
           +'<div class="entry-date">'+esc(freqShort(r))+'</div></div>'
+          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+      }).join('')+'</div>';
+  }
+
+  var listeInv=inventories.filter(function(iv){
+    var ic=iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[]);
+    return!iv.fixed&&(iv.type||'inventar')==='inventar'&&inCat(ic)&&!iUnder(ic);
+  }).sort(function(a,b){return nbSort(a.name,b.name);});
+  if(listeInv.length){
+    h+='<div class="sec-title">Lister</div><div class="card">'
+      +listeInv.map(function(iv){
+        var c=invCounts(iv);
+        return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
+          +'<div class="entry-body"><div class="entry-text">'+esc(iv.name)+'</div>'
+          +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
           +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
       }).join('')+'</div>';
   }
@@ -3923,8 +3950,8 @@ function removeInvField(fid){mf().fields=(mf().fields||[]).filter(function(x){re
 function submitInv(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
-  var catIds=f.type==='prosjekt'?(f.catIds||[]):[];
-  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,tags:f.tags||[],description:(f.description||'').trim(),amountType:f.amountType||'',targetAmount:parseKr(f.targetAmount),hoursMode:f.hoursMode==='monthly'?'monthly':'total',type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,sew:f.subtype==='sy'?f.sew:undefined,maint:(f.subtype==='vedlikehold'||f.subtype==='oppussing')?f.maint:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:f.type==='prosjekt'?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.type==='prosjekt'?f.trackHours!==false:undefined,varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:f.type==='pakke'?JSON.parse(JSON.stringify(PAKKE_DEFAULT_SEKSJONER)):[],items:[]};
+  var catIds=(f.type==='prosjekt'||f.type==='inventar')?(f.catIds||[]):[];
+  var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,tags:f.tags||[],description:(f.description||'').trim(),amountType:f.amountType||'',targetAmount:parseKr(f.targetAmount),hoursMode:f.hoursMode==='monthly'?'monthly':'total',type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,sew:f.subtype==='sy'?f.sew:undefined,maint:(f.subtype==='vedlikehold'||f.subtype==='oppussing')?f.maint:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:(f.type==='prosjekt'||f.type==='inventar')?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.type==='prosjekt'?f.trackHours!==false:undefined,varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:f.type==='pakke'?JSON.parse(JSON.stringify(PAKKE_DEFAULT_SEKSJONER)):[],items:[]};
   
   inventories.push(inv);save();closeModal();goInventar(inv.id);
 }
@@ -3932,8 +3959,8 @@ function saveEditInv(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var inv=invById(f.id);if(!inv)return;
-  var catIds=f.type==='prosjekt'?(f.catIds||[]):[];
-  inv.name=name;inv.tags=f.tags||[];inv.description=(f.description||'').trim();inv.amountType=f.amountType||'';inv.targetAmount=parseKr(f.targetAmount);inv.hoursMode=f.hoursMode==='monthly'?'monthly':'total';inv.forutsetninger=(f.forutsetninger||'').trim();inv.risikoer=(f.risikoer||'').trim();inv.type=f.type||'inventar';inv.subtype=f.subtype||'';inv.pakkeFast=f.type==='pakke'?!!f.pakkeFast:undefined;if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;if(f.subtype==='sy')inv.sew=f.sew;else delete inv.sew;if(f.subtype==='vedlikehold'||f.subtype==='oppussing')inv.maint=f.maint;else delete inv.maint;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=f.type==='prosjekt'?(catIds[0]||''):(f.catId||'');inv.catIds=catIds;if(f.type==='prosjekt')inv.resources=(f.resources||'').trim();inv.hoursTotal=numVal(f.hoursTotal)||'';if(f.type==='prosjekt')inv.trackHours=f.trackHours!==false;inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
+  var catIds=(f.type==='prosjekt'||f.type==='inventar')?(f.catIds||[]):[];
+  inv.name=name;inv.tags=f.tags||[];inv.description=(f.description||'').trim();inv.amountType=f.amountType||'';inv.targetAmount=parseKr(f.targetAmount);inv.hoursMode=f.hoursMode==='monthly'?'monthly':'total';inv.forutsetninger=(f.forutsetninger||'').trim();inv.risikoer=(f.risikoer||'').trim();inv.type=f.type||'inventar';inv.subtype=f.subtype||'';inv.pakkeFast=f.type==='pakke'?!!f.pakkeFast:undefined;if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;if(f.subtype==='sy')inv.sew=f.sew;else delete inv.sew;if(f.subtype==='vedlikehold'||f.subtype==='oppussing')inv.maint=f.maint;else delete inv.maint;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=(f.type==='prosjekt'||f.type==='inventar')?(catIds[0]||''):(f.catId||'');inv.catIds=catIds;if(f.type==='prosjekt')inv.resources=(f.resources||'').trim();inv.hoursTotal=numVal(f.hoursTotal)||'';if(f.type==='prosjekt')inv.trackHours=f.trackHours!==false;inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
   save();closeModal();
 }
 function deleteInv(id){
@@ -4990,7 +5017,25 @@ function modalHTML(){
          +'<button class="chip'+(!f.pakkeFast?' on':'')+'" onclick="mf().pakkeFast=false;render()">For en hendelse</button>'
          +'</div>'
          +'<div class="hint">'+(f.pakkeFast?'En fast pakkeliste brukes om igjen \u2014 til sv\u00f8mmehallen, treningsbagen, hva det skal v\u00e6re \u2014 og trenger ingen hendelse.':'Knyttes til turen eller anledningen den pakkes for.')+'</div>'
-        :''))
+        :(f.type==='inventar'
+        ?'<label class="field-lbl">Kategori(er) <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+         +'<div class="chips">'+cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);}).map(function(c){
+            var valgtL=f.catIds||[];
+            var on=valgtL.indexOf(c.id)>=0;
+            var under=cats.filter(function(x){return x.parentId===c.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
+            var noenUnder=under.some(function(x){return valgtL.indexOf(x.id)>=0;});
+            var ut='<button class="chip'+(on?' on':'')+'" onclick="toggleProjCat(\''+q(c.id)+'\')">'+esc(c.name)+'</button>';
+            if(under.length&&(on||noenUnder)){
+              ut+='<div style="width:100%;display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px 14px">'
+                +under.map(function(x){
+                  var uon=valgtL.indexOf(x.id)>=0;
+                  return'<button class="chip'+(uon?' on':'')+'" style="font-size:11px;padding:3px 9px" onclick="toggleProjCat(\''+q(x.id)+'\')">'+esc(x.name)+'</button>';
+                }).join('')+'</div>';
+            }
+            return ut;
+          }).join('')+'</div>'
+         +'<div class="hint">Uten kategori havner lista under \u00abEgne lister\u00bb p\u00e5 Utstyr-siden.</div>'
+        :'')))
       +(isProjM
         ?'<label class="field-lbl">Prosjekttype</label>'
          +'<div class="chips">'+PROSJEKTTYPER.map(function(t){
@@ -7718,11 +7763,11 @@ function inventarViewHTML(){
   }
   if(inv.fixed!=='utstyr'&&inv.fixed!=='forbruksvarer'){
     var masterUt=findFixedList('utstyr');
-    if(masterUt&&(masterUt.items||[]).length){
-      h+='<div class="chips" style="padding:6px 12px 0">'
-        +'<button class="chip" onclick="openInvPick(\''+q(inv.id)+'\',\''+q(masterUt.id)+'\')">+ Hent fra utstyrslista</button>'
-        +'</div>';
-    }
+    var masterFv=findFixedList('forbruksvarer');
+    var hentKnapper=[];
+    if(masterUt&&(masterUt.items||[]).length)hentKnapper.push('<button class="chip" onclick="openInvPick(\''+q(inv.id)+'\',\''+q(masterUt.id)+'\')">+ Hent fra utstyrslista</button>');
+    if(masterFv&&(masterFv.items||[]).length)hentKnapper.push('<button class="chip" onclick="openInvPick(\''+q(inv.id)+'\',\''+q(masterFv.id)+'\')">+ Hent fra forbruksvarelista</button>');
+    if(hentKnapper.length)h+='<div class="chips" style="padding:6px 12px 0">'+hentKnapper.join('')+'</div>';
   }
 
   var itemRow=function(it){
