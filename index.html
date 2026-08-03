@@ -1611,7 +1611,10 @@ function listOversiktViewHTML(){
     var v=it.values||{};
     var qty=v.__qty?esc(v.__qty)+(v.__unit?' '+esc(v.__unit):''):'';
     var needsMaint=v.__tilstand==='M\u00e5 repareres eller vedlikeholdes';
-    return'<div style="display:flex;align-items:baseline;gap:7px;line-height:0.5;padding:5px 14px 5px 6px;margin:1px 8px'+(needsMaint?';background:#FDF3C7;border-radius:5px':'')+'">'
+    // Beredskapsrelevante ting merkes oransje her også, ikke bare i selve lista
+    var bBg=beredBg(it);
+    var bg=bBg?bBg:(needsMaint?'#FDF3C7':'');
+    return'<div style="display:flex;align-items:baseline;gap:7px;line-height:0.5;padding:5px 14px 5px 6px;margin:1px 8px'+(bg?';background:'+bg+';border-radius:5px':'')+'">'
       +'<span style="flex-shrink:0;color:#000;font-size:9px">\u25cf</span>'
       +'<span style="flex:1;font-size:12px;color:var(--ink)">'+esc(it.name)+(qty?' <span style="color:var(--muted);font-size:11px">\u00b7 '+qty+'</span>':'')+'</span>'
       +'</div>';
