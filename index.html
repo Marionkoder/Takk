@@ -663,6 +663,7 @@ function addCustomUnit(u){
 }
 function goLister(){view={kind:'lister'};drawerOpen=false;render();}
 function goBeredskap(){view={kind:'beredskap'};drawerOpen=false;render();}
+function goInnkjop(){var iv=findFixedList('anskaffelser');if(iv)goInventar(iv.id);}
 function goUtstyr(){view={kind:'utstyr'};drawerOpen=false;render();}
 function goForbruksvarer(){view={kind:'forbruksvarer'};drawerOpen=false;render();}
 function goOkonomi(){view={kind:'okonomi'};drawerOpen=false;render();}
@@ -680,7 +681,7 @@ function rrTabsHTML(){
 function goVaretelling(){view={kind:'varetelling'};drawerOpen=false;render();}
 function varetellingHubViewHTML(){
   var h='<div class="view-title">Varetelling</div>'
-    +'<div class="view-sub">Forbruksvarer, beredskap og andre lister du teller opp. Utstyr har f\u00e5tt sin egen side.</div>';
+    +'<div class="view-sub">Forbruksvarer og andre lister du teller opp. Utstyr og Beredskap har f\u00e5tt sine egne sider.</div>';
   var fixedRow=function(key,goFn){
     var inv=findFixedList(key);
     if(!inv)return'';
@@ -691,11 +692,6 @@ function varetellingHubViewHTML(){
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   };
   h+=fixedRow('forbruksvarer','goForbruksvarer');
-  h+=fixedRow('beredskap','goBeredskap');
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goVenteliste()">'
-    +'<div class="entry-body"><div class="entry-text">Venteliste</div>'
-    +'<div class="entry-date">'+laters.length+' ting venter</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
   var invs=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')==='inventar';}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(invs.length){
@@ -8550,7 +8546,11 @@ function render(){
     +'<div class="entry-body"><div class="entry-text">Tid og penger</div>'
     +'<div class="entry-date">timebudsjett og pengeoversikt</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>'
-    +listeKortHTML('anskaffelser','Prioriterte innkj\u00f8p','det du planlegger \u00e5 kj\u00f8pe','goOkonomi'));
+    +listeKortHTML('anskaffelser','Prioriterte innkj\u00f8p','det du planlegger \u00e5 kj\u00f8pe','goInnkjop')
+    +'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goVenteliste()">'
+    +'<div class="entry-body"><div class="entry-text">Venteliste</div>'
+    +'<div class="entry-date">'+laters.length+' ting venter</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>');
   else if(view.kind==='beredskapkat')content=katSideHTML('beredskap','Beredskap','kat_beredskap',
     listeKortHTML('beredskap','Beredskapslista','det du trenger for \u00e5 klare deg selv en uke','goBeredskap'));
   else if(view.kind==='utstyrkat')content=katSideHTML('utstyr','Utstyr','kat_utstyr',
