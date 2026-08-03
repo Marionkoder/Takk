@@ -322,7 +322,7 @@ var curMonth=today.getMonth()+1;
    routines: {id,name,cats:[subIds],months:[1-12] (tom=alle),log:['YYYY-MM']}
    events:   {id,name,cats:[subIds],year,month,done}
 */
-var entries=[],cats=[],routines=[],events=[],goals=[],laters=[],results=[],inventories=[],budgetRows=[],deposits=[],timeLogs=[],mens=[],mensDag=[];
+var entries=[],cats=[],routines=[],events=[],goals=[],laters=[],results=[],inventories=[],budgetRows=[],deposits=[],timeLogs=[],mens=[],mensDag=[],maalinger=[];
 var invShowMissing=false;
 var openGoals={};
 var editMode=false;
@@ -499,11 +499,12 @@ function expStatus(v){
   return{c:'var(--muted)',txt:'utl\u00f8per '+fmtDate(v)};
 }
 function listHasExp(inv){return !!inv&&(inv.fixed==='beredskap'||inv.fixed==='forbruksvarer');}
-// Beredskapsrelevante punkter fargekodes: oransje når de mangler, lysegult når de er på plass.
-// Punkter som ikke er merket beredskapsrelevante får ingen farge.
+// Beredskapsrelevante punkter fargekodes med to tydelig oransje toner — lysere når de
+// er på plass, sterkere når de mangler — begge en annen fargefamilie enn den gule/rav-
+// fargede «gjenstår»/«trenger vedlikehold»-fargen brukt ellers, så det ikke blandes sammen.
 function beredBg(it){
   if(!it||!it.values||it.values.__bered!=='ja')return'';
-  return it.have?'#FDF3C7':'#F8D9BC';
+  return it.have?'#FBDFC4':'#EF9152';
 }
 // Kompakt velger for utstyr og forbruksvarer: viser bare det som er valgt,
 // pluss en nedtrekksliste for å legge til. Unngår en vegg av knapper.
@@ -666,6 +667,114 @@ function goBeredskap(){view={kind:'beredskap'};drawerOpen=false;render();}
 function goInnkjop(){var iv=findFixedList('anskaffelser');if(iv)goInventar(iv.id);}
 // Egne, ikke-faste inventarlister — nå plassert på Utstyr-siden, siden det stort
 // sett er ting man eier, i likhet med selve utstyrslista.
+// ── Måleserier: generisk fremdriftssporing, ikke knyttet til noen bestemt kategori ──
+// Datamodell: {id, navn, enhet, catId, referanser:[{id,verdi,navn}], punkter:[{id,dato,verdi,notat}]}
+function maalingerForKat(catId){return maalinger.filter(function(m){return m.catId===catId;}).sort(function(a,b){return nbSort(a.navn,b.navn);});}
+// Enkel, selvtegnet linjegraf i SVG — ingen eksterne biblioteker. Tegner fra første
+// måling, og viser hver referansebane som en stiplet linje med etikett.
+function maalingGrafSVG(serie){
+  var pts=(serie.punkter||[]).slice().sort(function(a,b){return a.dato<b.dato?-1:1;});
+  if(!pts.length)return'<div class="empty">Ingen m\u00e5linger enn\u00e5.</div>';
+  var refs=serie.referanser||[];
+  var alle=pts.map(function(p){return Number(p.verdi);}).concat(refs.map(function(r){return Number(r.verdi);}));
+  var minV=Math.min.apply(null,alle),maxV=Math.max.apply(null,alle);
+  if(minV===maxV){minV-=1;maxV+=1;}
+  var pad=(maxV-minV)*0.15;minV-=pad;maxV+=pad;
+  var W=320,H=130,ML=8,MR=8,MT=10,MB=18,plotW=W-ML-MR,plotH=H-MT-MB;
+  var xFor=function(i){return pts.length>1?ML+plotW*(i/(pts.length-1)):ML+plotW/2;};
+  var yFor=function(v){return MT+plotH-(v-minV)/(maxV-minV)*plotH;};
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:130px;display:block">';
+  refs.forEach(function(r){
+    var y=yFor(Number(r.verdi));
+    svg+='<line x1="'+ML+'" y1="'+y+'" x2="'+(W-MR)+'" y2="'+y+'" style="stroke:var(--rose);stroke-width:1;stroke-dasharray:4 3"/>'
+      +'<text x="'+(W-MR)+'" y="'+(y-3)+'" style="font-size:8px;fill:var(--muted)" text-anchor="end">'+esc(r.navn?r.navn+' '+r.verdi:String(r.verdi))+'</text>';
+  });
+  if(pts.length>1){
+    var linje=pts.map(function(p,i){return xFor(i)+','+yFor(Number(p.verdi));}).join(' ');
+    svg+='<polyline points="'+linje+'" style="fill:none;stroke:var(--ink);stroke-width:2"/>';
+  }
+  pts.forEach(function(p,i){
+    svg+='<circle cx="'+xFor(i)+'" cy="'+yFor(Number(p.verdi))+'" r="3.5" style="fill:var(--rose)"/>';
+  });
+  var f0=pts[0],fN=pts[pts.length-1];
+  svg+='<text x="'+xFor(0)+'" y="'+(H-4)+'" style="font-size:8px;fill:var(--muted)">'+esc(fmtDate(f0.dato))+'</text>';
+  if(pts.length>1)svg+='<text x="'+xFor(pts.length-1)+'" y="'+(H-4)+'" style="font-size:8px;fill:var(--muted)" text-anchor="end">'+esc(fmtDate(fN.dato))+'</text>';
+  svg+='</svg>';
+  return svg;
+}
+function maalingSerieHTML(serie){
+  var pkt=(serie.punkter||[]).slice().sort(function(a,b){return a.dato<b.dato?1:-1;}); // nyeste øverst
+  var h='<div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">'
+    +'<span>'+esc(serie.navn)+(serie.enhet?' <span style="font-weight:400;color:var(--rose)">('+esc(serie.enhet)+')</span>':'')+'</span>'
+    +'<button class="icon-btn" style="font-size:10px" onclick="openEditMaalingSerie(\''+q(serie.id)+'\')">\u270e</button></div>';
+  h+='<div class="card" style="padding:8px 10px 4px">'+maalingGrafSVG(serie)+'</div>';
+  h+='<div class="card">'+(pkt.length?pkt.map(function(p){
+      return'<div class="entry-row" style="cursor:pointer;padding:6px 14px" onclick="openEditMaalingPunkt(\''+q(serie.id)+'\',\''+q(p.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text" style="font-size:12.5px">'+fmtDate(p.dato)+' \u00b7 '+esc(String(p.verdi).replace('.',','))+(serie.enhet?' '+esc(serie.enhet):'')+'</div>'
+        +(p.notat?'<div class="entry-date">'+esc(p.notat)+'</div>':'')+'</div></div>';
+    }).join(''):'<div class="empty">Ingen m\u00e5linger enn\u00e5.</div>')+'</div>';
+  h+='<div style="padding:4px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openMaalingPunktModal(\''+q(serie.id)+'\')">+ Ny m\u00e5ling</button></div>';
+  return h;
+}
+function maalingerKatHTML(catId){
+  var serier=maalingerForKat(catId);
+  var h='';
+  if(serier.length){
+    h+='<div class="sec-title">M\u00e5linger</div>';
+    serier.forEach(function(s){h+=maalingSerieHTML(s);});
+  }
+  h+='<div style="padding:2px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openMaalingSerieModal(\''+q(catId)+'\')">+ Ny m\u00e5leserie</button></div>';
+  return h;
+}
+function openMaalingSerieModal(catId){modal={step:'maalingserie',form:{navn:'',enhet:'',catId:catId||'',referanser:[]}};render();}
+function openEditMaalingSerie(id){
+  var s=maalinger.find(function(x){return x.id===id;});if(!s)return;
+  modal={step:'maalingserie_edit',form:{id:id,navn:s.navn,enhet:s.enhet||'',catId:s.catId||'',referanser:JSON.parse(JSON.stringify(s.referanser||[]))}};render();
+}
+function addMaalingRef(){var f=mf();f.referanser=(f.referanser||[]).concat([{verdi:'',navn:''}]);render();}
+function rmMaalingRef(i){var f=mf();f.referanser.splice(i,1);render();}
+function maalingRefGyldige(f){
+  return(f.referanser||[]).filter(function(r){return(String(r.verdi||'').trim())!=='';});
+}
+function submitMaalingSerie(){
+  var f=mf();var n=(f.navn||'').trim();if(!n)return;
+  var ref=maalingRefGyldige(f).map(function(r){return{id:'mr'+Date.now()+Math.random().toString(36).slice(2,4),verdi:numVal(r.verdi),navn:(r.navn||'').trim()};});
+  maalinger.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),navn:n,enhet:(f.enhet||'').trim(),catId:f.catId||'',referanser:ref,punkter:[]});
+  save();closeModal();
+}
+function saveEditMaalingSerie(){
+  var f=mf();var n=(f.navn||'').trim();if(!n)return;
+  var s=maalinger.find(function(x){return x.id===f.id;});if(!s)return;
+  s.navn=n;s.enhet=(f.enhet||'').trim();
+  s.referanser=maalingRefGyldige(f).map(function(r){return{id:r.id||('mr'+Date.now()+Math.random().toString(36).slice(2,4)),verdi:numVal(r.verdi),navn:(r.navn||'').trim()};});
+  save();closeModal();
+}
+function deleteMaalingSerie(id){maalinger=maalinger.filter(function(x){return x.id!==id;});save();closeModal();}
+function openMaalingPunktModal(serieId){modal={step:'maalingpunkt',form:{serieId:serieId,dato:isoDate(today),verdi:'',notat:''}};render();}
+function openEditMaalingPunkt(serieId,punktId){
+  var s=maalinger.find(function(x){return x.id===serieId;});if(!s)return;
+  var p=(s.punkter||[]).find(function(x){return x.id===punktId;});if(!p)return;
+  modal={step:'maalingpunkt_edit',form:{serieId:serieId,id:punktId,dato:p.dato,verdi:String(p.verdi).replace('.',','),notat:p.notat||''}};render();
+}
+function maalingVerdiGyldig(v){return/^-?\d+([.,]\d+)?$/.test(String(v||'').trim());}
+function submitMaalingPunkt(){
+  var f=mf();if(!f.dato||!maalingVerdiGyldig(f.verdi))return;
+  var s=maalinger.find(function(x){return x.id===f.serieId;});if(!s)return;
+  s.punkter=(s.punkter||[]).concat([{id:'mp'+Date.now()+Math.random().toString(36).slice(2,6),dato:f.dato,verdi:numVal(f.verdi),notat:(f.notat||'').trim()}]);
+  save();closeModal();
+}
+function saveEditMaalingPunkt(){
+  var f=mf();if(!f.dato||!maalingVerdiGyldig(f.verdi))return;
+  var s=maalinger.find(function(x){return x.id===f.serieId;});if(!s)return;
+  var p=(s.punkter||[]).find(function(x){return x.id===f.id;});if(!p)return;
+  p.dato=f.dato;p.verdi=numVal(f.verdi);p.notat=(f.notat||'').trim();
+  save();closeModal();
+}
+function deleteMaalingPunkt(){
+  var f=mf();var s=maalinger.find(function(x){return x.id===f.serieId;});if(!s)return;
+  s.punkter=(s.punkter||[]).filter(function(x){return x.id!==f.id;});
+  save();closeModal();
+}
 function egneListerHTML(){
   var h='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
   // Lister uten kategori havner her — de med kategori vises nå på sin egen kategoriside
@@ -914,6 +1023,7 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
         +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     });
     h+='</div>';
+    h+=maalingerKatHTML(uc.id);
   });
   h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openNySubCat(\''+q(cat.id)+'\')">+ Ny underkategori</button></div>';
   return h;
@@ -1280,6 +1390,8 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
           +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
       }).join('')+'</div>';
   }
+
+  h+=maalingerKatHTML(cat.id);
 
   return h+katSideSlutt();
 }
@@ -2063,6 +2175,7 @@ function load(){
   try{timeLogs=JSON.parse(localStorage.getItem(SK+'_timelogs')||'[]');}catch(e){timeLogs=[];}
   try{mens=JSON.parse(localStorage.getItem(SK+'_mens')||'[]');}catch(e){mens=[];}
   try{mensDag=JSON.parse(localStorage.getItem(SK+'_mensdag')||'[]');}catch(e){mensDag=[];}
+  try{maalinger=JSON.parse(localStorage.getItem(SK+'_maalinger')||'[]');}catch(e){maalinger=[];}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
@@ -2649,6 +2762,7 @@ function save(){
   try{localStorage.setItem(SK+'_timelogs',JSON.stringify(timeLogs));}catch(e){}
   try{localStorage.setItem(SK+'_mens',JSON.stringify(mens));}catch(e){}
   try{localStorage.setItem(SK+'_mensdag',JSON.stringify(mensDag));}catch(e){}
+  try{localStorage.setItem(SK+'_maalinger',JSON.stringify(maalinger));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
@@ -4009,12 +4123,45 @@ function openEditInvItem(invId,itemId){
   var inv=invById(invId);var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
   modal={step:'invitem_edit',form:{invId:invId,id:itemId,sectionId:it.sectionId,name:it.name,note:it.note||'',mdate:it.date||'',inCal:it.inCal!==false,values:JSON.parse(JSON.stringify(it.values||{})),have:!!it.have}};render();
 }
+// Beredskapsrelevante punkter havner automatisk i Beredskapslista, med samme
+// syncId som den vanlige avhaknings-synken bruker — så «på plass» holder seg i takt
+// begge veier. Fjernes merket, fjernes kopien fra Beredskapslista igjen.
+function ensureBeredskapSync(invId,itemId,skalVaereMed){
+  var ber=findFixedList('beredskap');if(!ber)return;
+  var inv=invById(invId);if(!inv||inv.fixed==='beredskap')return;
+  var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
+  if(!it.syncId)it.syncId=it.id;
+  var existing=itemOnList(it,ber);
+  if(skalVaereMed&&!existing){
+    var values={};
+    (ber.fields||[]).forEach(function(tf){
+      var srcField=(inv.fields||[]).find(function(sf){return sf.name.toLowerCase()===tf.name.toLowerCase();});
+      if(srcField&&(it.values||{})[srcField.id])values[tf.id]=it.values[srcField.id];
+    });
+    var srcVals=it.values||{};
+    if(listHasQty(ber)&&srcVals.__qty){values.__qty=srcVals.__qty;if(srcVals.__unit)values.__unit=srcVals.__unit;}
+    if(srcVals.__farge)values.__farge=srcVals.__farge;
+    if(srcVals.__merke)values.__merke=srcVals.__merke;
+    if(srcVals.__tilstand)values.__tilstand=srcVals.__tilstand;
+    if(listHasDetails(ber)&&srcVals.__kjopt)values.__kjopt=srcVals.__kjopt;
+    if(listHasExp(ber)&&srcVals.__exp)values.__exp=srcVals.__exp;
+    values.__bered='ja';
+    ber.items=(ber.items||[]).concat([{
+      id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:null,
+      name:it.name,note:it.note||'',values:values,have:!!it.have,syncId:it.syncId
+    }]);
+  } else if(!skalVaereMed&&existing){
+    ber.items=(ber.items||[]).filter(function(x){return x.id!==existing.id;});
+  }
+}
 function submitInvItem(){
   var f=mf();var n=(f.name||'').trim();if(!n)return;
   var inv=invById(f.invId);if(!inv)return;
   // I garnleksikonet er navnet garnnavnet — speil det så matchingen finner det igjen
   if(inv.fixed==='garntyper'){f.values=f.values||{};f.values.__garnnavn=n;}
-  inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:f.sectionId||null,name:n,note:(f.note||'').trim(),date:f.mdate||'',inCal:!!f.inCal,values:f.values||{},have:!!f.have,goalIds:f.goalIds||[],resultIds:f.resultIds||[],routineIds:f.routineIds||[],eventIds:f.eventIds||[]}]);
+  var newItem={id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:f.sectionId||null,name:n,note:(f.note||'').trim(),date:f.mdate||'',inCal:!!f.inCal,values:f.values||{},have:!!f.have,goalIds:f.goalIds||[],resultIds:f.resultIds||[],routineIds:f.routineIds||[],eventIds:f.eventIds||[]};
+  inv.items=(inv.items||[]).concat([newItem]);
+  if(inv.fixed==='utstyr'||inv.fixed==='forbruksvarer')ensureBeredskapSync(inv.id,newItem.id,(newItem.values||{}).__bered==='ja');
   save();closeModal();
 }
 function saveEditInvItem(){
@@ -4022,6 +4169,7 @@ function saveEditInvItem(){
   var inv=invById(f.invId);var it=(inv.items||[]).find(function(x){return x.id===f.id;});if(!it)return;
   if(inv.fixed==='garntyper'){f.values=f.values||{};f.values.__garnnavn=n;}
   it.name=n;it.sectionId=f.sectionId||null;it.note=(f.note||'').trim();it.date=f.mdate||'';it.inCal=!!f.inCal;it.values=f.values||{};it.have=!!f.have;
+  if(inv.fixed==='utstyr'||inv.fixed==='forbruksvarer')ensureBeredskapSync(inv.id,it.id,(it.values||{}).__bered==='ja');
   save();closeModal();
 }
 function deleteInvItem(){
@@ -4151,7 +4299,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -4170,7 +4318,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -4527,6 +4675,8 @@ function updateSaveBtn(){
     enabled=(mf()._newMain||'').trim().length>0;
   }
   if(step==='mens'||step==='mens_edit')enabled=!!(mf().start||'').trim();
+  if(step==='maalingserie'||step==='maalingserie_edit')enabled=!!(mf().navn||'').trim();
+  if(step==='maalingpunkt'||step==='maalingpunkt_edit')enabled=!!mf().dato&&maalingVerdiGyldig(mf().verdi);
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId&&!!mf().subtype;
   if(step==='invsec'||step==='invsec_edit')enabled=(mf().name||'').trim().length>0;
@@ -4624,6 +4774,38 @@ function modalHTML(){
       +'<div class="hint">Bl\u00f8dningsmengde logges dag for dag under \u00abI dag\u00bb, siden den som regel endrer seg gjennom mensen.</div>'
       +'<button class="save-btn" onclick="'+(isEditM?'saveEditMens()':'submitMens()')+'" '+(f.start?'':'disabled')+'>Lagre</button>'
       +(isEditM?'<button class="del-full-btn" onclick="deleteMens(\''+q(f.id)+'\')">Slett</button>':'');
+
+  } else if(step==='maalingserie'||step==='maalingserie_edit'){
+    var isEditS=step==='maalingserie_edit';
+    body='<div class="modal-title">'+(isEditS?'Rediger m\u00e5leserie':'Ny m\u00e5leserie')+'</div>'
+      +'<label class="field-lbl">Navn</label>'
+      +'<input class="inp" type="text" value="'+esc(f.navn||'')+'" placeholder="F.eks. Vekt, Langtidsblods\u00fckker, Jernlagre \u2026" oninput="mf().navn=this.value;updateSaveBtn()">'
+      +'<label class="field-lbl">Enhet <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<input class="inp" type="text" value="'+esc(f.enhet||'')+'" placeholder="F.eks. kg, mmol/mol, \u00b5g/L \u2026" oninput="mf().enhet=this.value">'
+      +'<label class="field-lbl">Referansebaner <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +(f.referanser||[]).map(function(r,i){
+          return'<div style="display:flex;gap:6px;align-items:center;margin-top:4px">'
+            +'<input class="inp" type="text" inputmode="decimal" style="width:70px;margin:0" placeholder="verdi" value="'+esc(String(r.verdi==null?'':r.verdi))+'" oninput="this.value=this.value.replace(/[^0-9.,\\-]/g,\'\');mf().referanser['+i+'].verdi=this.value">'
+            +'<input class="inp" type="text" style="flex:1;margin:0" placeholder="F.eks. \u00d8vre grense, M\u00e5l \u2026" value="'+esc(r.navn||'')+'" oninput="mf().referanser['+i+'].navn=this.value">'
+            +'<button class="icon-btn" style="font-size:11px;padding:1px 7px" onclick="rmMaalingRef('+i+')">\u00d7</button>'
+            +'</div>';
+        }).join('')
+      +'<button class="chip-new" style="margin-top:6px" onclick="addMaalingRef()">+ referansebane</button>'
+      +'<div class="hint">Bruk flere referansebaner n\u00e5r noe skal holde seg innenfor et spenn \u2014 for eksempel \u00e9n for \u00f8vre og \u00e9n for nedre grense. Uten noen, monitoreres m\u00e5lingen bare.</div>'
+      +'<button class="save-btn" onclick="'+(isEditS?'saveEditMaalingSerie()':'submitMaalingSerie()')+'" '+((f.navn||'').trim()?'':'disabled')+'>Lagre</button>'
+      +(isEditS?'<button class="del-full-btn" onclick="deleteMaalingSerie(\''+q(f.id)+'\')">Slett m\u00e5leserie</button>':'');
+
+  } else if(step==='maalingpunkt'||step==='maalingpunkt_edit'){
+    var isEditP=step==='maalingpunkt_edit';
+    body='<div class="modal-title">'+(isEditP?'Rediger m\u00e5ling':'Ny m\u00e5ling')+'</div>'
+      +'<label class="field-lbl">Dato</label>'
+      +'<input class="inp" type="date" value="'+esc(f.dato||'')+'" oninput="mf().dato=this.value;updateSaveBtn()">'
+      +'<label class="field-lbl">Verdi</label>'
+      +'<input class="inp" type="text" inputmode="decimal" value="'+esc(String(f.verdi==null?'':f.verdi))+'" oninput="this.value=this.value.replace(/[^0-9.,\\-]/g,\'\');mf().verdi=this.value;updateSaveBtn()">'
+      +'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<textarea class="inp" rows="2" oninput="mf().notat=this.value">'+esc(f.notat||'')+'</textarea>'
+      +'<button class="save-btn" onclick="'+(isEditP?'saveEditMaalingPunkt()':'submitMaalingPunkt()')+'" '+(f.dato&&maalingVerdiGyldig(f.verdi)?'':'disabled')+'>Lagre</button>'
+      +(isEditP?'<button class="del-full-btn" onclick="deleteMaalingPunkt()">Slett m\u00e5ling</button>':'');
 
   } else if(step==='persontags'){
     var suggested=Object.keys(allTags()).filter(function(t){return (f.tags||[]).map(normTag).indexOf(normTag(t))<0;}).sort(function(a,b){return allTags()[b]-allTags()[a]||nbSort(a,b);}).slice(0,10);
@@ -5243,7 +5425,7 @@ function modalHTML(){
           +'<button class="chip'+(dv.__bered==='nei'||!dv.__bered?' on':'')+'" onclick="setItemVal(\'__bered\',\'nei\')">Nei</button>'
           +'</div>'
           +(dv.__bered==='ja'
-            ?'<div class="hint">'+(f.have?'P\u00e5 plass \u2014 vises med lysegul bakgrunn i lista.':'Mangler \u2014 vises med oransje bakgrunn i lista til du setter den som p\u00e5 plass.')+'</div>'
+            ?'<div class="hint">'+(f.have?'P\u00e5 plass \u2014 vises med lys oransje bakgrunn i lista.':'Mangler \u2014 vises med sterkere oransje bakgrunn i lista til du setter den som p\u00e5 plass.')+'</div>'
             :'');
       }
       var fx=invT?(invT.fixed||''):'';
@@ -5344,7 +5526,7 @@ function modalHTML(){
       var dvb=f.values||{};
       if(dvb.__bered!=='ja')return'';
       var on=!!f.have;
-      return'<div style="margin:-4px -4px 10px;padding:8px 12px;border-radius:10px;background:'+(on?'#FDF3C7':'#F8D9BC')+';font-size:12px;font-weight:700;color:var(--ink)">'
+      return'<div style="margin:-4px -4px 10px;padding:8px 12px;border-radius:10px;background:'+(on?'#FBDFC4':'#EF9152')+';font-size:12px;font-weight:700;color:var(--ink)">'
         +'Beredskap \u00b7 '+(on?'p\u00e5 plass':'mangler')+'</div>';
     })()
       +'<div class="modal-title">'+(isEditT?(isProj?'Rediger milep\u00e6l':'Rediger punkt'):(isProj?'Ny milep\u00e6l':'Nytt punkt'))+'</div>'
