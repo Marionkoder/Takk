@@ -664,6 +664,23 @@ function addCustomUnit(u){
 function goLister(){view={kind:'lister'};drawerOpen=false;render();}
 function goBeredskap(){view={kind:'beredskap'};drawerOpen=false;render();}
 function goInnkjop(){var iv=findFixedList('anskaffelser');if(iv)goInventar(iv.id);}
+// Egne, ikke-faste inventarlister — nå plassert på Utstyr-siden, siden det stort
+// sett er ting man eier, i likhet med selve utstyrslista.
+function egneListerHTML(){
+  var h='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
+  var invs=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')==='inventar';}).sort(function(a,b){return nbSort(a.name,b.name);});
+  if(invs.length){
+    h+='<div class="sec-title">Egne lister</div><div class="card">'
+      +invs.map(function(inv){
+        var c=invCounts(inv);
+        return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
+          +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+'</div>'
+          +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
+          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+      }).join('')+'</div>';
+  }
+  return h;
+}
 function goUtstyr(){view={kind:'utstyr'};drawerOpen=false;render();}
 function goForbruksvarer(){view={kind:'forbruksvarer'};drawerOpen=false;render();}
 function goOkonomi(){view={kind:'okonomi'};drawerOpen=false;render();}
@@ -677,34 +694,6 @@ function rrTabsHTML(){
     +'<button class="chip'+(rrTab==='rapporter'?' on':'')+'" onclick="goRapporterRessurs(\'rapporter\')">Rapporter</button>'
     +'<button class="chip'+(rrTab==='ressursbruk'?' on':'')+'" onclick="goRapporterRessurs(\'ressursbruk\')">Ressursbruk</button>'
     +'</div>';
-}
-function goVaretelling(){view={kind:'varetelling'};drawerOpen=false;render();}
-function varetellingHubViewHTML(){
-  var h='<div class="view-title">Varetelling</div>'
-    +'<div class="view-sub">Forbruksvarer og andre lister du teller opp. Utstyr og Beredskap har f\u00e5tt sine egne sider.</div>';
-  var fixedRow=function(key,goFn){
-    var inv=findFixedList(key);
-    if(!inv)return'';
-    var c=invCounts(inv);
-    return'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="'+goFn+'()">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+'</div>'
-      +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' \u00b7 <span style="color:var(--amber)">gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
-      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  };
-  h+=fixedRow('forbruksvarer','goForbruksvarer');
-  h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
-  var invs=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')==='inventar';}).sort(function(a,b){return nbSort(a.name,b.name);});
-  if(invs.length){
-    h+='<div class="sec-title">Egne lister</div><div class="card">'
-      +invs.map(function(inv){
-        var c=invCounts(inv);
-        return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
-          +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+'</div>'
-          +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
-          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-      }).join('')+'</div>';
-  }
-  return h;
 }
 // ── Garnmatching: hvilke oppskrifter dekkes av garnet i lageret? ──
 function garnGrams(it){
@@ -3953,7 +3942,7 @@ function deleteInv(id){
   inventories=inventories.filter(function(i){return i.id!==id;});
   save();closeModal();
   if(wasPakke){goReiser();}
-  else goVaretelling();
+  else goBack();
 }
 var utstyrDrill=[];
 function utstyrDrillInto(id){utstyrDrill.push(id);render();}
@@ -5857,9 +5846,9 @@ function sidebarHTML(){
    {vis:true,navn:'Natur',fn:'goNatur()',kat:'natur',kinds:['natur']},
    {vis:showReiser,navn:'Reiser',fn:'goReiser()',kat:'reiser',kinds:['reiser']},
    {vis:true,navn:'Kultur',fn:'goKultur()',kat:'kultur',kinds:['kultur']},
-   {vis:true,navn:'\u00d8konomi',fn:'goOkonomiKat()',kat:'\u00f8konomi',kinds:['okonomikat','okonomi','budsjett']},
+   {vis:true,navn:'\u00d8konomi',fn:'goOkonomiKat()',kat:'\u00f8konomi',kinds:['okonomikat','okonomi','budsjett','forbruksvarer']},
    {vis:true,navn:'Beredskap',fn:'goBeredskapKat()',kat:'beredskap',kinds:['beredskapkat','beredskap']},
-   {vis:true,navn:'Utstyr',fn:'goUtstyrKat()',kat:'utstyr',kinds:['utstyrkat','utstyr','forbruksvarer']}]
+   {vis:true,navn:'Utstyr',fn:'goUtstyrKat()',kat:'utstyr',kinds:['utstyrkat','utstyr']}]
   .filter(function(k){return k.vis;})
   .sort(function(a,b){return nbSort(a.navn,b.navn);})
   .forEach(function(k){
@@ -5870,7 +5859,6 @@ function sidebarHTML(){
       +'padding-left:10px;text-transform:uppercase;letter-spacing:.03em'+(paa?';font-weight:800':'')+'" onclick="'+k.fn+'">'
       +'<span class="s-arrow"></span>'+esc(k.navn)+'</div>';
   });
-  h+='<div class="side-month'+(view.kind==='varetelling'||view.kind==='utstyr'||view.kind==='forbruksvarer'||view.kind==='beredskap'||view.kind==='inventar'?'" style="color:var(--red)':'')+'" onclick="goVaretelling()"><span class="s-arrow"></span>Varetelling</div>';
   return h;
 }
 
@@ -8528,7 +8516,6 @@ function render(){
   else if(view.kind==='om')content=omViewHTML();
   else if(view.kind==='bursdager')content=bursdagerHubHTML();
   else if(view.kind==='bursdagsliste')content=bursdagslisteViewHTML();
-  else if(view.kind==='varetelling')content=varetellingHubViewHTML();
   else if(view.kind==='folk')content=folkViewHTML();
   else if(view.kind==='kreativitet')content=kreativitetViewHTML();
   else if(view.kind==='helse')content=katSideHTML('helse','Helse','kat_helse');
@@ -8547,6 +8534,7 @@ function render(){
     +'<div class="entry-date">timebudsjett og pengeoversikt</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>'
     +listeKortHTML('anskaffelser','Prioriterte innkj\u00f8p','det du planlegger \u00e5 kj\u00f8pe','goInnkjop')
+    +listeKortHTML('forbruksvarer','Forbruksvarer','det som brukes opp og m\u00e5 fylles p\u00e5','goForbruksvarer')
     +'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goVenteliste()">'
     +'<div class="entry-body"><div class="entry-text">Venteliste</div>'
     +'<div class="entry-date">'+laters.length+' ting venter</div></div>'
@@ -8555,7 +8543,7 @@ function render(){
     listeKortHTML('beredskap','Beredskapslista','det du trenger for \u00e5 klare deg selv en uke','goBeredskap'));
   else if(view.kind==='utstyrkat')content=katSideHTML('utstyr','Utstyr','kat_utstyr',
     listeKortHTML('utstyr','Utstyrslista','ting du eier, ordnet etter bruk og plassering','goUtstyr')
-    +listeKortHTML('forbruksvarer','Forbruksvarer','det som brukes opp og m\u00e5 fylles p\u00e5','goForbruksvarer'));
+    +egneListerHTML());
   else if(view.kind==='grupper')content=grupperViewHTML();
   else if(view.kind==='gruppe')content=gruppeViewHTML();
   else if(view.kind==='strikkeverksted')content=strikkeverkstedViewHTML();
