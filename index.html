@@ -504,7 +504,7 @@ function listHasExp(inv){return !!inv&&(inv.fixed==='beredskap'||inv.fixed==='fo
 // fargede «gjenstår»/«trenger vedlikehold»-fargen brukt ellers, så det ikke blandes sammen.
 function beredBg(it){
   if(!it||!it.values||it.values.__bered!=='ja')return'';
-  return it.have?'#FBDFC4':'#EF9152';
+  return it.have?'#F7C79B':'#EF9152';
 }
 // Kompakt velger for utstyr og forbruksvarer: viser bare det som er valgt,
 // pluss en nedtrekksliste for å legge til. Unngår en vegg av knapper.
@@ -1642,8 +1642,9 @@ function listOversiktViewHTML(){
       +'<div class="card">';
     mangler.forEach(function(it){
       var sec=(inv.sections||[]).find(function(x){return x.id===it.sectionId;});
-      h+='<div class="entry-row"><div class="entry-body">'
-        +'<div class="entry-text" style="color:var(--amber)">'+esc(it.name)+'</div>'
+      var mBg=beredBg(it);
+      h+='<div class="entry-row"'+(mBg?' style="background:'+mBg+'"':'')+'><div class="entry-body">'
+        +'<div class="entry-text" style="color:'+(mBg?'var(--ink)':'var(--amber)')+'">'+esc(it.name)+'</div>'
         +(sec?'<div class="entry-date">'+esc(sec.name)+'</div>':'')
         +(it.planned?'<div class="entry-date" style="color:var(--rose)">innkj\u00f8p planlagt</div>':'')
         +'</div></div>';
