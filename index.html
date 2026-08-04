@@ -1155,6 +1155,46 @@ function nyFolkPlan(){
   render();
 }
 function goFolk(){view={kind:'folk'};drawerOpen=false;render();}
+var bdayBolk='naere';
+// Bursdagsbolken på Folk: tre visninger i samme kort — de nærmeste, hele året, og gaveloggen
+function bdayBolkHTML(soon){
+  if(bdayBolk==='oversikt'){
+    var alle=events.filter(function(e){return e.bday&&!erMinne(e);})
+      .sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
+    if(!alle.length)return'<div class="empty">Ingen bursdager lagt inn enn\u00e5.</div>';
+    return alle.map(function(e){
+      var nAge=bdayNextAge(e);
+      return'<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
+        +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(e.name)+(nAge?' <span style="color:var(--muted);font-size:11px">fyller '+nAge+'</span>':'')+'</div>'
+        +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+'</div></div></div>';
+    }).join('')
+      +'<div style="padding:6px 14px"><button class="icon-btn" style="font-size:11px" onclick="goBursdagsliste()">\u00c5pne full bursdagsliste \u203a</button></div>';
+  }
+  if(bdayBolk==='gaver'){
+    var ideer=gifts.filter(function(g){return g.idea;}).length;
+    var gitt=gifts.filter(function(g){return!g.idea&&!g.received;}).length;
+    var faatt=gifts.filter(function(g){return g.received;}).length;
+    return'<div class="entry-row"><div class="entry-body">'
+      +'<div class="entry-text" style="font-size:13px">'+ideer+' gaveid\u00e9'+(ideer===1?'':'er')+'</div></div></div>'
+      +'<div class="entry-row"><div class="entry-body">'
+      +'<div class="entry-text" style="font-size:13px">'+gitt+' gave'+(gitt===1?'':'r')+' gitt</div></div></div>'
+      +'<div class="entry-row"><div class="entry-body">'
+      +'<div class="entry-text" style="font-size:13px">'+faatt+' gave'+(faatt===1?'':'r')+' f\u00e5tt</div></div></div>'
+      +'<div style="padding:6px 14px"><button class="icon-btn" style="font-size:11px" onclick="goGaver()">\u00c5pne gaveloggen \u203a</button></div>';
+  }
+  // Standard: de neste fjorten dagene
+  if(!soon.length)return'<div class="empty">Ingen de neste fjorten dagene.</div>';
+  return soon.map(function(e){
+    var d=daysToNextBday(e);
+    var nAge=bdayNextAge(e);
+    var round=isRoundBdayNext(e);
+    return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
+      +(round?confettiHTML():'')
+      +'<div class="entry-body"><div class="entry-text" style="font-size:13px">\ud83c\udf82 '+esc(e.name)
+      +(nAge?' fyller '+nAge:'')+(round?' \ud83c\udf89':'')+'</div>'
+      +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
+  }).join('');
+}
 function folkViewHTML(){
   var cat=folkCat();
   var h=katSideStart(cat)+'<div class="view-title">Folk</div>';
@@ -1232,20 +1272,13 @@ function folkViewHTML(){
 
   h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">';
   h+='<div style="flex:1;min-width:0">'
-    +'<div class="sec-title">Bursdager <span style="font-weight:400;color:var(--rose)">\u00b7 14 dager</span></div>'
-    +'<div class="card">'
-    +(soon.length?soon.map(function(e){
-        var d=daysToNextBday(e);
-        var nAge=bdayNextAge(e);
-        var round=isRoundBdayNext(e);
-        return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
-          +(round?confettiHTML():'')
-          +'<div class="entry-body"><div class="entry-text" style="font-size:13px">\ud83c\udf82 '+esc(e.name)
-          +(nAge?' fyller '+nAge:'')+(round?' \ud83c\udf89':'')+'</div>'
-          +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
+    +'<div class="chips" style="padding:10px 0 4px">'
+    +[['naere','Neste 14 dager'],['oversikt','Oversikt'],['gaver','Gavelogg']].map(function(t){
+        return'<button class="chip'+(bdayBolk===t[0]?' on':'')+'" style="font-size:11px" onclick="bdayBolk=\''+t[0]+'\';render()">'+t[1]+'</button>';
       }).join('')
-      :'<div class="empty">Ingen de neste fjorten dagene.</div>')
-    +'</div></div>';
+    +'</div>'
+    +'<div class="card">'+bdayBolkHTML(soon)+'</div>'
+    +'</div>';
   h+='<div style="flex:1;min-width:0">'
     +'<div class="sec-title">Planer med folk</div>'
     +'<div class="card">'+planerHTML()+'</div>'
@@ -1264,15 +1297,6 @@ function folkViewHTML(){
       }).join('')+'</div>';
   }
 
-  // Bursdagsliste og Gavelogg rett på Folk
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBursdagsliste()">'
-    +'<div class="entry-body"><div class="entry-text">Bursdagsliste</div>'
-    +'<div class="entry-date">alle bursdager gjennom \u00e5ret</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goGaver()">'
-    +'<div class="entry-body"><div class="entry-text">Gavelogg</div>'
-    +'<div class="entry-date">gaver gitt og f\u00e5tt, og gaveid\u00e9er</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   var antG=Object.keys(alleGruppeMedlemmer()).length;
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goGrupper()">'
     +'<div class="entry-body"><div class="entry-text">Grupper</div>'
