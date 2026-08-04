@@ -1201,12 +1201,34 @@ function folkViewHTML(){
     return y+'-'+pad(e.month)+'-'+pad(e.day||1);
   };
   var underIdsFolk=cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;});
+  // Alle planer vises her — også de med underkategori, gruppert etter den
   var evs=events.filter(function(e){
     if(e.bday||!inCat(e.cats))return false;
-    if((e.cats||[]).some(function(cid){return underIdsFolk.indexOf(cid)>=0;}))return false;
     if(e.repeat)return true;
     return planDato(e)>=iToday;
   }).sort(function(a,b){return planDato(a)<planDato(b)?-1:1;});
+  var underFolk=cats.filter(function(c){return c.parentId===cat.id;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  var planRad=function(e){
+    return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(e.name)+'</div>'
+      +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div></div>';
+  };
+  var planGruppeHdr=function(navn){
+    return'<div style="padding:6px 14px 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(navn)+'</div>';
+  };
+  var planerHTML=function(){
+    if(!evs.length)return'<div class="empty">Ingen planer framover.</div>';
+    var ut='';
+    // Først de uten underkategori, så én gruppe per underkategori
+    var utenUnder=evs.filter(function(e){return!(e.cats||[]).some(function(cid){return underIdsFolk.indexOf(cid)>=0;});});
+    if(utenUnder.length)ut+=utenUnder.map(planRad).join('');
+    underFolk.forEach(function(uc){
+      var mine=evs.filter(function(e){return(e.cats||[]).indexOf(uc.id)>=0;});
+      if(!mine.length)return;
+      ut+=planGruppeHdr(uc.name)+mine.map(planRad).join('');
+    });
+    return ut;
+  };
 
   h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">';
   h+='<div style="flex:1;min-width:0">'
@@ -1226,14 +1248,7 @@ function folkViewHTML(){
     +'</div></div>';
   h+='<div style="flex:1;min-width:0">'
     +'<div class="sec-title">Planer med folk</div>'
-    +'<div class="card">'
-    +(evs.length?evs.map(function(e){
-        return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
-          +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(e.name)+'</div>'
-          +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div></div>';
-      }).join('')
-      :'<div class="empty">Ingen planer framover.</div>')
-    +'</div>'
+    +'<div class="card">'+planerHTML()+'</div>'
     +'<div style="padding:6px 0 0"><button class="icon-btn" style="font-size:11px" onclick="nyFolkPlan()">+ Ny plan</button></div>'
     +'</div>';
   h+='</div>';
@@ -1270,7 +1285,7 @@ function folkViewHTML(){
     +'<button class="icon-btn" style="font-size:11px" onclick="nyKatListe(\''+q(cat.id)+'\')">+ Ny liste</button></div>';
 
   // Underkategorier som egne bokser — samme mønster som de andre kategorisidene
-  h+=katUnderBokserHTML(cat,evs,{});
+  h+=katUnderBokserHTML(cat,[],{});
   return h+katSideSlutt();
 }
 // Generisk kategoriside — grunnverdi, ordsky, og det kategorien inneholder.
@@ -8262,6 +8277,30 @@ function hashtagsViewHTML(){
     var s=seksjon(mc.id,mc.name,catColor(mc.id),mine);
     if(s){h+=s;noe=true;}
   });
+  // Stikkord knyttet til en underkategori, eller til en kategori som er slettet,
+  // ville ellers falle utenfor alle seksjonene og bli usynlige
+  var plassert={};
+  fritt.forEach(function(t){plassert[t]=1;});
+  mains.forEach(function(mc){tags.forEach(function(t){if(tagCats[t]===mc.id)plassert[t]=1;});});
+  var hjemlose=tags.filter(function(t){return!plassert[t];}).sort(sorter);
+  if(hjemlose.length){
+    var under=cats.filter(function(c){return c.parentId;});
+    var hjemLabel=function(t){
+      var c=under.find(function(x){return x.id===tagCats[t];});
+      if(c){var p=cats.find(function(x){return x.id===c.parentId;});return(p?p.name+' / ':'')+c.name;}
+      return'kategorien finnes ikke lenger';
+    };
+    var apenH=!tagKollaps['__hjemlose'];
+    h+='<div class="sec-title" style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleTagKollaps(\'__hjemlose\')">'
+      +'<span style="flex:1">Andre plasseringer <span style="font-weight:400;color:var(--rose)">\u00b7 '+hjemlose.length+'</span></span>'
+      +'<span style="color:var(--rose)">'+(apenH?'\u2039':'\u203a')+'</span></div>';
+    if(apenH){
+      h+='<div class="card">'+hjemlose.map(function(t){
+        return'<div style="padding:4px 14px 0;font-size:11px;color:var(--muted)">Ligger under: '+esc(hjemLabel(t))+'</div>'+tagRow(t);
+      }).join('')+'</div>';
+    }
+    noe=true;
+  }
   if(!noe)h+='<div class="card"><div class="empty">'+(sokQ?'Ingen stikkord passer s\u00f8ket.':'Ingen stikkord enn\u00e5.')+'</div></div>';
   return h;
 }
