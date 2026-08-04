@@ -1162,8 +1162,8 @@ function bdayBolkHTML(soon){
     var alle=events.filter(function(e){return e.bday&&!erMinne(e);});
     if(!alle.length)return'<div class="empty">Ingen bursdager lagt inn enn\u00e5.</div>';
     var ut='<div style="padding:8px 14px 4px"><button class="icon-btn" style="font-size:11px" onclick="goBursdagsliste()">\u00c5pne full bursdagsliste \u203a</button></div>';
-    // Gruppert på m\u00e5ned, fra inneværende og året rundt
-    for(var k=0;k<12;k++){
+    // Gruppert på måned — de neste tre, fra inneværende
+    for(var k=0;k<3;k++){
       var m=((curMonth-1+k)%12)+1;
       var iMnd=alle.filter(function(e){return e.month===m;})
         .sort(function(a,b){return(a.day||0)-(b.day||0)||nbSort(a.name,b.name);});
