@@ -8205,13 +8205,29 @@ function frittTagCloudHTML(){
   Object.keys(used).forEach(function(t){if(!tagCats[t])counts[t]=used[t];});
   return inlineCloudHTML(counts,'fritt');
 }
+var tagSok='',tagSort='freq',tagKollaps={};
+function setTagSok(v){tagSok=v;render();}
+function toggleTagKollaps(k){tagKollaps[k]=!tagKollaps[k];render();}
 function hashtagsViewHTML(){
   var h='<div class="view-sub" style="padding-top:8px">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
   var counts=allTagsPool();
   var tags=Object.keys(counts);
   if(!tags.length)return h+'<div class="card"><div class="empty">Ingen stikkord enn\u00e5. Legg til stikkord n\u00e5r du skriver innlegg.</div></div>';
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
-  var byFreq=function(a,b){return counts[b]-counts[a]||nbSort(a,b);};
+
+  // Søk og sortering
+  h+='<div style="padding:8px 12px 0">'
+    +'<input class="inp" type="text" style="margin:0" placeholder="S\u00f8k i stikkord \u2026" value="'+esc(tagSok)+'" oninput="setTagSok(this.value)">'
+    +'</div>'
+    +'<div class="chips" style="padding:8px 12px 0">'
+    +'<button class="chip'+(tagSort==='freq'?' on':'')+'" onclick="tagSort=\'freq\';render()">Mest brukt</button>'
+    +'<button class="chip'+(tagSort==='alfa'?' on':'')+'" onclick="tagSort=\'alfa\';render()">Alfabetisk</button>'
+    +'</div>';
+
+  var sokQ=normTag(tagSok);
+  if(sokQ)tags=tags.filter(function(t){return normTag(t).indexOf(sokQ)>=0;});
+  var sorter=tagSort==='alfa'?function(a,b){return nbSort(a,b);}:function(a,b){return counts[b]-counts[a]||nbSort(a,b);};
+
   var tagRow=function(t){
     var tc=tagColor(t);
     return'<div style="padding:8px 14px;border-bottom:1px solid var(--line)">'
@@ -8226,21 +8242,27 @@ function hashtagsViewHTML(){
       }).join('')
       +'</div></div>';
   };
-  // Frittstående gleder øverst — stikkord uten kategori
-  var fritt=tags.filter(function(t){return!tagCats[t];}).sort(byFreq);
-  h+='<div class="sec-title">Frittst\u00e5ende gleder</div>';
-  if(fritt.length)h+='<div class="card">'+fritt.map(tagRow).join('')+'</div>';
-  else h+='<div class="card"><div class="empty">Alle stikkord er knyttet til en kategori.</div></div>';
-  // Deretter hver kategori med sine stikkord
+  // Kollapsbar seksjon — åpen som standard, husker tilstand mellom visninger
+  var seksjon=function(nokkel,tittel,farge,liste){
+    if(!liste.length)return'';
+    var apen=!tagKollaps[nokkel];
+    return'<div class="sec-title" style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleTagKollaps(\''+q(nokkel)+'\')">'
+      +(farge?'<span style="width:11px;height:11px;border-radius:50%;background:'+farge+';display:inline-block;flex-shrink:0"></span>':'')
+      +'<span style="flex:1">'+esc(tittel)+' <span style="font-weight:400;color:var(--rose)">\u00b7 '+liste.length+'</span></span>'
+      +'<span style="color:var(--rose)">'+(apen?'\u2039':'\u203a')+'</span></div>'
+      +(apen?'<div class="card">'+liste.map(tagRow).join('')+'</div>':'');
+  };
+
+  var fritt=tags.filter(function(t){return!tagCats[t];}).sort(sorter);
+  var noe=false;
+  var frittHTML=seksjon('__fritt','Frittst\u00e5ende gleder','',fritt);
+  if(frittHTML){h+=frittHTML;noe=true;}
   mains.forEach(function(mc){
-    var mine=tags.filter(function(t){return tagCats[t]===mc.id;}).sort(byFreq);
-    if(!mine.length)return;
-    var col=catColor(mc.id);
-    h+='<div class="sec-title" style="display:flex;align-items:center;gap:8px">'
-      +(col?'<span style="width:11px;height:11px;border-radius:50%;background:'+col+';display:inline-block"></span>':'')
-      +esc(mc.name)+'</div>'
-      +'<div class="card">'+mine.map(tagRow).join('')+'</div>';
+    var mine=tags.filter(function(t){return tagCats[t]===mc.id;}).sort(sorter);
+    var s=seksjon(mc.id,mc.name,catColor(mc.id),mine);
+    if(s){h+=s;noe=true;}
   });
+  if(!noe)h+='<div class="card"><div class="empty">'+(sokQ?'Ingen stikkord passer s\u00f8ket.':'Ingen stikkord enn\u00e5.')+'</div></div>';
   return h;
 }
 function kategorierViewHTML(){
