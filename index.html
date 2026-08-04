@@ -3446,14 +3446,16 @@ function gavePersonViewHTML(){
       h+='</div>';
     });
   }
-  h+='<div class="sec-title">Hilsener i \u00e5r</div><div class="card" style="padding:8px 0">'
-    +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
-    +'<span style="flex:1;font-size:13px">Bursdagshilsen '+curYear+'</span>'
-    +'<button class="chip'+(greetDone(pn,curYear,'bursdag')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'bursdag\')">'+(greetDone(pn,curYear,'bursdag')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
-    +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
-    +'<span style="flex:1;font-size:13px">Julekort '+curYear+'</span>'
-    +'<button class="chip'+(greetDone(pn,curYear,'jul')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'jul\')">'+(greetDone(pn,curYear,'jul')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
-    +'</div>';
+  if(!erMinne(bd)){
+    h+='<div class="sec-title">Hilsener i \u00e5r</div><div class="card" style="padding:8px 0">'
+      +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
+      +'<span style="flex:1;font-size:13px">Bursdagshilsen '+curYear+'</span>'
+      +'<button class="chip'+(greetDone(pn,curYear,'bursdag')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'bursdag\')">'+(greetDone(pn,curYear,'bursdag')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
+      +'<div style="display:flex;align-items:center;gap:10px;padding:4px 14px">'
+      +'<span style="flex:1;font-size:13px">Julekort '+curYear+'</span>'
+      +'<button class="chip'+(greetDone(pn,curYear,'jul')?' on':'')+'" style="font-size:11px;padding:3px 10px" onclick="toggleGreet(\''+q(pn)+'\','+curYear+',\'jul\')">'+(greetDone(pn,curYear,'jul')?'\u2713 Sendt':'Marker sendt')+'</button></div>'
+      +'</div>';
+  }
   if(!gs.length){
     h+='<div class="card"><div class="empty">Ingen gaver logget for '+esc(pn)+' enn\u00e5. Trykk \u00ab+ Gave\u00bb for \u00e5 registrere en gave eller notere en id\u00e9.</div></div>';
   }
