@@ -1278,7 +1278,8 @@ function folkViewHTML(){
 
   h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">';
   h+='<div style="flex:1;min-width:0">'
-    +'<div class="chips" style="padding:10px 0 4px">'
+    +'<div class="sec-title">Bursdager</div>'
+    +'<div class="chips" style="padding:2px 0 4px">'
     +[['naere','Neste 14 dager'],['oversikt','Oversikt'],['gaver','Gavelogg']].map(function(t){
         return'<button class="chip'+(bdayBolk===t[0]?' on':'')+'" style="font-size:11px" onclick="bdayBolk=\''+t[0]+'\';render()">'+t[1]+'</button>';
       }).join('')
