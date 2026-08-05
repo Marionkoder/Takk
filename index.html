@@ -2383,9 +2383,9 @@ function load(){
     save();
   }
 
-  // Plasseringen fulgte tidligere ikke med til Beredskapslageret. Retter opp for alt
-  // som alt er synkronisert, og fanger samtidig opp merkede punkter som aldri ble kopiert.
-  var bp1=false;try{bp1=!!localStorage.getItem(SK+'_beredskapplass1');}catch(e){}
+  // Plasseringen (__p1/__p2/__p3) fulgte tidligere ikke med til Beredskapslageret.
+  // Retter opp for alt som alt er synkronisert, og fanger opp merkede punkter som aldri ble kopiert.
+  var bp1=false;try{bp1=!!localStorage.getItem(SK+'_beredskapplass2');}catch(e){}
   if(!bp1){
     var berL=inventories.find(function(iv){return iv.fixed==='beredskap';});
     if(berL){
@@ -2397,7 +2397,11 @@ function load(){
           if(!it.syncId)it.syncId=it.id;
           var kopi=(berL.items||[]).find(function(x){return x.syncId===it.syncId;});
           if(kopi){
-            // Fantes fra før, men uten plassering
+            var sv=it.values||{};
+            kopi.values=kopi.values||{};
+            if(sv.__p1)kopi.values.__p1=sv.__p1;
+            if(sv.__p2)kopi.values.__p2=sv.__p2;
+            if(sv.__p3)kopi.values.__p3=sv.__p3;
             if(!kopi.sectionId)kopi.sectionId=speilSeksjonssti(kilde,berL,it.sectionId);
           } else {
             ensureBeredskapSync(kilde.id,it.id,true);
@@ -2405,7 +2409,7 @@ function load(){
         });
       });
     }
-    try{localStorage.setItem(SK+'_beredskapplass1','1');}catch(e){}
+    try{localStorage.setItem(SK+'_beredskapplass2','1');}catch(e){}
     save();
   }
 
@@ -4300,6 +4304,10 @@ function ensureBeredskapSync(invId,itemId,skalVaereMed){
     if(srcVals.__tilstand)values.__tilstand=srcVals.__tilstand;
     if(listHasDetails(ber)&&srcVals.__kjopt)values.__kjopt=srcVals.__kjopt;
     if(listHasExp(ber)&&srcVals.__exp)values.__exp=srcVals.__exp;
+    // Plasseringen ligger i __p1/__p2/__p3, ikke i sectionId
+    if(srcVals.__p1)values.__p1=srcVals.__p1;
+    if(srcVals.__p2)values.__p2=srcVals.__p2;
+    if(srcVals.__p3)values.__p3=srcVals.__p3;
     values.__bered='ja';
     ber.items=(ber.items||[]).concat([{
       id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),
@@ -4307,8 +4315,13 @@ function ensureBeredskapSync(invId,itemId,skalVaereMed){
       name:it.name,note:it.note||'',values:values,have:!!it.have,syncId:it.syncId
     }]);
   } else if(skalVaereMed&&existing){
-    // Holder plasseringen i takt hvis den endres i kilden
+    // Holder plassering og seksjon i takt hvis de endres i kilden
     existing.sectionId=speilSeksjonssti(inv,ber,it.sectionId);
+    var sv=it.values||{};
+    existing.values=existing.values||{};
+    existing.values.__p1=sv.__p1||'';
+    existing.values.__p2=sv.__p2||'';
+    existing.values.__p3=sv.__p3||'';
   } else if(!skalVaereMed&&existing){
     ber.items=(ber.items||[]).filter(function(x){return x.id!==existing.id;});
   }
