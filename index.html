@@ -2383,6 +2383,32 @@ function load(){
     save();
   }
 
+  // Plasseringen fulgte tidligere ikke med til Beredskapslageret. Retter opp for alt
+  // som alt er synkronisert, og fanger samtidig opp merkede punkter som aldri ble kopiert.
+  var bp1=false;try{bp1=!!localStorage.getItem(SK+'_beredskapplass1');}catch(e){}
+  if(!bp1){
+    var berL=inventories.find(function(iv){return iv.fixed==='beredskap';});
+    if(berL){
+      ['utstyr','forbruksvarer'].forEach(function(key){
+        var kilde=inventories.find(function(iv){return iv.fixed===key;});
+        if(!kilde)return;
+        (kilde.items||[]).forEach(function(it){
+          if((it.values||{}).__bered!=='ja')return;
+          if(!it.syncId)it.syncId=it.id;
+          var kopi=(berL.items||[]).find(function(x){return x.syncId===it.syncId;});
+          if(kopi){
+            // Fantes fra før, men uten plassering
+            if(!kopi.sectionId)kopi.sectionId=speilSeksjonssti(kilde,berL,it.sectionId);
+          } else {
+            ensureBeredskapSync(kilde.id,it.id,true);
+          }
+        });
+      });
+    }
+    try{localStorage.setItem(SK+'_beredskapplass1','1');}catch(e){}
+    save();
+  }
+
   // Blødningsmengde hørte først til hele perioden — flyttes til startdagen som et dagsmerke,
   // siden mengden i praksis varierer gjennom mensen
   var mi1=false;try{mi1=!!localStorage.getItem(SK+'_mensintensitet1');}catch(e){}
