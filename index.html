@@ -1784,31 +1784,47 @@ function mensSettSlutt(dato){
   per.end=(per.end===dato)?'':dato;
   save();render();
 }
+// Starter en ny menstruasjon på denne datoen
+function mensStartNy(dato){
+  mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:dato,end:'',note:''});
+  save();render();
+}
 function mensDagMerkerHTML(dato,tittel){
   var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:''};
-  // Perioden som dekker denne datoen — enten pågående, eller allerede avsluttet på nettopp denne dagen
   var per=mensPeriodeFor(dato);
   var erSluttdag=per&&per.end===dato;
-  return'<div class="sec-title">'+esc(tittel)+'</div><div class="card" style="padding:10px 14px">'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
+  var syklusdag=mensSyklusdagForDato(dato);
+  // Sluttknappen først fra dag 3, startknappen først fra dag 20 — så de ikke ligger
+  // i veien de dagene det uansett ikke er aktuelt
+  var visSlutt=per&&(erSluttdag||(syklusdag&&syklusdag>=3));
+  var visStart=!per&&(!syklusdag||syklusdag>=20);
+  var h='<div class="sec-title">'+esc(tittel)+'</div><div class="card" style="padding:10px 14px">';
+  // Blødning og smerte gir bare mening under selve menstruasjonen
+  if(per){
+    h+='<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
         return'<button class="chip'+(Number(rad.intensity)===n[0]?' on':'')+'" onclick="mensSettDagIntensity(\''+dato+'\','+n[0]+')">'+mensDraaper(n[0])+' '+n[1]+'</button>';
       }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_SMERTE.map(function(n){
+      +'<div class="chips" style="margin-bottom:6px">'+MENS_SMERTE.map(function(n){
         var lyn=mensLyn(n[0]);
         return'<button class="chip'+(Number(rad.smerte)===n[0]?' on':'')+'" onclick="mensSettDagSmerte(\''+dato+'\','+n[0]+')">'+(lyn?lyn+' ':'')+n[1]+'</button>';
-      }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'
+      }).join('')+'</div>';
+  }
+  // Energi og fokus gjennom hele syklusen — det er her m\u00f8nsteret viser seg
+  h+='<div class="chips" style="margin-bottom:6px">'
     +'<button class="chip'+(rad.energi==='slapp'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'energi\',\'slapp\')">Slapp</button>'
     +'<button class="chip'+(rad.energi==='energisk'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'energi\',\'energisk\')">Energisk</button>'
     +'</div>'
-    +'<div class="chips"'+(per?' style="margin-bottom:6px"':'')+'>'
+    +'<div class="chips"'+((visSlutt||visStart)?' style="margin-bottom:6px"':'')+'>'
     +'<button class="chip'+(rad.fokus==='fokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'fokusert\')">Fokusert</button>'
     +'<button class="chip'+(rad.fokus==='ufokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'ufokusert\')">Ufokusert</button>'
-    +'</div>'
-    +(per?'<div class="chips">'
-      +'<button class="chip'+(erSluttdag?' on':'')+'" onclick="mensSettSlutt(\''+dato+'\')">'+(erSluttdag?'\u2713 Menstruasjon over':'Menstruasjon over')+'</button>'
-      +'</div>':'')
     +'</div>';
+  if(visSlutt){
+    h+='<div class="chips"><button class="chip'+(erSluttdag?' on':'')+'" onclick="mensSettSlutt(\''+dato+'\')">'+(erSluttdag?'\u2713 Menstruasjon over':'Menstruasjon over')+'</button></div>';
+  }
+  if(visStart){
+    h+='<div class="chips"><button class="chip" onclick="mensStartNy(\''+dato+'\')">Menstruasjonen startet</button></div>';
+  }
+  return h+'</div>';
 }
 function mensViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
@@ -2358,6 +2374,15 @@ function load(){
     save();
   }
 
+  // Beredskapslageret fikk bestemt form i navnet
+  var bn1=false;try{bn1=!!localStorage.getItem(SK+'_beredskapnavn1');}catch(e){}
+  if(!bn1){
+    var berInv=inventories.find(function(iv){return iv.fixed==='beredskap';});
+    if(berInv&&(berInv.name==='Beredskapslager'||berInv.name==='Beredskap'))berInv.name='Beredskapslageret';
+    try{localStorage.setItem(SK+'_beredskapnavn1','1');}catch(e){}
+    save();
+  }
+
   // Blødningsmengde hørte først til hele perioden — flyttes til startdagen som et dagsmerke,
   // siden mengden i praksis varierer gjennom mensen
   var mi1=false;try{mi1=!!localStorage.getItem(SK+'_mensintensitet1');}catch(e){}
@@ -2411,7 +2436,7 @@ function load(){
         catId:'',fields:[],sections:[],items:[]});
     }
     if(!inventories.some(function(iv){return iv.fixed==='beredskap';})){
-      inventories.push({id:'fixed_beredskap',name:'Beredskapslager',type:'inventar',fixed:'beredskap',qty:true,
+      inventories.push({id:'fixed_beredskap',name:'Beredskapslageret',type:'inventar',fixed:'beredskap',qty:true,
         catId:'',fields:[],
         sections:JSON.parse(JSON.stringify(BEREDSKAP_SEKSJONER)),
         items:[]});
@@ -4198,9 +4223,38 @@ function openEditInvItem(invId,itemId){
   var inv=invById(invId);var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
   modal={step:'invitem_edit',form:{invId:invId,id:itemId,sectionId:it.sectionId,name:it.name,note:it.note||'',mdate:it.date||'',inCal:it.inCal!==false,values:JSON.parse(JSON.stringify(it.values||{})),have:!!it.have}};render();
 }
-// Beredskapsrelevante punkter havner automatisk i Beredskapslista, med samme
+// Beredskapsrelevante punkter havner automatisk i Beredskapslageret, med samme
 // syncId som den vanlige avhaknings-synken bruker — så «på plass» holder seg i takt
-// begge veier. Fjernes merket, fjernes kopien fra Beredskapslista igjen.
+// begge veier. Fjernes merket, fjernes kopien fra Beredskapslageret igjen.
+// Speiler en plasseringssti (med eventuelle nivåer over) fra én liste til en annen,
+// og gir tilbake id-en til den innerste seksjonen i målliste
+function speilSeksjonssti(src,target,sectionId){
+  if(!sectionId)return null;
+  var sti=[],guard=0;
+  var sid=sectionId;
+  while(sid&&guard++<10){
+    var sc=(src.sections||[]).find(function(x){return x.id===sid;});
+    if(!sc)break;
+    sti.unshift(sc);
+    sid=sc.parentId||'';
+  }
+  if(!sti.length)return null;
+  target.sections=target.sections||[];
+  var parent='';
+  var sisteId=null;
+  sti.forEach(function(sc){
+    var finnes=target.sections.find(function(x){
+      return(x.name||'').toLowerCase()===(sc.name||'').toLowerCase()&&(x.parentId||'')===parent;
+    });
+    if(!finnes){
+      finnes={id:'sc'+Date.now()+Math.random().toString(36).slice(2,6),name:sc.name,parentId:parent};
+      target.sections.push(finnes);
+    }
+    parent=finnes.id;
+    sisteId=finnes.id;
+  });
+  return sisteId;
+}
 function ensureBeredskapSync(invId,itemId,skalVaereMed){
   var ber=findFixedList('beredskap');if(!ber)return;
   var inv=invById(invId);if(!inv||inv.fixed==='beredskap')return;
@@ -4222,9 +4276,13 @@ function ensureBeredskapSync(invId,itemId,skalVaereMed){
     if(listHasExp(ber)&&srcVals.__exp)values.__exp=srcVals.__exp;
     values.__bered='ja';
     ber.items=(ber.items||[]).concat([{
-      id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:null,
+      id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),
+      sectionId:speilSeksjonssti(inv,ber,it.sectionId),
       name:it.name,note:it.note||'',values:values,have:!!it.have,syncId:it.syncId
     }]);
+  } else if(skalVaereMed&&existing){
+    // Holder plasseringen i takt hvis den endres i kilden
+    existing.sectionId=speilSeksjonssti(inv,ber,it.sectionId);
   } else if(!skalVaereMed&&existing){
     ber.items=(ber.items||[]).filter(function(x){return x.id!==existing.id;});
   }
@@ -6904,6 +6962,7 @@ function dagViewHTML(){
     +(dayMs.length?' '+dayMs.map(milestoneBtnHTML).join(' '):'')
     +'</div></div></div>';
 
+  // Boksen tilpasser seg selv: bl\u00f8dning og smerte bare under mens, energi og fokus alltid
   if(showMens)h+=mensDagMerkerHTML(view.d,isToday?'Menstruasjon \u2014 i dag':'Menstruasjon \u2014 denne dagen');
 
   // Daglige rutiner
@@ -8888,7 +8947,7 @@ function render(){
     +'<div class="entry-date">'+laters.length+' ting venter</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>');
   else if(view.kind==='beredskapkat')content=katSideHTML('beredskap','Beredskap','kat_beredskap',
-    listeKortHTML('beredskap','Beredskapslista','det du trenger for \u00e5 klare deg selv en uke','goBeredskap'));
+    listeKortHTML('beredskap','Beredskapslageret','tvilling av utstyr og forbruksvarer merket beredskapsrelevant','goBeredskap'));
   else if(view.kind==='utstyrkat')content=katSideHTML('utstyr','Utstyr','kat_utstyr',
     listeKortHTML('utstyr','Utstyrslista','ting du eier, ordnet etter bruk og plassering','goUtstyr')
     +egneListerHTML());
