@@ -1768,8 +1768,27 @@ function mensKortHTML(){
 }
 // Dagsmerker for en vilkårlig dato — brukt både på mens-siden (for i dag) og
 // som «tvilling» på Dag-siden i Loggføring, så begge alltid viser samme greie.
+// Perioden som dekker en gitt dato — en pågående periode regnes som løpende til i dag
+function mensPeriodeFor(dato){
+  var iToday3=isoDate(today);
+  return mens.filter(function(m){
+    if(!m.start||dato<m.start)return false;
+    if(m.end)return dato<=m.end;
+    return dato<=iToday3; // pågående
+  }).sort(function(a,b){return a.start<b.start?1:-1;})[0]||null;
+}
+// «Menstruasjon over» setter sluttdato til denne dagen. Trykk igjen for å angre,
+// da regnes perioden som pågående på nytt.
+function mensSettSlutt(dato){
+  var per=mensPeriodeFor(dato);if(!per)return;
+  per.end=(per.end===dato)?'':dato;
+  save();render();
+}
 function mensDagMerkerHTML(dato,tittel){
   var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:''};
+  // Perioden som dekker denne datoen — enten pågående, eller allerede avsluttet på nettopp denne dagen
+  var per=mensPeriodeFor(dato);
+  var erSluttdag=per&&per.end===dato;
   return'<div class="sec-title">'+esc(tittel)+'</div><div class="card" style="padding:10px 14px">'
     +'<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
         return'<button class="chip'+(Number(rad.intensity)===n[0]?' on':'')+'" onclick="mensSettDagIntensity(\''+dato+'\','+n[0]+')">'+mensDraaper(n[0])+' '+n[1]+'</button>';
@@ -1782,10 +1801,14 @@ function mensDagMerkerHTML(dato,tittel){
     +'<button class="chip'+(rad.energi==='slapp'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'energi\',\'slapp\')">Slapp</button>'
     +'<button class="chip'+(rad.energi==='energisk'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'energi\',\'energisk\')">Energisk</button>'
     +'</div>'
-    +'<div class="chips">'
+    +'<div class="chips"'+(per?' style="margin-bottom:6px"':'')+'>'
     +'<button class="chip'+(rad.fokus==='fokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'fokusert\')">Fokusert</button>'
     +'<button class="chip'+(rad.fokus==='ufokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'ufokusert\')">Ufokusert</button>'
-    +'</div></div>';
+    +'</div>'
+    +(per?'<div class="chips">'
+      +'<button class="chip'+(erSluttdag?' on':'')+'" onclick="mensSettSlutt(\''+dato+'\')">'+(erSluttdag?'\u2713 Menstruasjon over':'Menstruasjon over')+'</button>'
+      +'</div>':'')
+    +'</div>';
 }
 function mensViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
