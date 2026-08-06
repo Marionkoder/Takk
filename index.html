@@ -4402,7 +4402,7 @@ function ensureBeredskapSync(invId,itemId,skalVaereMed){
     if(listHasQty(ber)&&srcVals.__qty){values.__qty=srcVals.__qty;if(srcVals.__unit)values.__unit=srcVals.__unit;}
     if(srcVals.__farge)values.__farge=srcVals.__farge;
     if(srcVals.__merke)values.__merke=srcVals.__merke;
-    if(srcVals.__tilstand)values.__tilstand=srcVals.__tilstand;
+    if(srcVals.__tilstand&&inv.fixed!=='forbruksvarer')values.__tilstand=srcVals.__tilstand;
     if(listHasDetails(ber)&&srcVals.__kjopt)values.__kjopt=srcVals.__kjopt;
     if(listHasExp(ber)&&srcVals.__exp)values.__exp=srcVals.__exp;
     // Plasseringen ligger i __p1/__p2/__p3, ikke i sectionId
@@ -4416,13 +4416,31 @@ function ensureBeredskapSync(invId,itemId,skalVaereMed){
       name:it.name,note:it.note||'',values:values,have:!!it.have,syncId:it.syncId
     }]);
   } else if(skalVaereMed&&existing){
-    // Holder plassering og seksjon i takt hvis de endres i kilden
+    // Ekte tvilling: navn, notat og alle relevante felter holdes i takt med kilden.
+    // «__berkat» er kopiens eget felt (hvilke beredskapsunderkategorier den er valgt til)
+    // og skal derfor ikke overskrives.
     existing.sectionId=speilSeksjonssti(inv,ber,it.sectionId);
+    existing.name=it.name;
+    existing.note=it.note||'';
     var sv=it.values||{};
-    existing.values=existing.values||{};
-    existing.values.__p1=sv.__p1||'';
-    existing.values.__p2=sv.__p2||'';
-    existing.values.__p3=sv.__p3||'';
+    var beholdt=(existing.values||{}).__berkat||'';
+    var nyeV={};
+    (ber.fields||[]).forEach(function(tf){
+      var srcField=(inv.fields||[]).find(function(sf){return sf.name.toLowerCase()===tf.name.toLowerCase();});
+      if(srcField&&sv[srcField.id])nyeV[tf.id]=sv[srcField.id];
+    });
+    if(listHasQty(ber)&&sv.__qty){nyeV.__qty=sv.__qty;if(sv.__unit)nyeV.__unit=sv.__unit;}
+    if(sv.__farge)nyeV.__farge=sv.__farge;
+    if(sv.__merke)nyeV.__merke=sv.__merke;
+    if(sv.__tilstand&&inv.fixed!=='forbruksvarer')nyeV.__tilstand=sv.__tilstand;
+    if(listHasDetails(ber)&&sv.__kjopt)nyeV.__kjopt=sv.__kjopt;
+    if(listHasExp(ber)&&sv.__exp)nyeV.__exp=sv.__exp;
+    if(sv.__p1)nyeV.__p1=sv.__p1;
+    if(sv.__p2)nyeV.__p2=sv.__p2;
+    if(sv.__p3)nyeV.__p3=sv.__p3;
+    nyeV.__bered='ja';
+    if(beholdt)nyeV.__berkat=beholdt;
+    existing.values=nyeV;
   } else if(!skalVaereMed&&existing){
     ber.items=(ber.items||[]).filter(function(x){return x.id!==existing.id;});
   }
@@ -5750,7 +5768,7 @@ function modalHTML(){
             :'');
       }
       var fx=invT?(invT.fixed||''):'';
-      var noTilstand=['garnlager','garntyper','strikkeoppskrifter','strikkeutstyr'].indexOf(fx)>=0
+      var noTilstand=['garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','forbruksvarer'].indexOf(fx)>=0
         ||(invT&&(invT.type||'inventar')==='prosjekt');
       var isLeksikon=fx==='garntyper';
       // Garn: type og leverandør — brukes både på oppskrifter og i garnlageret
@@ -8310,7 +8328,7 @@ function inventarViewHTML(){
       dRow.push(dvv.__matVaier?esc(dvv.__matPinner||'?')+'/'+esc(dvv.__matVaier):esc(dvv.__matPinner));
     }
     if(dvv.__merke)dRow.push(esc(dvv.__merke));
-    if(dvv.__tilstand&&(inv.type||'inventar')!=='prosjekt')dRow.push('<span style="color:'+(dvv.__tilstand==='M\u00e5 erstattes'?'var(--red)':dvv.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(dvv.__tilstand)+'</span>');
+    if(dvv.__tilstand&&(inv.type||'inventar')!=='prosjekt'&&inv.fixed!=='forbruksvarer')dRow.push('<span style="color:'+(dvv.__tilstand==='M\u00e5 erstattes'?'var(--red)':dvv.__tilstand==='M\u00e5 repareres eller vedlikeholdes'?'var(--amber)':'var(--muted)')+'">'+esc(dvv.__tilstand)+'</span>');
     if(listHasDetails(inv)&&dvv.__kjopt)dRow.push('kj\u00f8pt '+esc(dvv.__kjopt));
     var twoBtn=listHasDetails(inv);
     var bBg=beredBg(it);
