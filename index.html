@@ -1055,11 +1055,11 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
         +'<div style="flex:1;min-width:0">'
         +'<div class="card" style="padding:6px 0">'
         +(valgte.length?(function(){
-            // Gruppert på plassering — behovene er ulike på de ulike stedene
+            // Gruppert på øverste plasseringsnivå — det er stedet som avgjør behovet her
             var grupper={},rekke=[];
             valgte.forEach(function(it){
               var v=it.values||{};
-              var sted=[v.__p1,v.__p2,v.__p3].filter(Boolean).join(' / ')||'Uten plassering';
+              var sted=v.__p1||'Uten plassering';
               if(!grupper[sted]){grupper[sted]=[];rekke.push(sted);}
               grupper[sted].push(it);
             });
