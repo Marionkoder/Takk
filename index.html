@@ -1054,13 +1054,28 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
       h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">'
         +'<div style="flex:1;min-width:0">'
         +'<div class="card" style="padding:6px 0">'
-        +(valgte.length?valgte.map(function(it){
-            var bBg=beredBg(it);
-            var v=it.values||{};
-            var plass=[v.__p1,v.__p2,v.__p3].filter(Boolean).join(' / ');
-            return'<div style="padding:4px 12px;font-size:12px;line-height:1.35'+(bBg?';background:'+bBg:'')+'">'
-              +esc(it.name)+(plass?'<span style="color:var(--muted)"> \u00b7 '+esc(plass)+'</span>':'')+'</div>';
-          }).join('')
+        +(valgte.length?(function(){
+            // Gruppert på plassering — behovene er ulike på de ulike stedene
+            var grupper={},rekke=[];
+            valgte.forEach(function(it){
+              var v=it.values||{};
+              var sted=[v.__p1,v.__p2,v.__p3].filter(Boolean).join(' / ')||'Uten plassering';
+              if(!grupper[sted]){grupper[sted]=[];rekke.push(sted);}
+              grupper[sted].push(it);
+            });
+            rekke.sort(function(a,b){
+              if(a==='Uten plassering')return 1;
+              if(b==='Uten plassering')return-1;
+              return nbSort(a,b);
+            });
+            return rekke.map(function(sted){
+              return'<div style="padding:5px 12px 1px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(sted)+'</div>'
+                +grupper[sted].map(function(it){
+                  var bBg=beredBg(it);
+                  return'<div style="padding:2px 12px;font-size:12px;line-height:1.35'+(bBg?';background:'+bBg:'')+'">'+esc(it.name)+'</div>';
+                }).join('');
+            }).join('');
+          })()
           :'<div class="empty" style="padding:6px 12px">Ingen punkter valgt enn\u00e5.</div>')
         +'</div>'
         +'<div style="padding:4px 0 0"><button class="icon-btn" style="font-size:11px" onclick="openBerPick(\''+q(uc.id)+'\')">Velg fra beredskapslageret</button></div>'
