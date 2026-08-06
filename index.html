@@ -332,6 +332,45 @@ var gifts=[];
 var tagCats={};
 function tagColor(tag){var cid=tagCats[tag];if(!cid)return null;var col=catColor(cid);return col?lightHex(col,0.62):null;}
 function setTagCat(tag,catId){if(catId)tagCats[tag]=catId;else delete tagCats[tag];save();render();}
+// Bytter ut et stikkord overalt det brukes. Er målet et stikkord som alt finnes,
+// blir det en sammenslåing — og et innlegg som hadde begge, ender med ett.
+function byttTagOveralt(fra,til){
+  fra=normTag(fra);til=normTag(til);
+  if(!fra||!til||fra===til)return 0;
+  var antall=0;
+  var bytt=function(liste){
+    (liste||[]).forEach(function(x){
+      if(!x.tags||!x.tags.length)return;
+      var hadde=x.tags.map(normTag).indexOf(fra)>=0;
+      if(!hadde)return;
+      var nye=[];
+      x.tags.forEach(function(t){
+        var n=normTag(t)===fra?til:normTag(t);
+        if(nye.indexOf(n)<0)nye.push(n); // hindrer duplikat når begge fantes
+      });
+      x.tags=nye;antall++;
+    });
+  };
+  bytt(entries);bytt(events);bytt(routines);bytt(inventories);bytt(results);
+  // Kategoritilknytningen følger med, med mindre målet alt har en
+  if(tagCats[fra]&&!tagCats[til])tagCats[til]=tagCats[fra];
+  delete tagCats[fra];
+  return antall;
+}
+function openTagRename(tag){modal={step:'tagrename',form:{fra:tag,til:tag}};render();}
+function openTagMerge(tag){modal={step:'tagmerge',form:{fra:tag,til:'',sok:''}};render();}
+function submitTagRename(){
+  var f=mf();var til=normTag(f.til||'');
+  if(!til||til===normTag(f.fra))return;
+  byttTagOveralt(f.fra,til);
+  save();closeModal();
+}
+function submitTagMerge(){
+  var f=mf();
+  if(!f.til)return;
+  byttTagOveralt(f.fra,f.til);
+  save();closeModal();
+}
 var administrerTab='kategorier';
 function goAdministrer(tab){view={kind:'administrer'};if(tab)administrerTab=tab;drawerOpen=false;render();}
 function goHashtags(){goAdministrer('hashtagger');}
@@ -5063,6 +5102,32 @@ function modalHTML(){
         :'<div class="empty">'+(sokP?'Ingen treff.':'Beredskapslageret er tomt.')+'</div>')
       +'<button class="save-btn" onclick="closeModal()">Ferdig</button>';
 
+  } else if(step==='tagrename'){
+    var nyN=normTag(f.til||'');
+    var finnesAlt=nyN&&nyN!==normTag(f.fra)&&Object.keys(allTagsPool()).map(normTag).indexOf(nyN)>=0;
+    body='<div class="modal-title">Endre navn p\u00e5 #'+esc(f.fra)+'</div>'
+      +'<label class="field-lbl">Nytt navn</label>'
+      +'<input class="inp" type="text" value="'+esc(f.til||'')+'" oninput="mf().til=this.value;render()">'
+      +(finnesAlt?'<div class="hint" style="color:var(--amber)">#'+esc(nyN)+' finnes fra f\u00f8r \u2014 de to blir sl\u00e5tt sammen.</div>'
+        :'<div class="hint">Stikkordet byttes ut overalt: i dagboka, p\u00e5 hendelser, rutiner og prosjekter.</div>')
+      +'<button class="save-btn" onclick="submitTagRename()" '+(nyN&&nyN!==normTag(f.fra)?'':'disabled')+'>Lagre</button>';
+
+  } else if(step==='tagmerge'){
+    var alleT=Object.keys(allTagsPool()).filter(function(t){return normTag(t)!==normTag(f.fra);}).sort(nbSort);
+    var sokT=normTag(f.sok||'');
+    if(sokT)alleT=alleT.filter(function(t){return normTag(t).indexOf(sokT)>=0;});
+    body='<div class="modal-title">Sl\u00e5 sammen #'+esc(f.fra)+'</div>'
+      +'<div class="hint">Velg hvilket stikkord #'+esc(f.fra)+' skal bli til. Alt som er merket med #'+esc(f.fra)+' f\u00e5r det nye stikkordet, og #'+esc(f.fra)+' forsvinner.</div>'
+      +'<input class="inp" type="text" placeholder="S\u00f8k \u2026" value="'+esc(f.sok||'')+'" oninput="mf().sok=this.value;render()">'
+      +(alleT.length?'<div style="max-height:44vh;overflow:auto;margin-top:8px">'+alleT.map(function(t){
+          var paa=normTag(f.til)===normTag(t);
+          return'<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);cursor:pointer" onclick="mf().til=\''+q(t)+'\';render()">'
+            +'<button class="chk'+(paa?' done':'')+'" style="flex-shrink:0">'+(paa?'\u2713':'')+'</button>'
+            +'<span style="flex:1;font-size:13px">#'+esc(t)+'</span></div>';
+        }).join('')+'</div>'
+        :'<div class="empty">'+(sokT?'Ingen treff.':'Ingen andre stikkord.')+'</div>')
+      +'<button class="save-btn" onclick="submitTagMerge()" '+(f.til?'':'disabled')+'>'+(f.til?'Sl\u00e5 #'+esc(f.fra)+' sammen med #'+esc(f.til):'Velg et stikkord')+'</button>';
+
   } else if(step==='persontags'){
     var suggested=Object.keys(allTags()).filter(function(t){return (f.tags||[]).map(normTag).indexOf(normTag(t))<0;}).sort(function(a,b){return allTags()[b]-allTags()[a]||nbSort(a,b);}).slice(0,10);
     body='<div class="modal-title">'+((f.tags||[]).length?'Rediger hashtagger':'Tilknytt hashtagger')+'</div>'
@@ -7086,7 +7151,10 @@ function dagViewHTML(){
     +'</div></div></div>';
 
   // Boksen tilpasser seg selv: bl\u00f8dning og smerte bare under mens, energi og fokus alltid
-  if(showMens)h+=mensDagMerkerHTML(view.d,isToday?'Menstruasjon \u2014 i dag':'Menstruasjon \u2014 denne dagen');
+  if(showMens){
+    var sd=mensSyklusdagForDato(view.d);
+    h+=mensDagMerkerHTML(view.d,sd?'Syklusdag '+sd:'Menstruasjon');
+  }
 
   // Daglige rutiner
   var dtodo=periodTodoItems({wk:weekNum(d),wKey:'w'+weekYear(d)+'-'+pad(weekNum(d)),ym:dy+'-'+pad(dm),m:dm,y:dy,daily:view.d,onlyGroup:'daily'});
@@ -8484,7 +8552,11 @@ function hashtagsViewHTML(){
     return'<div style="padding:8px 14px;border-bottom:1px solid var(--line)">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
       +'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>'
-      +'<span style="font-size:11px;color:var(--muted)">'+counts[t]+' innlegg</span></div>'
+      +'<span style="font-size:11px;color:var(--muted)">'+counts[t]+' innlegg</span>'
+      +'<span style="flex:1"></span>'
+      +'<button class="icon-btn" style="font-size:10px;padding:1px 6px" onclick="openTagRename(\''+q(t)+'\')">Endre navn</button>'
+      +'<button class="icon-btn" style="font-size:10px;padding:1px 6px" onclick="openTagMerge(\''+q(t)+'\')">Sl\u00e5 sammen</button>'
+      +'</div>'
       +'<div class="chips">'
       +'<button class="chip'+(!tagCats[t]?' on':'')+'" onclick="setTagCat(\''+q(t)+'\',\'\')">Ingen</button>'
       +mains.map(function(mc){
