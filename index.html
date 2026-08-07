@@ -107,6 +107,12 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .confetti{position:relative;overflow:hidden}
 .confetti i{position:absolute;top:-10px;width:5px;height:9px;border-radius:1px;opacity:.85;pointer-events:none;animation:cfall 2.8s linear infinite}
 .shimmer{position:relative;overflow:hidden}
+/* Kort respons når en rutine hakes av — g\u00e5r \u00e9n gang og gir seg selv */
+.rutine-ok{position:relative;overflow:hidden}
+.rutine-ok::after{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:var(--ok-farge,var(--rose));opacity:0;animation:rutinepuls 1.1s ease-out 1}
+@keyframes rutinepuls{0%{opacity:0}18%{opacity:.42}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.rutine-ok::after{animation:none;display:none}}
 .shimmer::after{content:'';position:absolute;top:0;left:-60%;width:60%;height:100%;pointer-events:none;
   background:linear-gradient(75deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.65) 50%,rgba(255,255,255,0) 70%);
   animation:shimmersweep 3s ease-out infinite}
@@ -134,10 +140,10 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .quick-log{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:10px 12px 4px;padding:12px 14px}
 .quick-log textarea{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px;font-family:inherit;font-size:14px;resize:vertical;min-height:64px;color:var(--ink)}
 .quick-log textarea:focus{outline:2px solid var(--sel-line)}
-.catbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px}
-.cat-box{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:10px;padding:7px 9px;min-width:0}
-.cb-hd{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px}
-.cb-item{display:block;width:100%;text-align:left;background:none;border:none;font-family:inherit;font-size:12px;line-height:1.45;color:var(--ink);padding:2px 0;cursor:pointer}
+.catbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 12px}
+.cat-box{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:10px;padding:5px 8px;min-width:0}
+.cb-hd{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:1px}
+.cb-item{display:block;width:100%;text-align:left;background:none;border:none;font-family:inherit;font-size:12px;line-height:1.3;color:var(--ink);padding:1px 0;cursor:pointer;border-radius:4px}
 .cb-item .o{color:var(--rose)}
 .kal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px}
 .mm{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 6px;cursor:pointer;font-family:inherit;text-align:left;color:var(--ink)}
@@ -259,6 +265,22 @@ var UKEDAGER_FULL=['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','sø
 
 function pad(n){return String(n).padStart(2,'0');}
 function dow(d){return(new Date(d).getDay()+6)%7;}
+// Mengde over tid for en daglig rutine — «11 av 14», uten rekker som kan brytes.
+// Teller bare dagene rutinen faktisk gjaldt, så ukedagsbegrensning ikke gir falskt lav score.
+function rutineMengde(r,dager){
+  if(r.freq!=='daily')return null;
+  dager=dager||14;
+  var rd=r.days||[];
+  var log=r.log||[];
+  var gjort=0,mulige=0;
+  for(var i=0;i<dager;i++){
+    var d=new Date(today);d.setDate(d.getDate()-i);
+    if(rd.length&&rd.indexOf(dow(d))<0)continue;
+    mulige++;
+    if(log.indexOf('d'+isoDate(d))>=0)gjort++;
+  }
+  return mulige?{gjort:gjort,mulige:mulige}:null;
+}
 function isoDate(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 function fmtDate(s){var d=new Date(s+'T00:00:00');return d.getDate()+'. '+MND_FULL[d.getMonth()]+' '+d.getFullYear();}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -1518,9 +1540,11 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
   if(rts.length){
     h+='<div class="sec-title">Rutiner</div><div class="card">'
       +rts.map(function(r){
+        var m=rutineMengde(r);
         return'<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
           +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
-          +'<div class="entry-date">'+esc(freqShort(r))+'</div></div>'
+          +'<div class="entry-date">'+esc(freqShort(r))
+          +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
           +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
       }).join('')+'</div>';
   }
@@ -6424,7 +6448,7 @@ function entryRowHTML(e){
 function sidebarHTML(){
   // Logo øverst, som i banneret — klikkbar til Dagbok
   var h='<div style="cursor:pointer" onclick="goHjem()">'
-    +'<div style="font-size:24px;font-weight:800;letter-spacing:0.5px;color:var(--title,var(--ink));padding:14px 18px 10px">GODE DAGER</div>'
+    +'<div style="font-size:24px;font-weight:800;letter-spacing:0.5px;color:var(--title,var(--ink));padding:14px 18px 10px 32px">GODE DAGER</div>'
     +'<div class="stripe-ribbon"></div>'
     +'</div>';
   // Samme form som kategoristripene under: store bokstaver, full bredde — men kremhvit
@@ -6647,7 +6671,9 @@ function catBoxesHTML(items){
       +'<div class="cb-hd">'+esc(g.cat?g.cat.name:'Annet')+'</div>'
       +g.items.map(function(it){
         if(it.done){
-          return'<button class="cb-item" style="opacity:.5" onclick="'+it.click+'"><span style="color:var(--red)">\u2713</span> <span style="text-decoration:line-through">'+esc(it.label)+'</span>'
+          // Nettopp haket av — kort respons i kategoriens farge
+          var nettopp=it.key&&recentDone[it.key];
+          return'<button class="cb-item'+(nettopp?' rutine-ok':'')+'" style="opacity:.5'+(nettopp&&col?';--ok-farge:'+col:'')+'" onclick="'+it.click+'"><span style="color:var(--red)">\u2713</span> <span style="text-decoration:line-through">'+esc(it.label)+'</span>'
             +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')+'</button>';
         }
         return'<button class="cb-item" onclick="'+it.click+'"><span class="o">\u25cb</span> '+esc(it.label)
@@ -6664,7 +6690,7 @@ function periodTodoItems(scope){
     var done=(r.log||[]).includes(key);
     var rk='r_'+r.id+'_'+key;
     if(done&&!recentDone[rk])return;
-    out.push({label:r.name,sub:sub,done:done,cat:mainCatOf(r.cats),click:"boxToggleRoutine('"+q(r.id)+"','"+q(key)+"')",routineId:r.id,trackHours:!!r.trackHours});
+    out.push({label:r.name,sub:sub,done:done,key:rk,cat:mainCatOf(r.cats),click:"boxToggleRoutine('"+q(r.id)+"','"+q(key)+"')",routineId:r.id,trackHours:!!r.trackHours});
   };
   routines.forEach(function(r){
     var months=r.months||[];
