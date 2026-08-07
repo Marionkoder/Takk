@@ -1697,7 +1697,7 @@ function printOversikt(invId){
           var bits=[];
           if(v.__qty)bits.push(v.__qty+' '+(v.__unit||''));
           if(v.__merke)bits.push(v.__merke);
-          if(v.__tilstand)bits.push(v.__tilstand);
+          if(v.__tilstand&&inv.fixed!=='forbruksvarer')bits.push(v.__tilstand);
           if(v.__exp&&v.__exp!=='na')bits.push('utl\u00f8per '+fmtDate(v.__exp));
           h+='<div style="margin-left:'+(p3?16:p2?8:0)+'pt">\u2610 '+esc(it.name)+(bits.length?' <span style="color:#444">\u2014 '+esc(bits.join(' \u00b7 '))+'</span>':'')+'</div>';
         });
@@ -1757,7 +1757,7 @@ function listOversiktViewHTML(){
   var rowFor=function(it){
     var v=it.values||{};
     var qty=v.__qty?esc(v.__qty)+(v.__unit?' '+esc(v.__unit):''):'';
-    var needsMaint=v.__tilstand==='M\u00e5 repareres eller vedlikeholdes';
+    var needsMaint=v.__tilstand==='M\u00e5 repareres eller vedlikeholdes'&&inv.fixed!=='forbruksvarer';
     // Beredskapsrelevante ting merkes oransje her også, ikke bare i selve lista
     var bBg=beredBg(it);
     var bg=bBg?bBg:(needsMaint?'#FDF3C7':'');
@@ -6398,10 +6398,14 @@ function entryRowHTML(e){
 
 /* ── Sidemeny ── */
 function sidebarHTML(){
-  var h='<div class="side-month'+(view.kind==='om'?'" style="color:var(--red)':'')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
-  h+='<div class="side-month'+(view.kind==='innstillinger'||view.kind==='administrer'?'" style="color:var(--red)':'')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
-  h+='<div class="side-month'+(view.kind==='planlegging'?'" style="color:var(--red)':'')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
-  h+='<div class="side-month'+(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett'?'" style="color:var(--red)':'')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
+  // Samme form som kategoristripene under: store bokstaver, full bredde — men kremhvit
+  var toppStil=function(aktiv){
+    return'background:#F2EEE5;color:var(--ink);padding-left:10px;text-transform:uppercase;letter-spacing:.03em'+(aktiv?';font-weight:800':'');
+  };
+  var h='<div class="side-month" style="'+toppStil(view.kind==='om')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
+  h+='<div class="side-month" style="'+toppStil(view.kind==='innstillinger'||view.kind==='administrer')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
+  h+='<div class="side-month" style="'+toppStil(view.kind==='planlegging')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
+  h+='<div class="side-month" style="'+toppStil(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   // Kategorisidene: alfabetisk, hver med sin egen kategorifarge — som stripene ellers
   [{vis:showFolk,navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
    {vis:showStrikk,navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
