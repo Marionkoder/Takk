@@ -697,6 +697,8 @@ function allUnits(){return DEFAULT_UNITS.concat(customUnits.filter(function(u){r
 function addCustomUnit(u){
   u=(u||'').trim();
   if(!u)return;
+  // Enheter skrives alltid med liten forbokstav, som g, dl og n\u00f8ster
+  u=u.charAt(0).toLowerCase()+u.slice(1);
   if(allUnits().some(function(x){return x.toLowerCase()===u.toLowerCase();}))return u;
   customUnits.push(u);save();
   return u;
@@ -2703,6 +2705,28 @@ function load(){
     });
     customUnits=customUnits.map(function(u){return u==='boks'?'bokser':u;});
     try{localStorage.setItem(SK+'_unitfix1','1');}catch(e){}
+    save();
+  }
+
+  // Alle måleenheter skrives med liten forbokstav
+  var un2=false;try{un2=!!localStorage.getItem(SK+'_unitfix2');}catch(e){}
+  if(!un2){
+    var small=function(u){return u?u.charAt(0).toLowerCase()+u.slice(1):u;};
+    inventories.forEach(function(iv){
+      (iv.items||[]).forEach(function(it){
+        if(it.values&&it.values.__unit)it.values.__unit=small(it.values.__unit);
+      });
+    });
+    // Enheter som blir like etter endringen, sl\u00e5s sammen til \u00e9n
+    var sett={};
+    customUnits=customUnits.map(small).filter(function(u){
+      var k=u.toLowerCase();
+      if(sett[k])return false;
+      sett[k]=1;return true;
+    });
+    // M\u00e5leserier bruker ogs\u00e5 enhet
+    maalinger.forEach(function(m){if(m.enhet)m.enhet=small(m.enhet);});
+    try{localStorage.setItem(SK+'_unitfix2','1');}catch(e){}
     save();
   }
 
@@ -6398,11 +6422,16 @@ function entryRowHTML(e){
 
 /* ── Sidemeny ── */
 function sidebarHTML(){
+  // Logo øverst, som i banneret — klikkbar til Dagbok
+  var h='<div style="cursor:pointer" onclick="goHjem()">'
+    +'<div style="font-size:24px;font-weight:800;letter-spacing:0.5px;color:var(--title,var(--ink));padding:14px 18px 10px">GODE DAGER</div>'
+    +'<div class="stripe-ribbon"></div>'
+    +'</div>';
   // Samme form som kategoristripene under: store bokstaver, full bredde — men kremhvit
   var toppStil=function(aktiv){
     return'background:#F2EEE5;color:var(--ink);padding-left:10px;text-transform:uppercase;letter-spacing:.03em'+(aktiv?';font-weight:800':'');
   };
-  var h='<div class="side-month" style="'+toppStil(view.kind==='om')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
+  h+='<div class="side-month" style="'+toppStil(view.kind==='om')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
   h+='<div class="side-month" style="'+toppStil(view.kind==='innstillinger'||view.kind==='administrer')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
   h+='<div class="side-month" style="'+toppStil(view.kind==='planlegging')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
   h+='<div class="side-month" style="'+toppStil(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
@@ -9114,7 +9143,7 @@ function render(){
 
   var topbar='<div class="topbar">'
     +'<div class="topbar-row">'
-    +'<h1>GODE DAGER</h1>'
+    +'<h1 style="cursor:pointer" onclick="goHjem()">GODE DAGER</h1>'
     +(editMode
       ?'<button class="icon-btn" onclick="exportTekst()">↓ Tekst</button>'
        +'<button class="icon-btn" onclick="exportJSON()">↓ JSON</button>'
