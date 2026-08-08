@@ -4474,6 +4474,9 @@ function saveEditInvItem(){
 function deleteInvItem(){
   var f=mf();var inv=invById(f.invId);if(!inv)return;
   inv.items=(inv.items||[]).filter(function(x){return x.id!==f.id;});
+  // Prestasjonen for en slettet milep\u00e6l skal ikke bli liggende igjen
+  var nokkel='pms:'+inv.id+':'+f.id;
+  achievements=achievements.filter(function(a){return a.key!==nokkel;});
   save();closeModal();
 }
 function toggleFormRoutineId(id){
