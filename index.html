@@ -87,6 +87,9 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .view-sub{font-size:12px;color:var(--muted);padding:0 16px 8px;line-height:1.55}
 .card{background:var(--card);border-radius:14px;overflow:hidden;margin:8px 12px 4px;border:1px solid var(--line)}
 .entry-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.entry-row.tett{padding:4px 14px;align-items:center}
+.entry-row.tett .entry-text{font-size:12.5px;line-height:1.3}
+.entry-row.tett .entry-date{font-size:10.5px;line-height:1.25}
 .entry-row:last-child{border-bottom:none}
 .entry-dot{width:5px;height:5px;border-radius:99px;background:var(--rose);flex-shrink:0;margin-top:8px}
 .entry-body{flex:1;min-width:0}
@@ -265,6 +268,13 @@ var UKEDAGER_FULL=['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','sø
 
 function pad(n){return String(n).padStart(2,'0');}
 function dow(d){return(new Date(d).getDay()+6)%7;}
+// Dagens nøkkel for en daglig rutine — null hvis rutinen ikke gjelder i dag
+function rutineDagNokkel(r){
+  if(r.freq!=='daily')return null;
+  var rd=r.days||[];
+  if(rd.length&&rd.indexOf(dow(today))<0)return null;
+  return'd'+isoDate(today);
+}
 // Mengde over tid for en daglig rutine — «11 av 14», uten rekker som kan brytes.
 // Teller bare dagene rutinen faktisk gjaldt, så ukedagsbegrensning ikke gir falskt lav score.
 function rutineMengde(r,dager){
@@ -414,15 +424,39 @@ var DEFAULT_UNITS=['bokser','dl','g','kg','kroner','liter','ml','n\u00f8ster','s
 var customUnits=[];
 var weeklyAvailableHours=0;
 var soundOn=true;
-var showStrikk=true;
-var showFolk=true;
-var showHelse=true;
+// Hvilke kategorisider som vises i menyen. Ny bruker starter med Folk og Utstyr;
+// resten skrus på ved behov under Innstillinger → Personlig.
+var KAT_SIDER=[
+  {n:'folk',navn:'Folk'},{n:'kreativitet',navn:'Kreativitet'},{n:'helse',navn:'Helse'},
+  {n:'matdrikke',navn:'Mat og drikke'},{n:'hjem',navn:'Hjem'},{n:'kompetanse',navn:'Kompetanse'},
+  {n:'natur',navn:'Natur'},{n:'reiser',navn:'Reiser'},{n:'kultur',navn:'Kultur'},
+  {n:'okonomi',navn:'\u00d8konomi'},{n:'beredskap',navn:'Beredskap'},{n:'utstyr',navn:'Utstyr'}
+];
+var KAT_STANDARD={folk:true,utstyr:true};
+var katVis={};
+function katPaa(n){return katVis[n]===undefined?!!KAT_STANDARD[n]:!!katVis[n];}
+function toggleKatSide(n){
+  katVis[n]=!katPaa(n);
+  // Står du på siden du nettopp skrudde av, sendes du tilbake til innstillingene
+  if(!katPaa(n)){
+    var side=(typeof KAT_SIDER!=='undefined'?KAT_SIDER:[]).find(function(x){return x.n===n;});
+    var m=sidebarKinds(n);
+    if(m.indexOf(view.kind)>=0)view={kind:'personlig'};
+  }
+  save();render();
+}
+// Hvilke visninger som hører til en kategoriside
+function sidebarKinds(n){
+  var t={folk:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson'],
+    kreativitet:['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch'],
+    helse:['helse','mens'],matdrikke:['matdrikke'],hjem:['hjemkat'],kompetanse:['kompetanse'],
+    natur:['natur'],reiser:['reiser'],kultur:['kultur'],
+    okonomi:['okonomikat','okonomi','budsjett','forbruksvarer'],
+    beredskap:['beredskapkat','beredskap'],utstyr:['utstyrkat','utstyr']};
+  return t[n]||[];
+}
 var showMens=true;
 var mensManuellSyklus=null,mensManuellVarighet=null;
-var showMat=true;
-var showHjem=true;
-var showKomp=true;
-var showReiser=true;
 // Original seiersfanfare — syntetisert, ingen lydfiler. Stigende treklang som lander
 // på oktaven, med en varm messinglignende klang (sagtann + mykt filter).
 var _audioCtx=null;
@@ -1541,11 +1575,17 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
     h+='<div class="sec-title">Rutiner</div><div class="card">'
       +rts.map(function(r){
         var m=rutineMengde(r);
-        return'<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
-          +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
+        var rk=rutineDagNokkel(r);
+        var gjort=rk&&(r.log||[]).indexOf(rk)>=0;
+        var nettopp=rk&&recentDone['r_'+r.id+'_'+rk];
+        var col=catColor(mainCatOf(r.cats));
+        return'<div class="entry-row tett'+(nettopp?' rutine-ok':'')+'"'+(nettopp&&col?' style="--ok-farge:'+col+'"':'')+'>'
+          +(rk?'<button class="chk'+(gjort?' done':'')+'" style="flex-shrink:0" onclick="boxToggleRoutine(\''+q(r.id)+'\',\''+q(rk)+'\')">'+(gjort?'\u2713':'')+'</button>':'')
+          +'<div class="entry-body" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
+          +'<div class="entry-text"'+(gjort?' style="opacity:.55;text-decoration:line-through"':'')+'>'+esc(r.name)+'</div>'
           +'<div class="entry-date">'+esc(freqShort(r))
           +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
-          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+          +'<span style="align-self:center;color:var(--rose);cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">\u203a</span></div>';
       }).join('')+'</div>';
   }
 
@@ -2397,16 +2437,10 @@ function load(){
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
   try{weeklyAvailableHours=Number(localStorage.getItem(SK+'_availhours'))||0;}catch(e){weeklyAvailableHours=0;}
   try{soundOn=localStorage.getItem(SK+'_sound')!=='0';}catch(e){soundOn=true;}
-  try{showStrikk=localStorage.getItem(SK+'_strikkmeny')!=='0';}catch(e){showStrikk=true;}
-  try{showFolk=localStorage.getItem(SK+'_folkmeny')!=='0';}catch(e){showFolk=true;}
-  try{showHelse=localStorage.getItem(SK+'_helsemeny')!=='0';}catch(e){showHelse=true;}
+  try{katVis=JSON.parse(localStorage.getItem(SK+'_katvis')||'{}');}catch(e){katVis={};}
   try{showMens=localStorage.getItem(SK+'_mensmeny')!=='0';}catch(e){showMens=true;}
   try{mensManuellSyklus=Number(localStorage.getItem(SK+'_menssyklus'))||null;}catch(e){mensManuellSyklus=null;}
   try{mensManuellVarighet=Number(localStorage.getItem(SK+'_mensvarighet'))||null;}catch(e){mensManuellVarighet=null;}
-  try{showMat=localStorage.getItem(SK+'_matmeny')!=='0';}catch(e){showMat=true;}
-  try{showHjem=localStorage.getItem(SK+'_hjemmeny')!=='0';}catch(e){showHjem=true;}
-  try{showKomp=localStorage.getItem(SK+'_kompmeny')!=='0';}catch(e){showKomp=true;}
-  try{showReiser=localStorage.getItem(SK+'_reisermeny')!=='0';}catch(e){showReiser=true;}
   try{places=JSON.parse(localStorage.getItem(SK+'_places')||'{"l1":[],"l2":[],"l3":[]}');}catch(e){places={l1:[],l2:[],l3:[]};}
   try{achievements=JSON.parse(localStorage.getItem(SK+'_ach')||'[]');}catch(e){achievements=[];}
   try{achDismissed=JSON.parse(localStorage.getItem(SK+'_achdis')||'[]');}catch(e){achDismissed=[];}
@@ -3045,16 +3079,10 @@ function save(){
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
   try{localStorage.setItem(SK+'_availhours',String(weeklyAvailableHours));}catch(e){}
   try{localStorage.setItem(SK+'_sound',soundOn?'1':'0');}catch(e){}
-  try{localStorage.setItem(SK+'_strikkmeny',showStrikk?'1':'0');}catch(e){}
-  try{localStorage.setItem(SK+'_folkmeny',showFolk?'1':'0');}catch(e){}
-  try{localStorage.setItem(SK+'_helsemeny',showHelse?'1':'0');}catch(e){}
+  try{localStorage.setItem(SK+'_katvis',JSON.stringify(katVis));}catch(e){}
   try{localStorage.setItem(SK+'_mensmeny',showMens?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_menssyklus',String(mensManuellSyklus||''));}catch(e){}
   try{localStorage.setItem(SK+'_mensvarighet',String(mensManuellVarighet||''));}catch(e){}
-  try{localStorage.setItem(SK+'_matmeny',showMat?'1':'0');}catch(e){}
-  try{localStorage.setItem(SK+'_hjemmeny',showHjem?'1':'0');}catch(e){}
-  try{localStorage.setItem(SK+'_kompmeny',showKomp?'1':'0');}catch(e){}
-  try{localStorage.setItem(SK+'_reisermeny',showReiser?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_places',JSON.stringify(places));}catch(e){}
   try{localStorage.setItem(SK+'_ach',JSON.stringify(achievements));}catch(e){}
   try{localStorage.setItem(SK+'_achdis',JSON.stringify(achDismissed));}catch(e){}
@@ -3791,44 +3819,9 @@ function gavePersonViewHTML(){
   return h;
 }
 function goInnstillinger(){view={kind:'innstillinger'};drawerOpen=false;render();}
-function toggleHelseMeny(){
-  showHelse=!showHelse;
-  if(!showHelse&&view.kind==='helse')view={kind:'personlig'};
-  save();render();
-}
 function toggleMensMeny(){
   showMens=!showMens;
   if(!showMens&&view.kind==='mens')view={kind:'personlig'};
-  save();render();
-}
-function toggleReiserMeny(){
-  showReiser=!showReiser;
-  if(!showReiser&&view.kind==='reiser')view={kind:'personlig'};
-  save();render();
-}
-function toggleKompMeny(){
-  showKomp=!showKomp;
-  if(!showKomp&&view.kind==='kompetanse')view={kind:'personlig'};
-  save();render();
-}
-function toggleHjemMeny(){
-  showHjem=!showHjem;
-  if(!showHjem&&view.kind==='hjemkat')view={kind:'personlig'};
-  save();render();
-}
-function toggleMatMeny(){
-  showMat=!showMat;
-  if(!showMat&&view.kind==='matdrikke')view={kind:'personlig'};
-  save();render();
-}
-function toggleFolkMeny(){
-  showFolk=!showFolk;
-  if(!showFolk&&['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson'].indexOf(view.kind)>=0)view={kind:'personlig'};
-  save();render();
-}
-function toggleStrikkMeny(){
-  showStrikk=!showStrikk;
-  if(!showStrikk&&['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch'].indexOf(view.kind)>=0)view={kind:'personlig'};
   save();render();
 }
 function goPersonlig(){view={kind:'personlig'};drawerOpen=false;render();}
@@ -3866,61 +3859,28 @@ function personligViewHTML(){
   h+='</div>'
     +'<div style="font-size:12px;color:var(--muted);padding-top:12px">'+(cur?'Valgt: '+esc((CAT_COLORS.find(function(x){return x.id===cur;})||{}).name||'')+'. Trykk den kremhvite for standard.':'Standard (kremhvit).')+'</div>'
     +'</div>';
-  // Menypunkter
+  // Menypunkter — én bryter per kategoriside
   h+='<div class="sec-title">Menypunkter</div>'
-    +'<div class="view-sub">Sl\u00e5 av det du ikke bruker, s\u00e5 blir menyen kortere.</div>'
-    +'<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Kreativitet</div>'
-    +'<div class="entry-date">strikkeverksted, garnlager og oppskrifter</div></div>'
-    +'<button class="chip'+(showStrikk?' on':'')+'" onclick="toggleStrikkMeny()">'+(showStrikk?'P\u00e5':'Av')+'</button>'
+    +'<div class="view-sub">Sl\u00e5 p\u00e5 de livsomr\u00e5dene du vil ha i menyen.</div>'
+    +'<div class="card">'
+    +KAT_SIDER.map(function(k){
+      var paa=katPaa(k.n);
+      return'<div class="entry-row tett">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(k.navn)+'</div></div>'
+        +'<button class="chip'+(paa?' on':'')+'" style="font-size:11px;align-self:center" onclick="toggleKatSide(\''+q(k.n)+'\')">'+(paa?'P\u00e5':'Av')+'</button>'
+        +'</div>';
+    }).join('')
     +'</div>'
-    +(showStrikk?'':'<div class="hint">Innholdet beholdes \u2014 det er bare skjult fra menyen.</div>')
-    +'</div>'
-    +'<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Folk</div>'
-    +'<div class="entry-date">bursdagsbok, grupper og stikkord for kategorien</div></div>'
-    +'<button class="chip'+(showFolk?' on':'')+'" onclick="toggleFolkMeny()">'+(showFolk?'P\u00e5':'Av')+'</button>'
-    +'</div>'
-    +(showFolk?'':'<div class="hint">Innholdet beholdes \u2014 det er bare skjult fra menyen.</div>')
-    +'</div>'
-    +'<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Helse</div>'
-    +'<div class="entry-date">prosjekter, rutiner og stikkord for kategorien</div></div>'
-    +'<button class="chip'+(showHelse?' on':'')+'" onclick="toggleHelseMeny()">'+(showHelse?'P\u00e5':'Av')+'</button>'
-    +'</div></div>'
-    +'<div class="card" style="padding:12px 14px">'
+    +'<div class="hint">Innholdet beholdes uansett \u2014 det er bare skjult fra menyen.</div>';
+  // Menstruasjonstracker h\u00f8rer til Helse, men skrus av og p\u00e5 for seg
+  h+='<div class="card" style="padding:12px 14px;margin-top:8px">'
     +'<div style="display:flex;align-items:center;gap:8px">'
     +'<div style="flex:1"><div class="entry-text">Menstruasjonstracker</div>'
     +'<div class="entry-date">kortet p\u00e5 Helse-siden</div></div>'
     +'<button class="chip'+(showMens?' on':'')+'" onclick="toggleMensMeny()">'+(showMens?'P\u00e5':'Av')+'</button>'
-    +'</div></div>'
-    +'<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Mat og drikke</div>'
-    +'<div class="entry-date">prosjekter, rutiner og stikkord for kategorien</div></div>'
-    +'<button class="chip'+(showMat?' on':'')+'" onclick="toggleMatMeny()">'+(showMat?'P\u00e5':'Av')+'</button>'
-    +'</div></div>'
-    +'<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Hjem</div>'
-    +'<div class="entry-date">prosjekter, rutiner og stikkord for kategorien</div></div>'
-    +'<button class="chip'+(showHjem?' on':'')+'" onclick="toggleHjemMeny()">'+(showHjem?'P\u00e5':'Av')+'</button>'
-    +'</div></div>'
-    +'<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Kompetanse</div>'
-    +'<div class="entry-date">prosjekter, rutiner og stikkord for kategorien</div></div>'
-    +'<button class="chip'+(showKomp?' on':'')+'" onclick="toggleKompMeny()">'+(showKomp?'P\u00e5':'Av')+'</button>'
-    +'</div></div>'
-    +'<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Reiser</div>'
-    +'<div class="entry-date">pakkelister, prosjekter og planer</div></div>'
-    +'<button class="chip'+(showReiser?' on':'')+'" onclick="toggleReiserMeny()">'+(showReiser?'P\u00e5':'Av')+'</button>'
     +'</div></div>';
+
+
   // Min bursdag
   var myb=myBirthday();
   var myn=celebrationName();
@@ -6460,19 +6420,19 @@ function sidebarHTML(){
   h+='<div class="side-month" style="'+toppStil(view.kind==='planlegging')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
   h+='<div class="side-month" style="'+toppStil(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   // Kategorisidene: alfabetisk, hver med sin egen kategorifarge — som stripene ellers
-  [{vis:showFolk,navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
-   {vis:showStrikk,navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
-   {vis:showHelse,navn:'Helse',fn:'goHelse()',kat:'helse',kinds:['helse','mens']},
-   {vis:showMat,navn:'Mat og drikke',fn:'goMatDrikke()',kat:'mat og drikke',kinds:['matdrikke']},
-   {vis:showHjem,navn:'Hjem',fn:'goHjem2()',kat:'hjem',kinds:['hjemkat']},
-   {vis:showKomp,navn:'Kompetanse',fn:'goKompetanse()',kat:'kompetanse',kinds:['kompetanse']},
-   {vis:true,navn:'Natur',fn:'goNatur()',kat:'natur',kinds:['natur']},
-   {vis:showReiser,navn:'Reiser',fn:'goReiser()',kat:'reiser',kinds:['reiser']},
-   {vis:true,navn:'Kultur',fn:'goKultur()',kat:'kultur',kinds:['kultur']},
-   {vis:true,navn:'\u00d8konomi',fn:'goOkonomiKat()',kat:'\u00f8konomi',kinds:['okonomikat','okonomi','budsjett','forbruksvarer']},
-   {vis:true,navn:'Beredskap',fn:'goBeredskapKat()',kat:'beredskap',kinds:['beredskapkat','beredskap']},
-   {vis:true,navn:'Utstyr',fn:'goUtstyrKat()',kat:'utstyr',kinds:['utstyrkat','utstyr']}]
-  .filter(function(k){return k.vis;})
+  [{n:'folk',navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
+   {n:'kreativitet',navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
+   {n:'helse',navn:'Helse',fn:'goHelse()',kat:'helse',kinds:['helse','mens']},
+   {n:'matdrikke',navn:'Mat og drikke',fn:'goMatDrikke()',kat:'mat og drikke',kinds:['matdrikke']},
+   {n:'hjem',navn:'Hjem',fn:'goHjem2()',kat:'hjem',kinds:['hjemkat']},
+   {n:'kompetanse',navn:'Kompetanse',fn:'goKompetanse()',kat:'kompetanse',kinds:['kompetanse']},
+   {n:'natur',navn:'Natur',fn:'goNatur()',kat:'natur',kinds:['natur']},
+   {n:'reiser',navn:'Reiser',fn:'goReiser()',kat:'reiser',kinds:['reiser']},
+   {n:'kultur',navn:'Kultur',fn:'goKultur()',kat:'kultur',kinds:['kultur']},
+   {n:'okonomi',navn:'\u00d8konomi',fn:'goOkonomiKat()',kat:'\u00f8konomi',kinds:['okonomikat','okonomi','budsjett','forbruksvarer']},
+   {n:'beredskap',navn:'Beredskap',fn:'goBeredskapKat()',kat:'beredskap',kinds:['beredskapkat','beredskap']},
+   {n:'utstyr',navn:'Utstyr',fn:'goUtstyrKat()',kat:'utstyr',kinds:['utstyrkat','utstyr']}]
+  .filter(function(k){return katPaa(k.n);})
   .sort(function(a,b){return nbSort(a.navn,b.navn);})
   .forEach(function(k){
     var c=katVedNavn(k.kat);
