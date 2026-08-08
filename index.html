@@ -2544,6 +2544,22 @@ function load(){
     save();
   }
 
+  // Feiringen på forsida leser prestasjoner, ikke selve milepælen. Rydder derfor bort
+  // prestasjoner for milepæler som er slettet eller haket av igjen — kjøres hver gang,
+  // siden slikt kan oppstå på nytt.
+  (function(){
+    var før=achievements.length;
+    achievements=achievements.filter(function(a){
+      if(a.kind!=='milestone'||String(a.key||'').indexOf('pms:')!==0)return true;
+      var d=String(a.key).split(':');
+      var iv=inventories.find(function(x){return x.id===d[1];});
+      if(!iv)return false;
+      var it=(iv.items||[]).find(function(x){return x.id===d[2];});
+      return!!it&&!!it.have;
+    });
+    if(achievements.length!==før)save();
+  })();
+
   // Plasseringen (__p1/__p2/__p3) fulgte tidligere ikke med til Beredskapslageret.
   // Retter opp for alt som alt er synkronisert, og fanger opp merkede punkter som aldri ble kopiert.
   var bp1=false;try{bp1=!!localStorage.getItem(SK+'_beredskapplass2');}catch(e){}
@@ -3967,7 +3983,12 @@ function toggleInvItem(invId,itemId){
   var inv=invById(invId);if(!inv)return;
   var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
   it.have=!it.have;
-  if(it.have&&(inv.type||'inventar')==='prosjekt')addAchievement('milestone','pms:'+inv.id+':'+it.id,it.name,inv.goalIds||[],inv.catId?[inv.catId]:[],inv.name);
+  if((inv.type||'inventar')==='prosjekt'){
+    var mNokkel='pms:'+inv.id+':'+it.id;
+    if(it.have)addAchievement('milestone',mNokkel,it.name,inv.goalIds||[],inv.catId?[inv.catId]:[],inv.name);
+    // Angrer du avhakingen, skal feiringen forsvinne med den
+    else achievements=achievements.filter(function(a){return a.key!==mNokkel;});
+  }
   // «Pakket» på en pakkeliste betyr ikke «har» i inventaret — synk bare mellom inventarlister
   if(it.syncId&&(inv.type||'inventar')!=='pakke'){
     inventories.forEach(function(iv){
