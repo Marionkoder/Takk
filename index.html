@@ -4009,26 +4009,26 @@ function kvartalMarkerFerdig(y,q){
   save();render();
 }
 function kvartalViewHTML(){
-  var y=view.y,q=view.q;
-  var n=kvartalNokkel(y,q);
+  var y=view.y,kv=view.q;
+  var n=kvartalNokkel(y,kv);
   var notat=kvartalNotat[n]||{};
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
-    +'<div class="view-title">Planlegging \u00b7 '+kvartalNavn(q)+' '+y+'</div>'
+    +'<div class="view-title">Planlegging \u00b7 '+kvartalNavn(kv)+' '+y+'</div>'
     +'<div class="view-sub">Prioriter tid og penger for de neste tre m\u00e5nedene.</div>';
   // Bla mellom kvartaler
-  var forrige=q===1?{y:y-1,q:4}:{y:y,q:q-1};
-  var neste=q===4?{y:y+1,q:1}:{y:y,q:q+1};
+  var forrige=kv===1?{y:y-1,kv:4}:{y:y,kv:kv-1};
+  var neste=kv===4?{y:y+1,kv:1}:{y:y,kv:kv+1};
   h+='<div style="display:flex;gap:8px;padding:0 12px 4px">'
-    +'<button class="icon-btn" style="font-size:11px" onclick="goKvartal('+forrige.y+','+forrige.q+')">\u2039 forrige</button>'
-    +'<button class="icon-btn" style="font-size:11px" onclick="goKvartal('+neste.y+','+neste.q+')">neste \u203a</button>'
+    +'<button class="icon-btn" style="font-size:11px" onclick="goKvartal('+forrige.y+','+forrige.kv+')">\u2039 forrige</button>'
+    +'<button class="icon-btn" style="font-size:11px" onclick="goKvartal('+neste.y+','+neste.kv+')">neste \u203a</button>'
     +'</div>';
 
   // ── Tid ──
   var poster=timeTrackedItems().map(function(it){
-    return{it:it,timer:kvartalTimerFor(it,y,q)};
+    return{it:it,timer:kvartalTimerFor(it,y,kv)};
   }).filter(function(x){return x.timer>0;}).sort(function(a,b){return b.timer-a.timer;});
   var prosjektTimer=poster.reduce(function(a,b){return a+b.timer;},0);
-  var rutineTimer=kvartalRutinetimer(y,q);
+  var rutineTimer=kvartalRutinetimer(y,kv);
   var sumTimer=Math.round((prosjektTimer+rutineTimer)*10)/10;
   var tilgjengelig=weeklyAvailableHours?Math.round(weeklyAvailableHours*13.04*10)/10:0;
   var diff=tilgjengelig?Math.round((tilgjengelig-sumTimer)*10)/10:null;
@@ -4077,10 +4077,10 @@ function kvartalViewHTML(){
   // ── Prioritering ──
   h+='<div class="sec-title">Min prioritering</div>'
     +'<div class="card" style="padding:10px 12px">'
-    +'<textarea class="inp" rows="4" style="margin:0" placeholder="Hva er viktigst dette kvartalet? Hva kan vente?" oninput="kvartalSettNotat('+y+','+q+',this.value)">'+esc(notat.tekst||'')+'</textarea>'
+    +'<textarea class="inp" rows="4" style="margin:0" placeholder="Hva er viktigst dette kvartalet? Hva kan vente?" oninput="kvartalSettNotat('+y+','+kv+',this.value)">'+esc(notat.tekst||'')+'</textarea>'
     +'</div>'
     +'<div style="padding:8px 12px 0">'
-    +'<button class="chip'+(notat.ferdig?' on':'')+'" onclick="kvartalMarkerFerdig('+y+','+q+')">'+(notat.ferdig?'\u2713 Planlagt':'Marker som planlagt')+'</button>'
+    +'<button class="chip'+(notat.ferdig?' on':'')+'" onclick="kvartalMarkerFerdig('+y+','+kv+')">'+(notat.ferdig?'\u2713 Planlagt':'Marker som planlagt')+'</button>'
     +'</div>';
   return h;
 }
