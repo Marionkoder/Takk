@@ -1708,6 +1708,11 @@ function okonomiHubHTML(){
   rrTab='ressursbruk';
   var h=rrTabsHTML();
   h+='<div class="view-title">Ressursbruk</div>';
+  var kNaa=kvartalNaa();
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goKvartal()">'
+    +'<div class="entry-body"><div class="entry-text">Kvartalsplanlegging</div>'
+    +'<div class="entry-date">'+esc(kvartalNavn(kNaa.q))+' '+kNaa.y+' \u00b7 prioriter tid og penger</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBudsjett(curYear)">'
     +'<div class="entry-body"><div class="entry-text">Tid og penger</div>'
     +'<div class="entry-date">det som er disponibelt til p\u00e5g\u00e5ende prosjekter og prosjekter</div></div>'
@@ -2432,6 +2437,7 @@ function load(){
   try{mens=JSON.parse(localStorage.getItem(SK+'_mens')||'[]');}catch(e){mens=[];}
   try{mensDag=JSON.parse(localStorage.getItem(SK+'_mensdag')||'[]');}catch(e){mensDag=[];}
   try{maalinger=JSON.parse(localStorage.getItem(SK+'_maalinger')||'[]');}catch(e){maalinger=[];}
+  try{kvartalNotat=JSON.parse(localStorage.getItem(SK+'_kvartal')||'{}');}catch(e){kvartalNotat={};}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
@@ -3090,6 +3096,7 @@ function save(){
   try{localStorage.setItem(SK+'_mens',JSON.stringify(mens));}catch(e){}
   try{localStorage.setItem(SK+'_mensdag',JSON.stringify(mensDag));}catch(e){}
   try{localStorage.setItem(SK+'_maalinger',JSON.stringify(maalinger));}catch(e){}
+  try{localStorage.setItem(SK+'_kvartal',JSON.stringify(kvartalNotat));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
@@ -3931,6 +3938,152 @@ function turnPinOff(){
   if(f.cur!==pd.pin){f._err2='Feil PIN.';render();return;}
   pinClear();closeModal();
 }
+// ── Kvartalsvis planleggingsdag ──
+// Faste kvartaler. Regner ut om planen for de neste tre m\u00e5nedene g\u00e5r opp,
+// og lar deg prioritere direkte derfra.
+var kvartalNotat={};
+function kvartalNaa(d){d=d||today;return{y:d.getFullYear(),q:Math.floor(d.getMonth()/3)+1};}
+function kvartalMaaneder(y,q){var s=(q-1)*3+1;return[s,s+1,s+2];}
+function kvartalNavn(q){return['1. kvartal (jan\u2013mar)','2. kvartal (apr\u2013jun)','3. kvartal (jul\u2013sep)','4. kvartal (okt\u2013des)'][q-1];}
+function kvartalNokkel(y,q){return y+'-Q'+q;}
+// Er vi i de f\u00f8rste dagene av et nytt kvartal, og planleggingen ikke gjort?
+function kvartalTrengsNaa(){
+  var k=kvartalNaa();
+  var m=today.getMonth()+1;
+  var erFørsteMnd=(m-1)%3===0;
+  if(!erFørsteMnd||today.getDate()>14)return null;
+  var n=kvartalNokkel(k.y,k.q);
+  return(kvartalNotat[n]&&kvartalNotat[n].ferdig)?null:k;
+}
+function goKvartal(y,q){
+  var k=kvartalNaa();
+  view={kind:'kvartal',y:y||k.y,q:q||k.q};drawerOpen=false;render();
+}
+// Timer et prosjekt trenger i kvartalet, gitt frist og gjenst\u00e5ende arbeid
+function kvartalTimerFor(it,y,q){
+  if(!it.trackHours)return 0;
+  var mnd=kvartalMaaneder(y,q);
+  if(it.hoursMode==='monthly')return(Number(it.hoursTotal)||0)*3;
+  var dl=itemDeadlineYM(it);
+  if(!dl)return 0;
+  var dlYM=dl.year*12+(dl.month-1);
+  var startYM=y*12+(mnd[0]-1);
+  var sluttYM=y*12+(mnd[2]-1);
+  if(dlYM<startYM)return 0; // fristen har passert
+  var brukt=hoursFor(it.kind,it.refId,null,null,'\u00e5r');
+  var igjen=Math.max(0,(Number(it.hoursTotal)||0)-brukt);
+  if(!igjen)return 0;
+  var todayYM=today.getFullYear()*12+today.getMonth();
+  var fraYM=Math.max(startYM,todayYM);
+  var mndIgjen=Math.max(1,dlYM-fraYM+1);
+  var mndIKvartal=Math.max(0,Math.min(sluttYM,dlYM)-fraYM+1);
+  return Math.round(igjen/mndIgjen*mndIKvartal*10)/10;
+}
+function kvartalRutinetimer(y,q){
+  var sum=0;
+  kvartalMaaneder(y,q).forEach(function(m){
+    routines.forEach(function(r){
+      if(!r.trackHours)return;
+      sum+=routineExpectedHours(r,y,m,'m\u00e5ned')||0;
+    });
+  });
+  return Math.round(sum*10)/10;
+}
+function kvartalUtsett(refId){
+  var iv=invById(refId);if(!iv||!iv.endDate)return;
+  var d=new Date(iv.endDate+'T00:00:00');
+  d.setMonth(d.getMonth()+3);
+  iv.endDate=isoDate(d);
+  save();render();
+}
+function kvartalSettNotat(y,q,v){
+  var n=kvartalNokkel(y,q);
+  kvartalNotat[n]=kvartalNotat[n]||{};
+  kvartalNotat[n].tekst=v;
+  save();
+}
+function kvartalMarkerFerdig(y,q){
+  var n=kvartalNokkel(y,q);
+  kvartalNotat[n]=kvartalNotat[n]||{};
+  kvartalNotat[n].ferdig=!kvartalNotat[n].ferdig;
+  save();render();
+}
+function kvartalViewHTML(){
+  var y=view.y,q=view.q;
+  var n=kvartalNokkel(y,q);
+  var notat=kvartalNotat[n]||{};
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div class="view-title">Planlegging \u00b7 '+kvartalNavn(q)+' '+y+'</div>'
+    +'<div class="view-sub">Prioriter tid og penger for de neste tre m\u00e5nedene.</div>';
+  // Bla mellom kvartaler
+  var forrige=q===1?{y:y-1,q:4}:{y:y,q:q-1};
+  var neste=q===4?{y:y+1,q:1}:{y:y,q:q+1};
+  h+='<div style="display:flex;gap:8px;padding:0 12px 4px">'
+    +'<button class="icon-btn" style="font-size:11px" onclick="goKvartal('+forrige.y+','+forrige.q+')">\u2039 forrige</button>'
+    +'<button class="icon-btn" style="font-size:11px" onclick="goKvartal('+neste.y+','+neste.q+')">neste \u203a</button>'
+    +'</div>';
+
+  // ── Tid ──
+  var poster=timeTrackedItems().map(function(it){
+    return{it:it,timer:kvartalTimerFor(it,y,q)};
+  }).filter(function(x){return x.timer>0;}).sort(function(a,b){return b.timer-a.timer;});
+  var prosjektTimer=poster.reduce(function(a,b){return a+b.timer;},0);
+  var rutineTimer=kvartalRutinetimer(y,q);
+  var sumTimer=Math.round((prosjektTimer+rutineTimer)*10)/10;
+  var tilgjengelig=weeklyAvailableHours?Math.round(weeklyAvailableHours*13.04*10)/10:0;
+  var diff=tilgjengelig?Math.round((tilgjengelig-sumTimer)*10)/10:null;
+
+  h+='<div class="sec-title">Tid</div><div class="card" style="padding:12px 14px">'
+    +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>Prosjekter</span><b>'+prosjektTimer.toString().replace('.',',')+' t</b></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>Rutiner</span><b>'+rutineTimer.toString().replace('.',',')+' t</b></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-top:1px solid var(--line);margin-top:4px"><span>Trengs i alt</span><b>'+sumTimer.toString().replace('.',',')+' t</b></div>'
+    +(tilgjengelig
+      ?'<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>Du har</span><b>'+tilgjengelig.toString().replace('.',',')+' t</b></div>'
+       +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-top:1px solid var(--line);margin-top:4px;color:'+(diff<0?'var(--red)':'var(--muted)')+'">'
+       +'<span>'+(diff<0?'Mangler':'Til overs')+'</span><b>'+Math.abs(diff).toString().replace('.',',')+' t</b></div>'
+       +(diff<0?'<div style="font-size:11.5px;color:var(--red);margin-top:6px">Planen g\u00e5r ikke opp. Utsett noe under, eller juster timene.</div>':'')
+      :'<div class="hint">Legg inn tilgjengelig tid per uke under Tid og penger for \u00e5 se om planen g\u00e5r opp.</div>')
+    +'</div>';
+
+  if(poster.length){
+    h+='<div class="sec-title">Prosjekter dette kvartalet</div><div class="card">'
+      +poster.map(function(x){
+        var pmnd=Math.round(x.timer/3*10)/10;
+        return'<div class="entry-row tett">'
+          +'<div class="entry-body" style="cursor:pointer" onclick="goInventar(\''+q(x.it.refId)+'\')">'
+          +'<div class="entry-text">'+esc(x.it.name)+'</div>'
+          +'<div class="entry-date">'+x.timer.toString().replace('.',',')+' t i kvartalet \u00b7 ca. '+pmnd.toString().replace('.',',')+' t/mnd</div></div>'
+          +'<button class="icon-btn" style="font-size:10px;align-self:center" onclick="kvartalUtsett(\''+q(x.it.refId)+'\')">Utsett 3 mnd</button>'
+          +'</div>';
+      }).join('')+'</div>';
+  }
+
+  // ── Penger ──
+  var pengePoster=moneyTrackedItems();
+  if(pengePoster.length){
+    var sumSpar=0,sumInn=0,sumUt=0;
+    pengePoster.forEach(function(it){
+      var r=it.moneyRes;var b=Number(r.targetAmount)||0;
+      if(r.amountType==='spar')sumSpar+=b;else if(r.amountType==='in')sumInn+=b;else if(r.amountType==='ut')sumUt+=b;
+    });
+    h+='<div class="sec-title">Penger</div><div class="card" style="padding:12px 14px">'
+      +(sumSpar?'<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>Sparem\u00e5l</span><b>'+fmtKr(sumSpar)+'</b></div>':'')
+      +(sumInn?'<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>Ventet inn</span><b>'+fmtKr(sumInn)+'</b></div>':'')
+      +(sumUt?'<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>Ventet ut</span><b>'+fmtKr(sumUt)+'</b></div>':'')
+      +'<div style="padding-top:6px"><button class="icon-btn" style="font-size:11px" onclick="goBudsjett()">\u00c5pne Tid og penger \u203a</button></div>'
+      +'</div>';
+  }
+
+  // ── Prioritering ──
+  h+='<div class="sec-title">Min prioritering</div>'
+    +'<div class="card" style="padding:10px 12px">'
+    +'<textarea class="inp" rows="4" style="margin:0" placeholder="Hva er viktigst dette kvartalet? Hva kan vente?" oninput="kvartalSettNotat('+y+','+q+',this.value)">'+esc(notat.tekst||'')+'</textarea>'
+    +'</div>'
+    +'<div style="padding:8px 12px 0">'
+    +'<button class="chip'+(notat.ferdig?' on':'')+'" onclick="kvartalMarkerFerdig('+y+','+q+')">'+(notat.ferdig?'\u2713 Planlagt':'Marker som planlagt')+'</button>'
+    +'</div>';
+  return h;
+}
 function goBudsjett(y,q,m){view={kind:'budsjett',year:y,q:q||'\u00e5r',month:m||curMonth};drawerOpen=false;render();}
 function addBudgetLine(catId){
   var row=budgetRowFor(catId,view.year,true);
@@ -4622,7 +4775,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -4641,7 +4794,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -6822,6 +6975,15 @@ function hjemViewHTML(){
   h+=quickLogHTML();
 
   // Ferske anerkjennelser (siste 24 timer) — milepæler og prosjekter
+  // Påminnelse om kvartalsplanlegging — vises i starten av hvert kvartal til den er gjort
+  var kvTrengs=kvartalTrengsNaa();
+  if(kvTrengs){
+    h+='<div class="card" style="padding:12px 14px;margin-top:8px;border-left:4px solid var(--rose);cursor:pointer" onclick="goKvartal('+kvTrengs.y+','+kvTrengs.q+')">'
+      +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">Nytt kvartal</div>'
+      +'<div style="font-size:15px;font-weight:800;margin-top:3px">Planlegg '+kvartalNavn(kvTrengs.q).split(' (')[0]+'</div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-top:4px">Se om tiden og pengene g\u00e5r opp de neste tre m\u00e5nedene \u203a</div>'
+      +'</div>';
+  }
   var freshAch=achievements.filter(function(a){return(Date.now()-(a.ts||0))<86400000;}).sort(function(a,b){return(b.ts||0)-(a.ts||0);});
   if(freshAch.length){
     h+='<div class="sec-title">Feiring</div>';
@@ -9229,6 +9391,7 @@ function render(){
   else if(view.kind==='rapport')content=rapportViewHTML();
   else if(view.kind==='arsrapport')content=arsrapportViewHTML();
   else if(view.kind==='inventar')content=inventarViewHTML();
+  else if(view.kind==='kvartal')content=kvartalViewHTML();
   else if(view.kind==='budsjett')content=budsjettViewHTML();
   else if(view.kind==='innstillinger')content=innstillingerViewHTML();
   else if(view.kind==='personlig')content=personligViewHTML();
