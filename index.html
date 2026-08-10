@@ -1387,6 +1387,7 @@ function folkViewHTML(){
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
   var sky=cloudSectionHTML(counts,true,'folk','Ti på topp',true);
   if(sky)h+=sky;
+  h+=katRutineKnapperHTML(ids);
 
   // Bursdager og planer side om side
   var soon=bdays.filter(function(e){
@@ -1480,6 +1481,54 @@ function folkViewHTML(){
 }
 // Generisk kategoriside — grunnverdi, ordsky, og det kategorien inneholder.
 // Som Folk og Kreativitet eier den ingenting; alt vises fra der det bor.
+// Rutiner som knapper — daglige hver dag, ukentlige fra mandag, månedlige fra den 1.,
+// årlige fra 1. januar. Blir stående ut perioden så du kan ta dem igjen senere.
+function katRutineKnapperHTML(ids){
+  var mine=routines.filter(function(r){return(r.cats||[]).some(function(c){return ids.indexOf(c)>=0;});});
+  if(!mine.length)return'';
+  var wKey='w'+weekYear(today)+'-'+pad(weekNum(today));
+  var ymKey=curYear+'-'+pad(curMonth);
+  var grupper=[
+    {tit:'I dag',liste:[]},
+    {tit:'Denne uka',liste:[]},
+    {tit:'Denne m\u00e5neden',liste:[]},
+    {tit:'I \u00e5r',liste:[]}
+  ];
+  mine.forEach(function(r){
+    var f=r.freq||'monthly';
+    if(f==='daily'){
+      var rd=r.days||[];
+      if(rd.length&&rd.indexOf(dow(today))<0)return;
+      grupper[0].liste.push({r:r,key:'d'+isoDate(today)});
+    } else if(f==='weekly'||f==='odd'||f==='even'){
+      var wk=weekNum(today);
+      if(f==='odd'&&wk%2===0)return;
+      if(f==='even'&&wk%2===1)return;
+      grupper[1].liste.push({r:r,key:wKey});
+    } else if(f==='yearly'){
+      grupper[3].liste.push({r:r,key:'y'+curYear});
+    } else {
+      grupper[2].liste.push({r:r,key:'m'+ymKey});
+    }
+  });
+  var h='';
+  grupper.forEach(function(g){
+    if(!g.liste.length)return;
+    h+='<div style="padding:6px 12px 2px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+g.tit+'</div>'
+      +'<div class="chips" style="padding:0 12px 4px">'
+      +g.liste.sort(function(a,b){return nbSort(a.r.name,b.r.name);}).map(function(x){
+        var gjort=(x.r.log||[]).indexOf(x.key)>=0;
+        var nettopp=recentDone['r_'+x.r.id+'_'+x.key];
+        var col=catColor(mainCatOf(x.r.cats));
+        return'<button class="chip'+(gjort?' on':'')+(nettopp?' rutine-ok':'')+'"'
+          +(nettopp&&col?' style="--ok-farge:'+col+'"':'')
+          +' onclick="boxToggleRoutine(\''+q(x.r.id)+'\',\''+q(x.key)+'\')">'
+          +(gjort?'\u2713 ':'')+esc(x.r.name)+'</button>';
+      }).join('')
+      +'</div>';
+  });
+  return h?'<div class="sec-title">Rutiner <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div><div class="card" style="padding:4px 0 8px">'+h+'</div>':'';
+}
 function katSideHTML(navn, tittel, skyNokkel, ekstra){
   var cat=katVedNavn(navn);
   var h=katSideStart(cat)+'<div class="view-title">'+esc(tittel)+'</div>';
@@ -1532,6 +1581,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
     return(rad.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;});
   });
   if(katRader.length)h+=ganttHTML(katRader,'Prosjektene i tid');
+  h+=katRutineKnapperHTML(ids);
 
   if(ekstra)h+=ekstra;
 
@@ -1572,20 +1622,15 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
 
   var rts=routines.filter(function(r){return inCat(r.cats)&&!iUnder(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(rts.length){
-    h+='<div class="sec-title">Rutiner</div><div class="card">'
+    // Selve avhakingen skjer med knappene lenger opp; her ligger redigering og mengde
+    h+='<div class="sec-title">Rediger rutiner</div><div class="card">'
       +rts.map(function(r){
         var m=rutineMengde(r);
-        var rk=rutineDagNokkel(r);
-        var gjort=rk&&(r.log||[]).indexOf(rk)>=0;
-        var nettopp=rk&&recentDone['r_'+r.id+'_'+rk];
-        var col=catColor(mainCatOf(r.cats));
-        return'<div class="entry-row tett'+(nettopp?' rutine-ok':'')+'"'+(nettopp&&col?' style="--ok-farge:'+col+'"':'')+'>'
-          +(rk?'<button class="chk'+(gjort?' done':'')+'" style="flex-shrink:0" onclick="boxToggleRoutine(\''+q(r.id)+'\',\''+q(rk)+'\')">'+(gjort?'\u2713':'')+'</button>':'')
-          +'<div class="entry-body" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
-          +'<div class="entry-text"'+(gjort?' style="opacity:.55;text-decoration:line-through"':'')+'>'+esc(r.name)+'</div>'
+        return'<div class="entry-row tett" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
+          +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
           +'<div class="entry-date">'+esc(freqShort(r))
           +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
-          +'<span style="align-self:center;color:var(--rose);cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">\u203a</span></div>';
+          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
       }).join('')+'</div>';
   }
 
