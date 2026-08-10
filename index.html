@@ -1188,107 +1188,8 @@ function catIdsUnder(cat){
   if(!cat)return [];
   return [cat.id].concat(cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;}));
 }
-function alleGruppeMedlemmer(){
-  var g={};
-  events.filter(function(e){return e.bday;}).forEach(function(e){
-    personGroupsFor(e.name).forEach(function(t){
-      g[t]=g[t]||[];
-      if(g[t].indexOf(e.name)<0)g[t].push(e.name);
-    });
-  });
-  return g;
-}
-function goGrupper(){view={kind:'grupper'};drawerOpen=false;render();}
-function grupperViewHTML(){
-  var g=alleGruppeMedlemmer();
-  var navn=Object.keys(g).sort(nbSort);
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
-    +'<div class="view-title">Grupper</div>'
-    +'<div class="view-sub">Grupper samler folk. De henter ikke innlegg til personsidene \u2014 det gj\u00f8r bare de personlige hashtaggene.</div>';
-  if(!navn.length){
-    return h+'<div class="card"><div class="empty">Ingen grupper enn\u00e5. \u00c5pne en person i Bursdagslista og legg personen i en gruppe \u2014 f.eks. familie, venner eller kolleger.</div></div>';
-  }
-  h+='<div class="card">'+navn.map(function(t){
-    var folk=g[t].slice().sort(nbSort);
-    return'<div class="entry-row" style="cursor:pointer" onclick="goGruppe(\''+q(t)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(t)+' <span style="font-size:11px;font-weight:400;color:var(--muted)">\u00b7 '+folk.length+'</span></div>'
-      +'<div class="entry-date">'+esc(folk.join(', '))+'</div></div>'
-      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-  }).join('')+'</div>';
-  return h;
-}
-function goGruppe(tag){view={kind:'gruppe',tag:tag};drawerOpen=false;render();}
 // Samler alt appen vet om en gruppe: hvem som er med, bursdagene deres,
 // planer merket med gruppen, og dagbokinnlegg med gruppens hashtagg.
-function gruppeMedlemmer(tag){
-  return events.filter(function(e){
-    return e.bday&&personGroupsFor(e.name).indexOf(normTag(tag))>=0;
-  });
-}
-function gruppeViewHTML(){
-  var tag=normTag(view.tag||'');
-  var medl=gruppeMedlemmer(tag);
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
-    +'<div class="view-title">'+esc(tag)+'</div>'
-    +'<div class="view-sub">'+medl.length+' person'+(medl.length===1?'':'er')+' i denne gruppen</div>';
-
-  // Medlemmer, med når de sist ble skrevet om
-  var yearAgo=new Date(today);yearAgo.setFullYear(yearAgo.getFullYear()-1);
-  h+='<div class="card">'+medl.slice().sort(function(a,b){return nbSort(a.name,b.name);}).map(function(e){
-    var cnt=personEntryCountSince(e.name,isoDate(yearAgo));
-    var d=daysToNextBday(e);
-    return'<div class="entry-row" style="cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
-      +'<div class="entry-date">bursdag '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]
-      +' \u00b7 om '+d+' dager \u00b7 '
-      +(cnt?cnt+' innlegg siste \u00e5r':'<span style="color:var(--amber)">ingen innlegg siste \u00e5r</span>')
-      +'</div></div>'
-      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-  }).join('')+'</div>';
-
-  // Bursdager i rekkefølge
-  var iToday=isoDate(today);
-  var soon=medl.slice().sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b);});
-  if(soon.length){
-    h+='<div class="sec-title">Neste bursdager</div><div class="card">'
-      +soon.slice(0,5).map(function(e){
-        var d=daysToNextBday(e);
-        var nAge=bdayNextAge(e);
-        var round=isRoundBdayNext(e);
-        return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative">'
-          +(round?confettiHTML():'')
-          +'<div class="entry-body"><div class="entry-text">\ud83c\udf82 '+esc(e.name)+(nAge?' fyller '+nAge:'')+(round?' \ud83c\udf89':'')+'</div>'
-          +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
-      }).join('')+'</div>';
-  }
-
-  // Planer merket med gruppens hashtagg som personmerke
-  var planer=events.filter(function(e){
-    if(e.bday)return false;
-    return(e.personTags||[]).map(normTag).indexOf(tag)>=0;
-  });
-  h+='<div class="sec-title">Planer med gruppen</div>';
-  if(planer.length){
-    h+='<div class="card">'+planer.map(function(e){
-      return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
-        +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    }).join('')+'</div>';
-  } else {
-    h+='<div class="card"><div class="empty">Ingen planer merket med #'+esc(tag)+' enn\u00e5.</div></div>';
-  }
-  h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="nyGruppePlan(\''+q(tag)+'\')">+ Ny plan med gruppen</button></div>';
-
-  return h;
-}
-function nyGruppePlan(tag){
-  openEventModal();
-  var c=folkCat();
-  if(c)mf().cats=[c.id];
-  mf().personTags=[normTag(tag)];
-  render();
-}
 function nyFolkPlan(){
   openEventModal();
   var c=folkCat();
@@ -1445,12 +1346,6 @@ function folkViewHTML(){
           +' \u00b7 '+(d===0?'i dag':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
       }).join('')+'</div>';
   }
-
-  var antG=Object.keys(alleGruppeMedlemmer()).length;
-  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goGrupper()">'
-    +'<div class="entry-body"><div class="entry-text">Grupper</div>'
-    +'<div class="entry-date">'+(antG?antG+' gruppe'+(antG===1?'':'r'):'ingen grupper enn\u00e5')+'</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
 
   h+='<div style="padding:2px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="nyKatProsjekt(\''+q(cat.id)+'\')">+ Nytt prosjekt</button> '
     +'<button class="icon-btn" style="font-size:11px" onclick="nyKatRutine(\''+q(cat.id)+'\')">+ Ny rutine</button> '
@@ -2400,27 +2295,6 @@ function personTagsFor(person){
   if(!bd||!bd.personTags)return [];
   return bd.personTags.map(normTag).filter(Boolean);
 }
-function personGroupsFor(person){
-  // Gruppetilhørighet: brukes bare til å samle folk, aldri til å hente innlegg
-  var bd=bdayForPerson(person);
-  if(!bd||!bd.groups)return [];
-  return bd.groups.map(normTag).filter(Boolean);
-}
-function entriesForPerson(person){
-  var tags=personTagsFor(person);
-  if(!tags.length)return [];
-  return entries.filter(function(e){
-    return (e.tags||[]).some(function(t){return tags.indexOf(normTag(t))>=0;});
-  }).sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
-}
-function personEntryCountSince(person,fromIso){
-  var tags=personTagsFor(person);
-  if(!tags.length)return 0;
-  return entries.filter(function(e){
-    if(fromIso&&e.date<fromIso)return false;
-    return (e.tags||[]).some(function(t){return tags.indexOf(normTag(t))>=0;});
-  }).length;
-}
 var view={kind:'hjem',month:curMonth,year:curYear};
 var navHistory=[];
 // Generisk tilbakeknapp: går til den faktiske forrige siden, uansett hvordan
@@ -2613,6 +2487,21 @@ function load(){
       });
     }
     try{localStorage.setItem(SK+'_beredskapplass2','1');}catch(e){}
+    save();
+  }
+
+  // Hashtagger og grupper på personer er avviklet. Rydder bort gammel data,
+  // og legger alle bursdager fast på Folk-kategorien.
+  var pt1=false;try{pt1=!!localStorage.getItem(SK+'_persontagsvekk1');}catch(e){}
+  if(!pt1){
+    var fk=folkCat();
+    events.forEach(function(e){
+      if(!e.bday)return;
+      delete e.personTags;
+      delete e.groups;
+      if(fk)e.cats=[fk.id];
+    });
+    try{localStorage.setItem(SK+'_persontagsvekk1','1');}catch(e){}
     save();
   }
 
@@ -3359,37 +3248,6 @@ function syncResultInvs(resultId,invIds){
     if(!want&&has)iv.resultIds=iv.resultIds.filter(function(x){return x!==resultId;});
   });
 }
-function openPersonTags(person){
-  var bd=bdayForPerson(person);if(!bd)return;
-  modal={step:'persontags',form:{person:person,bdayId:bd.id,tags:[].concat(bd.personTags||[]),groups:[].concat(bd.groups||[]),_in:'',_gin:''}};render();
-}
-function personTagsAdd(){
-  var f=mf();var t=normTag(f._in||'');
-  if(t&&(f.tags||[]).map(normTag).indexOf(t)<0)f.tags=(f.tags||[]).concat([t]);
-  f._in='';render();
-}
-function personTagsRm(t){var f=mf();f.tags=(f.tags||[]).filter(function(x){return normTag(x)!==normTag(t);});render();}
-function personTagsSave(){
-  var f=mf();var bd=events.find(function(e){return e.id===f.bdayId;});if(!bd)return;
-  bd.personTags=f.tags||[];bd.groups=f.groups||[];save();closeModal();
-}
-function personGroupAdd(){
-  var f=mf();var t=normTag(f._gin||'');
-  if(t&&(f.groups||[]).map(normTag).indexOf(t)<0)f.groups=(f.groups||[]).concat([t]);
-  f._gin='';render();
-}
-function personGroupRm(t){var f=mf();f.groups=(f.groups||[]).filter(function(x){return normTag(x)!==normTag(t);});render();}
-function alleGrupper(){
-  var out={};
-  events.forEach(function(e){if(e.bday)(e.groups||[]).forEach(function(t){out[normTag(t)]=1;});});
-  return Object.keys(out).sort(nbSort);
-}
-function addPersonTag(){
-  var f=mf();var t=normTag(f._ptInput||'');
-  if(t&&(f.personTags||[]).map(normTag).indexOf(t)<0)f.personTags=(f.personTags||[]).concat([t]);
-  f._ptInput='';render();
-}
-function rmPersonTag(t){var f=mf();f.personTags=(f.personTags||[]).filter(function(x){return normTag(x)!==normTag(t);});render();}
 function syncResultRoutines(resultId,ids){
   routines.forEach(function(r){
     var has=(r.resultIds||[]).indexOf(resultId)>=0;
@@ -3645,15 +3503,6 @@ function gavePersonViewHTML(){
     +'</div>'
     +'</div>';
   if(bd){
-    var pTags=personTagsFor(pn);
-    h+='<div style="padding:6px 12px 0">'
-      +(pTags.length?'<div class="chips" style="margin-bottom:4px">'+pTags.map(function(t){
-          return'<span class="chip" style="cursor:default">#'+esc(t)+'</span>';
-        }).join('')+'</div>':'')
-      +'<button class="chip" style="font-size:11px" onclick="openPersonTags(\''+q(pn)+'\')">'+(pTags.length?'Rediger hashtagger':'Tilknytt hashtagger')+'</button>'
-      +'</div>';
-  }
-  if(bd){
     var dd=daysToNextBday(bd);var nAge=erMinne(bd)?null:bdayNextAge(bd);
     h+='<div class="view-sub" style="padding-top:2px">'+(erMinne(bd)?'Minnebursdag '+(bd.day?bd.day+'. ':'')+MND_FULL[bd.month-1]:(nAge!==null?'Fyller '+nAge+' om '+dd+' dager':(dd===0?'Bursdag i dag':dd===1?'Bursdag i morgen':'Bursdag om '+dd+' dager')))+'</div>';
     h+='<div class="stripe-thin"></div>';
@@ -3761,17 +3610,6 @@ function gavePersonViewHTML(){
     }
   }
 
-  // Takknemlig for — innlegg som handler om personen (via valgte hashtagger)
-  var pTags=personTagsFor(pn);
-  var pEntries=entriesForPerson(pn);
-  h+='<div class="sec-title">Takknemlig for</div>';
-  if(!pTags.length){
-    h+='<div class="card"><div class="empty">Knytt en eller flere hashtagger til '+esc(pn)+' (rediger bursdagen, eller bruk «Tilknytt hashtagg»), så vises takknemlighetsinnlegg om denne personen her.</div></div>';
-  } else if(!pEntries.length){
-    h+='<div class="card"><div class="empty">Ingen innlegg merket med '+pTags.map(function(t){return '#'+esc(t);}).join(', ')+' ennå.</div></div>';
-  } else {
-    h+='<div class="card">'+pEntries.map(entryRowHTML).join('')+'</div>';
-  }
   return h;
 }
 function goInnstillinger(){view={kind:'innstillinger'};drawerOpen=false;render();}
@@ -5143,6 +4981,8 @@ function submitEvent(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   if(f.bday&&bdayCount()>=BDAY_MAX)return;
+  // Bursdager har ikke egen kategorivelger \u2014 de h\u00f8rer alltid til Folk
+  if(f.bday){var fk=folkCat();f.cats=fk?[fk.id]:[];}
   events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,tags:f.tags||[],repeat:!!f.repeat,bday:!!f.bday,memorial:!!f.memorial,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],done:false,log:[]});
   if(f._fromLater)laters=laters.filter(function(l){return l.id!==f._fromLater;});
   save();closeModal();
@@ -5151,6 +4991,7 @@ function saveEditEvent(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var e=events.find(function(x){return x.id===f.id;});if(!e)return;
+  if(f.bday){var fk=folkCat();f.cats=fk?[fk.id]:[];}
   e.name=name;e.cats=f.cats;e.month=Number(f.month);e.year=Number(f.year);
   e.day=f.day?Number(f.day):null;e.toMonth=(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null;e.toDay=(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null;e.tags=f.tags||[];e.repeat=!!f.repeat;e.bday=!!f.bday;e.memorial=!!f.memorial;e.interval=Number(f.interval)||1;
   e.sinceYear=f.sinceYear?Number(f.sinceYear):null;
@@ -5350,36 +5191,6 @@ function modalHTML(){
         :'<div class="empty">'+(sokT?'Ingen treff.':'Ingen andre stikkord.')+'</div>')
       +'<button class="save-btn" onclick="submitTagMerge()" '+(f.til?'':'disabled')+'>'+(f.til?'Sl\u00e5 #'+esc(f.fra)+' sammen med #'+esc(f.til):'Velg et stikkord')+'</button>';
 
-  } else if(step==='persontags'){
-    var suggested=Object.keys(allTags()).filter(function(t){return (f.tags||[]).map(normTag).indexOf(normTag(t))<0;}).sort(function(a,b){return allTags()[b]-allTags()[a]||nbSort(a,b);}).slice(0,10);
-    body='<div class="modal-title">'+((f.tags||[]).length?'Rediger hashtagger':'Tilknytt hashtagger')+'</div>'
-      +'<div class="hint" style="line-height:1.6">Velg hvilke stikkord som handler om '+esc(f.person)+'. Innlegg i takknemlighetsboka med disse stikkordene vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og folk med samme navn holdes fra hverandre.</div>'
-      +((f.tags||[]).length?'<label class="field-lbl">Tilknyttet</label><div class="chips" style="margin-bottom:4px">'+(f.tags||[]).map(function(t){
-          return'<button class="chip on" onclick="personTagsRm(\''+q(t)+'\')">#'+esc(t)+' \u00d7</button>';
-        }).join('')+'</div>':'')
-      +'<label class="field-lbl">Legg til</label>'
-      +'<div style="display:flex;gap:8px;align-items:center">'
-      +'<input class="inp" type="text" style="flex:1;margin:0" placeholder="F.eks. JennyA" value="'+esc(f._in||'')+'" oninput="mf()._in=this.value" onkeydown="if(event.key===\'Enter\'){event.preventDefault();personTagsAdd();}">'
-      +'<button class="chip" onclick="personTagsAdd()">+ Legg til</button></div>'
-      +(suggested.length?'<div class="hint" style="margin-top:8px">Stikkord du alt bruker:</div>'
-        +'<div class="chips">'+suggested.map(function(t){
-          return'<button class="chip" onclick="mf().tags=(mf().tags||[]).concat([\''+q(t)+'\']);mf()._in=\'\';render()">#'+esc(t)+'</button>';
-        }).join('')+'</div>':'')
-      +'<div class="hint-box" style="margin-top:12px">Grupper er noe annet enn personlige hashtagger: de samler folk, men henter <b>ikke</b> innlegg til personsiden.</div>'
-      +'<label class="field-lbl">Grupper</label>'
-      +((f.groups||[]).length?'<div class="chips" style="margin-bottom:4px">'+(f.groups||[]).map(function(t){
-          return'<button class="chip on" onclick="personGroupRm(\''+q(t)+'\')">'+esc(t)+' \u00d7</button>';
-        }).join('')+'</div>':'')
-      +'<div style="display:flex;gap:8px;align-items:center">'
-      +'<input class="inp" type="text" style="flex:1;margin:0" placeholder="F.eks. familie, venner" value="'+esc(f._gin||'')+'" oninput="mf()._gin=this.value" onkeydown="if(event.key===\'Enter\'){event.preventDefault();personGroupAdd();}">'
-      +'<button class="chip" onclick="personGroupAdd()">+ Legg til</button></div>'
-      +(function(){
-        var eks=alleGrupper().filter(function(t){return(f.groups||[]).map(normTag).indexOf(t)<0;});
-        return eks.length?'<div class="hint" style="margin-top:8px">Grupper du alt bruker:</div><div class="chips">'
-          +eks.map(function(t){return'<button class="chip" onclick="mf().groups=(mf().groups||[]).concat([\''+q(t)+'\']);render()">'+esc(t)+'</button>';}).join('')
-          +'</div>':'';
-      })()
-      +'<button class="save-btn" onclick="personTagsSave()">Lagre</button>';
 
   } else if(step==='pinsetup'){
     body='<div class="modal-title">'+(f.has?'Endre PIN-l\u00e5s':'Sett opp PIN-l\u00e5s')+'</div>'
@@ -6504,10 +6315,10 @@ function modalHTML(){
       +'<select class="inp" style="width:auto" oninput="mf().month=this.value">'+mOpts+'</select>'
       +'<select class="inp" style="width:auto" oninput="mf().year=this.value">'+yOpts+'</select>'
       +'</div>'
-      +'<div class="chips" style="margin-top:10px">'
+      +(!f.bday?'<div class="chips" style="margin-top:10px">'
       +'<button class="chip'+(f.repeat?' on':'')+'" onclick="mf().repeat=!mf().repeat;render()">Gjentas</button>'
       +'<button class="chip'+(f.bday?' on':'')+'" onclick="mf().bday=!mf().bday;if(mf().bday){mf().repeat=true;mf().interval=1;}render()">Bursdag</button>'
-      +'</div>'
+      +'</div>':'')
       +(!f.bday&&f.day?'<label class="field-lbl">Til dato <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt, for hendelser over flere dager</span></label>'
         +'<div style="display:flex;gap:8px">'
         +'<select class="inp" style="width:auto" oninput="mf().toDay=this.value">'
@@ -6524,30 +6335,14 @@ function modalHTML(){
         +'</select>':'')
       +(f.repeat?'<div class="hint">'+(f.bday?'Bursdager gjentas hvert \u00e5r.':'Gjentas fra og med valgt \u00e5r med valgt hyppighet \u2014 f.eks. annethvert \u00e5r. Noe som skjer fast flere ganger i \u00e5ret, legges heller inn som rutine.')+'</div>':'<div class="hint">En engangs\u00adhendelse. Skjer det fast flere ganger i \u00e5ret, er det per definisjon en rutine \u2014 legg det inn der i stedet.</div>')
       +(f.bday&&!isEditE&&bdayCount()>=BDAY_MAX?'<div class="hint" style="color:var(--amber)">Du har n\u00e5dd '+BDAY_MAX+' bursdager \u2014 Dunbars tall for hvor mange meningsfulle relasjoner et menneske greier \u00e5 holde ved like. Slett en f\u00f8r du legger til flere.</div>':'')
-      +'<label class="field-lbl">Startår <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
+      +'<label class="field-lbl">'+(f.bday?'F\u00f8dsels\u00e5r':'Start\u00e5r')+' <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
       +'<input class="inp" type="number" style="width:110px" value="'+esc(String(f.sinceYear||''))+'" placeholder="f.eks. 1986" oninput="mf().sinceYear=this.value">'
-      +'<div class="hint">Fødselsår, bryllupsår eller året det skjedde sist — så vises antall år automatisk, f.eks. «Kari · 40 år».</div>'
-      +(f.bday?'<label class="field-lbl">Hashtagger om denne personen <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
-        +((f.personTags||[]).length?'<div class="chips" style="margin-bottom:6px">'+(f.personTags||[]).map(function(t){
-            return'<button class="chip on" onclick="rmPersonTag(\''+q(t)+'\')">#'+esc(t)+' \u00d7</button>';
-          }).join('')+'</div>':'')
-        +'<div style="display:flex;gap:8px;align-items:center">'
-        +'<input class="inp" type="text" style="flex:1;margin:0" placeholder="F.eks. JennyA" value="'+esc(f._ptInput||'')+'" oninput="mf()._ptInput=this.value" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addPersonTag();}">'
-        +'<button class="chip" onclick="addPersonTag()">+ Legg til</button></div>'
-        +'<div class="hint">Innlegg i takknemlighetsboka som bruker disse stikkordene, vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og de tre Jenny-ene holdes fra hverandre.</div>':'')
       +(!f.bday?'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt, valgfritt</span></label>'
       +'<div class="chips">'+linkChipSection(f)+'</div>':'')
-      +(!f.bday&&(f.personTags||[]).length
-        ?'<label class="field-lbl">Gruppe</label>'
-         +'<div class="chips">'+(f.personTags||[]).map(function(t){
-            return'<button class="chip on" onclick="mf().personTags=(mf().personTags||[]).filter(function(x){return x!==\''+q(t)+'\';});render()">#'+esc(t)+' \u00d7</button>';
-          }).join('')+'</div>'
-         +'<div class="hint">Planen vises p\u00e5 gruppesiden under Folk.</div>'
-        :'')
       +(!f.bday?equipmentPickerHTML(f):'')
       +'<label class="field-lbl">Stikkord <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'+tagSectionHTML(f)
-      +'<label class="field-lbl">Kategori(er)</label>'
-      +'<div class="chips">'+catChipSection(f)+'</div>'
+      +(!f.bday?'<label class="field-lbl">Kategori(er)</label>'
+      +'<div class="chips">'+catChipSection(f)+'</div>':'')
       +(isEditE?'<button class="del-full-btn" onclick="deleteEvent(\''+q(f.id)+'\')">Slett hendelse</button>':'')
       +'<button class="save-btn" onclick="'+(isEditE?'saveEditEvent()':'submitEvent()')+'" '+(routineValid()?'':'disabled')+'>'+(isEditE?'Lagre endringer':'Lagre hendelse')+'</button>';
 
@@ -7034,18 +6829,12 @@ function hjemViewHTML(){
   var bdayToday=events.filter(function(e){return e.bday&&!erMinne(e)&&daysToNextBday(e)===0;});
   bdayToday.forEach(function(e){
     var nAge=erMinne(e)?null:bdayNextAge(e);
-    var yearAgo=new Date(today);yearAgo.setFullYear(yearAgo.getFullYear()-1);
-    var cnt=personEntryCountSince(e.name,isoDate(yearAgo));
     h+='<div class="card confetti" style="position:relative;overflow:hidden;background:#EDE7F1;border-color:#C9BBD6;padding:16px 16px 14px;margin-top:10px">'
       +confettiHTML()
       +'<div style="position:relative">'
       +'<div style="font-size:17px;font-weight:800;color:#5E4B6E">'+esc(e.name)+(nAge!==null?' fyller '+nAge+' i dag!':' har bursdag i dag!')+'</div>'
-      +'<div style="font-size:13px;color:#6D5A7D;margin-top:4px;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
-      +(personTagsFor(e.name).length
-        ? (cnt>0?'Du har merket '+cnt+' innlegg i takknemlighetsboka med '+esc(e.name)+' i året som har gått.'
-                :'Du har ikke merket noen innlegg med '+esc(e.name)+' i året som har gått.')
-        :'Knytt en hashtagg til '+esc(e.name)+' for å telle takknemlighet gjennom året.')
-      +' ›</div></div></div>';
+      +'<div style="font-size:13px;color:#6D5A7D;margin-top:4px;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">Se personsiden</div>'
+      +' \u203a</div></div>';
   });
 
   // Bursdager de neste to ukene
@@ -8737,7 +8526,7 @@ var tagSok='',tagSort='freq',tagKollaps={};
 function setTagSok(v){tagSok=v;render();}
 function toggleTagKollaps(k){tagKollaps[k]=!tagKollaps[k];render();}
 function hashtagsViewHTML(){
-  var h='<div class="view-sub" style="padding-top:8px">Knytt hvert stikkord til en kategori. Da f\u00e5r det en lysere versjon av kategoriens farge \u2014 i ordskya og p\u00e5 innleggene.</div>';
+  var h='<div class="view-sub" style="padding-top:8px">Knytt hvert stikkord til en kategori. To personer med samme fornavn kan for eksempel tagges med fullt navn eller som Jenny A. og Jenny N.</div>';
   var counts=allTagsPool();
   var tags=Object.keys(counts);
   if(!tags.length)return h+'<div class="card"><div class="empty">Ingen stikkord enn\u00e5. Legg til stikkord n\u00e5r du skriver innlegg.</div></div>';
@@ -9356,8 +9145,6 @@ function render(){
   else if(view.kind==='utstyrkat')content=katSideHTML('utstyr','Utstyr','kat_utstyr',
     listeKortHTML('utstyr','Utstyrslista','ting du eier, ordnet etter bruk og plassering','goUtstyr')
     +egneListerHTML());
-  else if(view.kind==='grupper')content=grupperViewHTML();
-  else if(view.kind==='gruppe')content=gruppeViewHTML();
   else if(view.kind==='strikkeverksted')content=strikkeverkstedViewHTML();
   else if(view.kind==='garnmatch')content=garnmatchViewHTML();
   else if(view.kind==='strikkeprosjekter')content=strikkeprosjekterViewHTML();
