@@ -417,7 +417,6 @@ var DEFAULT_UNITS=['bokser','dl','g','kg','kroner','liter','ml','n\u00f8ster','s
 var customUnits=[];
 var weeklyAvailableHours=0;
 var soundOn=true;
-var wipTak=0;
 // Hvilke kategorisider som vises i menyen. Ny bruker starter med Folk og Utstyr;
 // resten skrus på ved behov under Innstillinger → Personlig.
 var KAT_SIDER=[
@@ -2462,7 +2461,8 @@ function load(){
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
   try{weeklyAvailableHours=Number(localStorage.getItem(SK+'_availhours'))||0;}catch(e){weeklyAvailableHours=0;}
   try{soundOn=localStorage.getItem(SK+'_sound')!=='0';}catch(e){soundOn=true;}
-  try{wipTak=Number(localStorage.getItem(SK+'_wiptak'))||0;}catch(e){wipTak=0;}
+  try{var tp=Number(localStorage.getItem(SK+'_taktplan'));if(tp||tp===0)kanbanTakPlan=tp;}catch(e){}
+  try{var ta=Number(localStorage.getItem(SK+'_takarbeid'));if(ta||ta===0)kanbanTakArbeid=ta;}catch(e){}
   try{katVis=JSON.parse(localStorage.getItem(SK+'_katvis')||'{}');}catch(e){katVis={};}
   try{showMens=localStorage.getItem(SK+'_mensmeny')!=='0';}catch(e){showMens=true;}
   try{mensManuellSyklus=Number(localStorage.getItem(SK+'_menssyklus'))||null;}catch(e){mensManuellSyklus=null;}
@@ -3122,7 +3122,8 @@ function save(){
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
   try{localStorage.setItem(SK+'_availhours',String(weeklyAvailableHours));}catch(e){}
   try{localStorage.setItem(SK+'_sound',soundOn?'1':'0');}catch(e){}
-  try{localStorage.setItem(SK+'_wiptak',String(wipTak||0));}catch(e){}
+  try{localStorage.setItem(SK+'_taktplan',String(kanbanTakPlan));}catch(e){}
+  try{localStorage.setItem(SK+'_takarbeid',String(kanbanTakArbeid));}catch(e){}
   try{localStorage.setItem(SK+'_katvis',JSON.stringify(katVis));}catch(e){}
   try{localStorage.setItem(SK+'_mensmeny',showMens?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_menssyklus',String(mensManuellSyklus||''));}catch(e){}
@@ -4132,35 +4133,57 @@ function markEquipmentUsed(ids,label){
   });
 }
 // ── Kanban ──
-// Tre faser. «Ferdigstilt» speiler completedDate, så tavla og resten av appen
-// alltid er enige om hva som er ferdig.
-var KANBAN_FASER=[['plan','Planlegging'],['arbeid','Gjennomf\u00f8ring'],['ferdig','Ferdigstilt']];
+// Fire faser. Ferdigstilt speiler completedDate, så tavla og resten av appen
+// alltid er enige om hva som er ferdig. Ideer har ingen timebegrensning — det er
+// før noe i det hele tatt er bestemt.
+var KANBAN_FASER=[['ide','Ideer'],['plan','Planlegging'],['arbeid','Gjennomf\u00f8ring'],['ferdig','Ferdigstilt']];
+var kanbanTakPlan=5,kanbanTakArbeid=15;
 function kanbanFase(iv){
   if(iv.completedDate)return'ferdig';
-  return iv.fase==='arbeid'?'arbeid':'plan';
+  return iv.fase||'plan'; // gamle prosjekter uten fase havner i Planlegging, ikke Ideer
 }
 function kanbanFlytt(invId,retning){
   var iv=invById(invId);if(!iv)return;
   var naa=kanbanFase(iv);
   var i=KANBAN_FASER.findIndex(function(f){return f[0]===naa;});
-  var ny=KANBAN_FASER[Math.max(0,Math.min(2,i+retning))];
+  var ny=KANBAN_FASER[Math.max(0,Math.min(3,i+retning))];
   if(!ny||ny[0]===naa)return;
   if(ny[0]==='ferdig'){toggleProjectDone(invId);return;} // gir feiring og setter dato
   if(naa==='ferdig'){delete iv.completedDate;(iv.resultIds||[]).forEach(function(rid){var rr=resultById(rid);if(rr)rr.achieved=false;});}
   iv.fase=ny[0];
   save();render();
 }
-// Timer som gjenst\u00e5r p\u00e5 et prosjekt — brukes til taket p\u00e5 hva som er under arbeid
+// Timer denne uka, logget på prosjekter som står i en gitt fase å nå.
+// Bruker den vanlige timeføringen — ingen egen timeklokke per aktivitet.
+function kanbanUkeTimer(fase){
+  var mand=isoDate(mondayOf(today));
+  var sond=new Date(mondayOf(today));sond.setDate(sond.getDate()+6);
+  var sondIso=isoDate(sond);
+  var iProsjekter=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&kanbanFase(iv)===fase;});
+  var sum=0;
+  timeLogs.forEach(function(t){
+    if(t.kind!=='proj')return;
+    if(!(t.date>=mand&&t.date<=sondIso))return;
+    if(iProsjekter.some(function(iv){return iv.id===t.refId;}))sum+=Number(t.hours)||0;
+  });
+  return Math.round(sum*10)/10;
+}
+function kanbanSettTak(fase,v){
+  var n=Math.max(0,Number(v)||0);
+  if(fase==='plan')kanbanTakPlan=n;else kanbanTakArbeid=n;
+  save();render();
+}
+// Aktiviteter på et prosjekt kan høre til planleggingsfasen eller gjennomføringsfasen
+function projAktiviteter(iv,fase){
+  return(iv.items||[]).filter(function(it){return(it.fase||'arbeid')===fase;});
+}
+// Timer som gjenst\u00e5r p\u00e5 et prosjekt \u2014 vises p\u00e5 kortet
 function kanbanTimerIgjen(iv){
   if(!iv.trackHours)return null;
   var tot=Number(iv.hoursTotal)||0;
   if(!tot)return null;
   var brukt=hoursFor('proj',iv.id,null,null,'\u00e5r')||0;
   return Math.max(0,Math.round((tot-brukt)*10)/10);
-}
-function kanbanSettTak(v){
-  wipTak=Math.max(0,Number(v)||0);
-  save();render();
 }
 function goKanban(){view={kind:'kanban'};drawerOpen=false;render();}
 function kanbanViewHTML(){
@@ -4174,27 +4197,27 @@ function kanbanTavleHTML(){
   var h='';
   if(!alle.length)return'<div class="card"><div class="empty">Ingen prosjekter enn\u00e5.</div></div>';
 
-  var iArbeid=alle.filter(function(iv){return kanbanFase(iv)==='arbeid';});
-  var timerIArbeid=iArbeid.reduce(function(a,iv){return a+(kanbanTimerIgjen(iv)||0);},0);
-  // Tak p\u00e5 hvor mange som kan v\u00e6re under arbeid samtidig
-  h+='<div class="card" style="padding:10px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">'
-    +'<span style="flex:1">Under arbeid samtidig \u2013 h\u00f8yst <input class="inp" type="text" inputmode="numeric" style="width:44px;display:inline-block;margin:0 4px;padding:2px 4px;text-align:right" value="'+esc(wipTak||'')+'" placeholder="0" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="kanbanSettTak(this.value)"></span>'
-    +'<b style="color:'+(wipTak&&iArbeid.length>wipTak?'var(--red)':'var(--ink)')+'">'+iArbeid.length+(wipTak?' / '+wipTak:'')+'</b>'
-    +'</div>'
-    +(timerIArbeid?'<div style="font-size:11.5px;color:var(--muted);margin-top:4px">'+String(Math.round(timerIArbeid*10)/10).replace('.',',')+' timer gjenst\u00e5r p\u00e5 det som er under arbeid</div>':'')
-    +(wipTak&&iArbeid.length>wipTak?'<div style="font-size:11.5px;color:var(--red);margin-top:4px">Du har flere i gang enn du har satt som tak.</div>':'')
-    +'</div>';
+  // Ukens timer mot taket, for de to fasene som faktisk har et tak
+  var farger={ide:'#F2E9D8',plan:'',arbeid:'',ferdig:'#DCEEDD'};
+  [['plan','Planlegging',kanbanTakPlan],['arbeid','Gjennomf\u00f8ring',kanbanTakArbeid]].forEach(function(t){
+    var brukt=kanbanUkeTimer(t[0]);
+    var tak=t[0]==='plan'?kanbanTakPlan:kanbanTakArbeid;
+    h+='<div class="card" style="padding:8px 14px;margin-bottom:4px">'
+      +'<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">'
+      +'<span style="flex:1">'+t[1]+' denne uka \u2013 h\u00f8yst <input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px;text-align:right" value="'+esc(String(tak))+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="kanbanSettTak(\''+t[0]+'\',this.value)"> t/uke</span>'
+      +'<b style="color:'+(brukt>tak?'var(--red)':'var(--ink)')+'">'+String(brukt).replace('.',',')+' / '+tak+' t</b>'
+      +'</div></div>';
+  });
 
-  h+='<div style="display:flex;gap:6px;align-items:flex-start;padding:0 8px">';
+  h+='<div style="display:flex;gap:6px;align-items:flex-start;padding:4px 8px 0;overflow-x:auto">';
   KANBAN_FASER.forEach(function(f,fi){
     var iFase=alle.filter(function(iv){return kanbanFase(iv)===f[0];})
       .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
-    h+='<div style="flex:1;min-width:0">'
-      +'<div style="padding:6px 2px 3px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grp)">'
+    h+='<div style="flex:1;min-width:118px;background:'+(farger[f[0]]||'transparent')+';border-radius:10px;padding:2px">'
+      +'<div style="padding:6px 4px 3px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grp)">'
       +f[1]+' <span style="font-weight:400;color:var(--rose)">'+iFase.length+'</span></div>';
     if(!iFase.length){
-      h+='<div style="font-size:11px;color:var(--muted);padding:4px 2px">\u2013</div>';
+      h+='<div style="font-size:11px;color:var(--muted);padding:4px 4px 8px">\u2013</div>';
     }
     iFase.forEach(function(iv){
       var col=catColor((iv.catIds&&iv.catIds[0])||iv.catId)||'var(--line)';
@@ -4207,7 +4230,7 @@ function kanbanTavleHTML(){
         +(frist?'<div style="font-size:10px;margin-top:1px;color:'+(forsinket?'var(--red)':'var(--muted)')+'">'+(iv.completedDate?'\u2713 '+fmtDate(iv.completedDate):'frist '+frist)+'</div>':'')
         +'<div style="display:flex;gap:3px;margin-top:4px">'
         +(fi>0?'<button class="icon-btn" style="font-size:11px;padding:1px 6px" onclick="kanbanFlytt(\''+q(iv.id)+'\',-1)">\u2039</button>':'')
-        +(fi<2?'<button class="icon-btn" style="font-size:11px;padding:1px 6px;margin-left:auto" onclick="kanbanFlytt(\''+q(iv.id)+'\',1)">\u203a</button>':'')
+        +(fi<3?'<button class="icon-btn" style="font-size:11px;padding:1px 6px;margin-left:auto" onclick="kanbanFlytt(\''+q(iv.id)+'\',1)">\u203a</button>':'')
         +'</div></div>';
     });
     h+='</div>';
@@ -4537,11 +4560,11 @@ function openInvItemModal(invId,secId){
   if(iv.fixed==='anskaffelser'&&!secId)secId='ik_passer';
   var t=iv.type||'inventar';
   var defHave=(t!=='pakke'&&t!=='prosjekt');
-  modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:vals,have:defHave,_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
+  modal={step:'invitem',form:{invId:invId,sectionId:secId,name:'',note:'',mdate:'',inCal:false,values:vals,have:defHave,fase:'arbeid',_x:0,goalIds:[],resultIds:[],routineIds:[],eventIds:[]}};render();
 }
 function openEditInvItem(invId,itemId){
   var inv=invById(invId);var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
-  modal={step:'invitem_edit',form:{invId:invId,id:itemId,sectionId:it.sectionId,name:it.name,note:it.note||'',mdate:it.date||'',inCal:it.inCal!==false,values:JSON.parse(JSON.stringify(it.values||{})),have:!!it.have}};render();
+  modal={step:'invitem_edit',form:{invId:invId,id:itemId,sectionId:it.sectionId,name:it.name,note:it.note||'',mdate:it.date||'',inCal:it.inCal!==false,values:JSON.parse(JSON.stringify(it.values||{})),have:!!it.have,fase:it.fase||'arbeid'}};render();
 }
 // Beredskapsrelevante punkter havner automatisk i Beredskapslageret, med samme
 // syncId som den vanlige avhaknings-synken bruker — så «på plass» holder seg i takt
@@ -4639,7 +4662,7 @@ function submitInvItem(){
   var inv=invById(f.invId);if(!inv)return;
   // I garnleksikonet er navnet garnnavnet — speil det så matchingen finner det igjen
   if(inv.fixed==='garntyper'){f.values=f.values||{};f.values.__garnnavn=n;}
-  var newItem={id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:f.sectionId||null,name:n,note:(f.note||'').trim(),date:f.mdate||'',inCal:!!f.inCal,values:f.values||{},have:!!f.have,goalIds:f.goalIds||[],resultIds:f.resultIds||[],routineIds:f.routineIds||[],eventIds:f.eventIds||[]};
+  var newItem={id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:f.sectionId||null,name:n,note:(f.note||'').trim(),date:f.mdate||'',inCal:!!f.inCal,values:f.values||{},have:!!f.have,fase:(inv.type||'inventar')==='prosjekt'?(f.fase||'arbeid'):undefined,goalIds:f.goalIds||[],resultIds:f.resultIds||[],routineIds:f.routineIds||[],eventIds:f.eventIds||[]};
   inv.items=(inv.items||[]).concat([newItem]);
   if(inv.fixed==='utstyr'||inv.fixed==='forbruksvarer')ensureBeredskapSync(inv.id,newItem.id,(newItem.values||{}).__bered==='ja');
   save();closeModal();
@@ -4649,6 +4672,7 @@ function saveEditInvItem(){
   var inv=invById(f.invId);var it=(inv.items||[]).find(function(x){return x.id===f.id;});if(!it)return;
   if(inv.fixed==='garntyper'){f.values=f.values||{};f.values.__garnnavn=n;}
   it.name=n;it.sectionId=f.sectionId||null;it.note=(f.note||'').trim();it.date=f.mdate||'';it.inCal=!!f.inCal;it.values=f.values||{};it.have=!!f.have;
+  if((inv.type||'inventar')==='prosjekt')it.fase=f.fase||'arbeid';
   if(inv.fixed==='utstyr'||inv.fixed==='forbruksvarer')ensureBeredskapSync(inv.id,it.id,(it.values||{}).__bered==='ja');
   save();closeModal();
 }
@@ -6051,6 +6075,11 @@ function modalHTML(){
       +'<div class="modal-title">'+(isEditT?(isProj?'Rediger milep\u00e6l':'Rediger punkt'):(isProj?'Ny milep\u00e6l':'Nytt punkt'))+'</div>'
       +'<label class="field-lbl">'+(invT.fixed==='garntyper'?'Garnnavn':'Navn')+'</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="'+(invT.fixed==='garntyper'?'F.eks. Finull, Peer Gynt \u2026':'F.eks. f\u00f4rede vinterst\u00f8vletter til penbruk \u2026')+'" oninput="mf().name=this.value;updateSaveBtn()">'
+      +(isProj?'<label class="field-lbl">H\u00f8rer til</label>'
+        +'<div class="chips">'
+        +'<button class="chip'+((f.fase||'arbeid')==='plan'?' on':'')+'" onclick="mf().fase=\'plan\';render()">Planlegging</button>'
+        +'<button class="chip'+((f.fase||'arbeid')!=='plan'?' on':'')+'" onclick="mf().fase=\'arbeid\';render()">Gjennomf\u00f8ring</button>'
+        +'</div>':'')
       +((function(){
         var t=invT.type||'inventar';
         if(t==='pakke'||t==='prosjekt'||invT.fixed==='garntyper'||invT.fixed==='strikkeoppskrifter')return'';
