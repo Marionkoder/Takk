@@ -1096,8 +1096,7 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
       return(iv.type||'inventar')==='prosjekt'&&!iv.completedDate
         &&((iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[])).indexOf(uc.id)>=0);
     }).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
-    var uRts=routines.filter(function(r){return(r.cats||[]).indexOf(uc.id)>=0;})
-      .sort(function(a,b){return nbSort(a.name,b.name);});
+    // Rutiner vises ikke her — de ligger som knapper under Gantt-diagrammet
     var uEvs=alleEvs.filter(function(e){return!naereIds[e.id]&&(e.cats||[]).indexOf(uc.id)>=0;});
     // Faste lister knyttet til denne underkategorien — f.eks. et lager
     var uLager=inventories.filter(function(iv){return iv.fixed&&iv.catId===uc.id;});
@@ -1131,19 +1130,13 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
         +'<div class="entry-date">prosjekt'+(iv.endDate?' \u00b7 frist '+fmtDate(iv.endDate):'')+'</div></div>'
         +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     });
-    uRts.forEach(function(r){
-      vanlig+='<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
-        +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
-        +'<div class="entry-date">rutine \u00b7 '+esc(freqShort(r))+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    });
     uEvs.forEach(function(e){
       vanlig+='<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
         +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
         +'<div class="entry-date">plan \u00b7 '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
         +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     });
-    var tomtVanlig='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt, en rutine eller en plan.</div>';
+    var tomtVanlig='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt eller en plan.</div>';
 
     h+='<div class="sec-title">'+esc(uc.name)+'</div>';
     if(berKol){
