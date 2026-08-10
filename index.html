@@ -269,12 +269,6 @@ var UKEDAGER_FULL=['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','sø
 function pad(n){return String(n).padStart(2,'0');}
 function dow(d){return(new Date(d).getDay()+6)%7;}
 // Dagens nøkkel for en daglig rutine — null hvis rutinen ikke gjelder i dag
-function rutineDagNokkel(r){
-  if(r.freq!=='daily')return null;
-  var rd=r.days||[];
-  if(rd.length&&rd.indexOf(dow(today))<0)return null;
-  return'd'+isoDate(today);
-}
 // Mengde over tid for en daglig rutine — «11 av 14», uten rekker som kan brytes.
 // Teller bare dagene rutinen faktisk gjaldt, så ukedagsbegrensning ikke gir falskt lav score.
 function rutineMengde(r,dager){
@@ -405,7 +399,6 @@ function submitTagMerge(){
 }
 var administrerTab='kategorier';
 function goAdministrer(tab){view={kind:'administrer'};if(tab)administrerTab=tab;drawerOpen=false;render();}
-function goHashtags(){goAdministrer('hashtagger');}
 // gift: {id, person, bdayId(valgfri), kind:'bursdag'|'jul'|'annet', year, what, idea:bool, received:bool, greeting:bool(bursdagshilsen), card:bool(julekort), note}
 function giftPeople(){
   var names={};
@@ -710,7 +703,6 @@ function rmPlace(lv,name){
   places[key]=(places[key]||[]).filter(function(x){return x!==name;});
   save();render();
 }
-function goPlassering(){goAdministrer('plassering');}
 function plasseringViewHTML(){
   var h='<div class="view-sub" style="padding-top:8px">Tre niv\u00e5er du kan velge mellom n\u00e5r du legger inn ting i inventarlistene. Niv\u00e5 1 er p\u00e5krevd, de to neste er frivillige.</div>';
   var lvl=[[1,'Niv\u00e5 1','F.eks. Hus, Hytte, Garasje'],[2,'Niv\u00e5 2','F.eks. Kj\u00f8kkenet, Kjelleren, Loftet'],[3,'Niv\u00e5 3','F.eks. \u00d8verste hylle, Skuff 2']];
@@ -759,7 +751,6 @@ function addCustomUnit(u){
   customUnits.push(u);save();
   return u;
 }
-function goLister(){view={kind:'lister'};drawerOpen=false;render();}
 function goBeredskap(){view={kind:'beredskap'};drawerOpen=false;render();}
 function goInnkjop(){var iv=findFixedList('anskaffelser');if(iv)goInventar(iv.id);}
 // Egne, ikke-faste inventarlister — nå plassert på Utstyr-siden, siden det stort
@@ -1019,7 +1010,6 @@ function lagreSomGarntype(){
   save();render();
 }
 function goGarntyper(){view={kind:'garntyper'};drawerOpen=false;render();}
-function goGarnmatch(){view={kind:'garnmatch'};drawerOpen=false;render();}
 function garnmatchViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Hva kan jeg strikke n\u00e5?</div>'
@@ -1194,7 +1184,6 @@ function katSideStart(cat){
 }
 function katSideSlutt(){return'</div>';}
 function folkCat(){return katVedNavn('folk');}
-function kreativitetCat(){return katVedNavn('kreativitet');}
 function catIdsUnder(cat){
   if(!cat)return [];
   return [cat.id].concat(cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;}));
@@ -1488,6 +1477,8 @@ function katRutineKnapperHTML(ids){
     {tit:'I \u00e5r',liste:[]}
   ];
   mine.forEach(function(r){
+    // Rutiner som bare gjelder visse m\u00e5neder, skal ikke dukke opp utenom
+    if(r.months&&r.months.length&&r.months.indexOf(curMonth)<0)return;
     var f=r.freq||'monthly';
     if(f==='daily'){
       var rd=r.days||[];
@@ -1694,7 +1685,6 @@ function kreativitetViewHTML(){
   return katSideHTML('kreativitet','Kreativitet','kreativitet',verksted);
 }
 function goStrikkeverksted(){view={kind:'strikkeverksted'};drawerOpen=false;render();}
-function goStrikkeprosjekter(){view={kind:'strikkeprosjekter'};drawerOpen=false;render();}
 function strikkeverkstedViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Strikkeverksted</div>'
@@ -1709,7 +1699,6 @@ function strikkeverkstedViewHTML(){
   });
   return h;
 }
-function goGarnlager(){view={kind:'garnlager'};drawerOpen=false;render();}
 function goStrikkeoppskrifter(){view={kind:'strikkeoppskrifter'};drawerOpen=false;render();}
 function goStrikkeutstyr(){view={kind:'strikkeutstyr'};drawerOpen=false;render();}
 function strikkeprosjekterViewHTML(){
@@ -1969,12 +1958,6 @@ function mensKortTekst(){
   if(dager<0)return'dag '+dag+' \u00b7 neste ventet, '+Math.abs(dager)+' dag'+(Math.abs(dager)===1?'':'er')+' forsinket';
   if(dager===0)return'dag '+dag+' \u00b7 neste ventet i dag';
   return'dag '+dag+' \u00b7 neste ventet om '+dager+' dag'+(dager===1?'':'er');
-}
-function mensKortHTML(){
-  return'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goMens()">'
-    +'<div class="entry-body"><div class="entry-text">Menstruasjon</div>'
-    +'<div class="entry-date">'+esc(mensKortTekst())+'</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
 }
 // Dagsmerker for en vilkårlig dato — brukt både på mens-siden (for i dag) og
 // som «tvilling» på Dag-siden i Loggføring, så begge alltid viser samme greie.
@@ -2301,7 +2284,6 @@ function startCelebration(){window._celebSlide=0;view={kind:'celebration'};drawe
 function celebNext(){window._celebSlide=(window._celebSlide||0)+1;render();}
 function celebPrev(){window._celebSlide=Math.max(0,(window._celebSlide||0)-1);render();}
 function closeCelebration(){markCelebrationSeen();window._celebSlide=0;goHjem();}
-function goBursdager(){goFolk();}
 var bdaySort='dato';
 function goBursdagsliste(){view={kind:'bursdagsliste'};drawerOpen=false;render();}
 function goGaver(){view={kind:'gaver'};drawerOpen=false;render();}
@@ -2400,7 +2382,6 @@ function submitGift(){
 function giftIdeaToGiven(id){var g=gifts.find(function(x){return x.id===id;});if(g){g.idea=false;save();render();}}
 function deleteGift(id){gifts=gifts.filter(function(x){return x.id!==id;});save();closeModal();}
 // Bursdagshilsen og julekort logges per person per år
-function greetKey(person,year,kind){return 'gr_'+kind+'_'+year+'_'+(person||'').trim();}
 function greetDone(person,year,kind){return gifts.some(function(g){return g.greetMark&&g.person===(person||'').trim()&&g.year===year&&g.kind===kind;});}
 function toggleGreet(person,year,kind){
   var existing=gifts.find(function(g){return g.greetMark&&g.person===(person||'').trim()&&g.year===year&&g.kind===kind;});
@@ -2440,7 +2421,6 @@ function personEntryCountSince(person,fromIso){
     return (e.tags||[]).some(function(t){return tags.indexOf(normTag(t))>=0;});
   }).length;
 }
-var dOpenMonth={},dOpenSec={};
 var view={kind:'hjem',month:curMonth,year:curYear};
 var navHistory=[];
 // Generisk tilbakeknapp: går til den faktiske forrige siden, uansett hvordan
@@ -3151,30 +3131,9 @@ function save(){
 }
 
 var tb={sleep:8,work:40,meals:2,rest:10};
-function setTb(k,v){tb[k]=Number(v)||0;save();render();}
-function tbFreeHours(){
-  return Math.max(0,168-(Number(tb.sleep)||0)*7-(Number(tb.work)||0)-(Number(tb.meals)||0)*7-(Number(tb.rest)||0));
-}
-function routineWeeklyHours(r){
-  var min=Number(r.minutes)||0;if(!min)return 0;
-  var perWeek=r.freq==='weekly'?1:(r.freq==='odd'||r.freq==='even')?0.5:1/4.345;
-  var monthShare=(r.months&&r.months.length)?r.months.length/12:1;
-  return min/60*perWeek*monthShare;
-}
-function projActive(iv){
-  if((iv.type||'inventar')!=='prosjekt')return false;
-  var t=isoDate(today);
-  if(iv.startDate&&t<iv.startDate)return false;
-  if(iv.endDate&&t>iv.endDate)return false;
-  return!(iv.items||[]).length||(iv.items||[]).some(function(it){return!it.have;});
-}
-
-var listFilter='alle';
 
 /* ── Navigasjon ── */
 function toggleDrawer(){drawerOpen=!drawerOpen;render();}
-function dToggleMonth(m){dOpenMonth[m]=!dOpenMonth[m];render();}
-function dToggleSec(key){dOpenSec[key]=!dOpenSec[key];render();}
 function goArsrapport(y){view={kind:'arsrapport',year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
 function goRapport(m,y){view={kind:'rapport',month:m,year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
 function goHjem(){recentDone={};view={kind:'hjem',month:curMonth,year:curYear};selectedTag=null;searchQuery='';drawerOpen=false;render();}
@@ -3336,7 +3295,6 @@ function resultById(id){return results.find(function(r){return r.id===id;});}
 // Alle prosjekter ligger nå i inventories
 function alleProsjekter(){return inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});}
 function prosjekterForGrunnverdi(gid){return alleProsjekter().filter(function(iv){return(iv.goalIds||[]).indexOf(gid)>=0;});}
-function prosjektFrist(iv){return iv.endDate||'';}
 function resultsFor(goalId){return results.filter(function(r){return r.valueId===goalId;}).sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);});}
 function monthsLeft(r){return(r.year-curYear)*12+(r.month-curMonth);}
 function resultDeadlineHTML(r){
@@ -3376,7 +3334,6 @@ function resultCatMatch(r,entryCats){
     return!!(c&&c.parentId&&sc.includes(c.parentId));
   });
 }
-function openResultModal(){modal={step:'result',form:{name:'',shortTitle:'',subtype:'',tags:[],valueId:'',month:curMonth,year:curYear+1,startMonth:'',startYear:'',subCats:[],achieved:false,targetAmount:'',amountType:'',hoursTotal:'',hoursMode:'total',trackHours:true,invIds:[],equipmentIds:[],budgetCat:'',milestones:[],_msName:'',_msDate:'',forutsetninger:'',risikoer:'',routineIds:[],eventIds:[]}};render();}
 function openEditResult(id){
   // Etter sammenslåingen redigeres alt gjennom prosjektet
   var eier=inventories.find(function(iv){
@@ -3495,21 +3452,6 @@ function toggleFormInvList(id){
   mf().invIds=a.includes(id)?a.filter(function(x){return x!==id;}):[].concat(a,[id]);
   render();
 }
-function placeResultFormInBudget(){
-  var f=mf();
-  var amt=parseKr(f.targetAmount);if(!amt)return;
-  if(f.amountType!=='in'&&f.amountType!=='ut')return;
-  var catId=f.budgetCat;if(!catId)return;
-  var yr=Number(f.year);
-  var row=budgetRowFor(catId,yr,true);
-  row.type=f.amountType;
-  var qi=Math.floor((Number(f.month)-1)/3);
-  row.plan[qi]=(row.plan[qi]||0)+amt;
-  row.planNote=row.planNote||[];
-  row.planNote[qi]=((row.planNote[qi]?row.planNote[qi]+' \u00b7 ':'')+(f.name||'').trim()).slice(0,120);
-  f._budgetPlaced=yr;
-  save();render();
-}
 function submitResult(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId||!f.subtype)return;
@@ -3575,11 +3517,6 @@ function budgetRowFor(catId,year,create){
   }
   return row||null;
 }
-function setBudget(catId,year,qi,field,val){
-  var row=budgetRowFor(catId,Number(year),true);
-  row[field][qi]=parseKr(val);
-  save();render();
-}
 var KVARTAL=['Q1 januar\u2013mars','Q2 april\u2013juni','Q3 juli\u2013september','Q4 oktober\u2013desember'];
 function setBudgetNote(rowId,qi,field,val){
   var row=budgetRows.find(function(b){return b.id===rowId;});if(!row)return;
@@ -3598,52 +3535,6 @@ function omViewHTML(){
     +'<div class="card" style="padding:16px 18px;font-size:14px;line-height:1.7">'
     +'Dette er en betaversjon. Alle immaterielle rettigheter tilh\u00f8rer M. All bruk av appen skjer p\u00e5 eget ansvar.'
     +'</div>';
-}
-function listerViewHTML(){
-  var h='<div class="view-title">Lister</div>';
-  h+='<div class="view-sub">Faste lister og dine egne.</div>';
-  // Faste lister
-  var fixed=[];
-  var userLists=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')!=='prosjekt';});
-  var rowFor=function(inv){
-    var c=invCounts(inv);
-    var typeTxt=inv.fixed==='anskaffelser'?'prioriterte innkj\u00f8p':inv.fixed==='beredskap'?'beredskapslager'
-      :(inv.type||'inventar')==='pakke'?(inv.pakkeFast?'fast pakkeliste':'pakkeliste'):'inventarliste';
-    return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+' <span style="font-size:10px;color:var(--rose)">\u00b7 '+typeTxt+'</span></div>'
-      +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 gjenst\u00e5r '+c.missing+'</span>':'')+'</div></div>'
-      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-  };
-  h+='<div class="card">'
-    +'<div class="entry-row" style="cursor:pointer" onclick="goVenteliste()">'
-    +'<div class="entry-body"><div class="entry-text">Venteliste</div>'
-    +'<div class="entry-date">'+laters.length+' ting venter</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  // Egne lister
-  h+='<button class="add-btn" onclick="openInvModal()">+ Ny liste</button>';
-  var packs=userLists.filter(function(iv){return(iv.type||'inventar')==='pakke';}).sort(function(a,b){return nbSort(a.name,b.name);});
-  var invs=userLists.filter(function(iv){return(iv.type||'inventar')==='inventar';}).sort(function(a,b){return nbSort(a.name,b.name);});
-  var colRow=function(inv){
-    var c=invCounts(inv);
-    return'<div class="entry-row" style="cursor:pointer;padding:8px 10px" onclick="goInventar(\''+q(inv.id)+'\')">'
-      +'<div class="entry-body"><div class="entry-text" style="font-size:14px">'+esc(inv.name)
-      +((inv.type||'inventar')==='pakke'&&inv.pakkeFast?' <span style="font-size:10px;color:var(--rose)">\u00b7 fast</span>':'')+'</div>'
-      +'<div class="entry-date">'+c.have+' av '+c.total+(c.missing?' <span style="color:var(--amber)">\u00b7 '+c.missing+'</span>':'')+'</div></div></div>';
-  };
-  if(packs.length||invs.length){
-    h+='<div class="sec-title">Egne lister</div>';
-    h+='<div style="display:flex;gap:8px;padding:0 12px">'
-      +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);padding:2px 2px 6px">Pakkelister</div>'
-        +(packs.length?'<div class="card" style="margin:0">'+packs.map(colRow).join('')+'</div>':'<div style="font-size:12px;color:var(--muted);padding:4px 2px">Ingen enn\u00e5</div>')
-      +'</div>'
-      +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);padding:2px 2px 6px">Inventarlister</div>'
-        +(invs.length?'<div class="card" style="margin:0">'+invs.map(colRow).join('')+'</div>':'<div style="font-size:12px;color:var(--muted);padding:4px 2px">Ingen enn\u00e5</div>')
-      +'</div>'
-    +'</div>';
-  }
-  return h;
 }
 function giftMatrixHTML(entries,names,clickable){
   var years=Array.from(new Set(entries.map(function(g){return Number(g.year);}))).sort(function(a,b){return b-a;});
@@ -3957,7 +3848,6 @@ function personligViewHTML(){
     +'</div>';
   return h;
 }
-function goKategorier(){goAdministrer('kategorier');}
 function openPinSetup(){
   var pd=pinData();
   modal={step:'pinsetup',form:{has:!!pd,pin:'',pin2:'',q:pd?pd.q:'',a:'',cur:'',showOff:false}};render();
@@ -4129,16 +4019,8 @@ function addBudgetLine(catId){
   save();closeModal();
 }
 function removeBudgetLine(rowId){budgetRows=budgetRows.filter(function(b){return b.id!==rowId;});save();closeModal();}
-function openBudgetLineModal(){modal={step:'budgetline',form:{type:'ut'}};render();}
-function openEditBudgetRow(rowId){
-  var row=budgetRows.find(function(b){return b.id===rowId;});if(!row)return;
-  modal={step:'budgetrow_edit',form:{id:rowId,catId:row.catId}};render();
-}
 function savedFor(resultId){
   return deposits.filter(function(d){return d.resultId===resultId;}).reduce(function(a,d){return a+(Number(d.amount)||0);},0);
-}
-function openPostingModal(){
-  modal={step:'posting',form:{rowId:'',amount:'',qi:Math.ceil(curMonth/3)-1,note:''}};render();
 }
 function submitPosting(){
   var f=mf();var amt=parseKr(f.amount);
@@ -4691,11 +4573,6 @@ function deleteInvItem(){
   achievements=achievements.filter(function(a){return a.key!==nokkel;});
   save();closeModal();
 }
-function toggleFormRoutineId(id){
-  var a=mf().routineIds||[];
-  mf().routineIds=a.includes(id)?a.filter(function(x){return x!==id;}):[].concat(a,[id]);
-  render();
-}
 function toggleFormEventId(id){
   var a=mf().eventIds||[];
   mf().eventIds=a.includes(id)?a.filter(function(x){return x!==id;}):[].concat(a,[id]);
@@ -4711,13 +4588,6 @@ function invRowToLater(invId,itemId){
   save();render();
 }
 function findFixedList(kind){return inventories.find(function(iv){return iv.fixed===kind;});}
-function laterToAnskaffelser(laterId){
-  var l=laters.find(function(x){return x.id===laterId;});if(!l)return;
-  var inv=findFixedList('anskaffelser');if(!inv)return;
-  inv.items=(inv.items||[]).concat([{id:'ii'+Date.now()+Math.random().toString(36).slice(2,6),sectionId:null,name:l.name,note:l.note||'',date:'',inCal:false,values:{__qty:'1',__unit:'stk'},have:false}]);
-  laters=laters.filter(function(x){return x.id!==laterId;});
-  save();render();
-}
 function invItemToLater(){
   var f=mf();var inv=invById(f.invId);if(!inv)return;
   var gids=[].concat(inv.goalIds||[]);
@@ -6942,8 +6812,6 @@ function boxToggleEvent(id,occYear){
   toggleEvent(id,occYear);
 }
 var planTab='verdier';
-function goPlanleggingProsjekt(){planTab='tidslinje';view={kind:'planlegging'};drawerOpen=false;render();}
-function goPlanleggingPakke(){goReiser();}
 function toggleQuickCat(id){
   var a=quickForm.cats;
   quickForm.cats=a.includes(id)?a.filter(function(x){return x!==id;}):[].concat(a,[id]);
@@ -7347,32 +7215,6 @@ function routineWeeksIn(m,y,freq){
   }
   return list;
 }
-function routineChipItems(list,m,y,onlyCurrentWeek){
-  var ym=y+'-'+pad(m);
-  var items=[];
-  var nowKey='w'+weekYear(today)+'-'+pad(weekNum(today));
-  list.forEach(function(r){
-    if(isWeekly(r)){
-      routineWeeksIn(m,y,r.freq).forEach(function(w){
-        if(onlyCurrentWeek&&w.key!==nowKey)return;
-        items.push({rid:r.id,key:w.key,label:r.name+' · uke '+w.week,done:(r.log||[]).includes(w.key)});
-      });
-    } else {
-      items.push({rid:r.id,key:ym,label:r.name,done:(r.log||[]).includes(ym)});
-    }
-  });
-  return items;
-}
-function routineChipsHTML(items){
-  var h='<div class="rt-chips">';
-  items.forEach(function(it){
-    var click=editMode?'openEditRoutine(\''+q(it.rid)+'\')':'toggleRoutine(\''+q(it.rid)+'\',\''+q(it.key)+'\')';
-    h+='<button class="rt-btn'+(it.done?' done':'')+'" onclick="'+click+'">'+(editMode?'✎ ':'')+esc(it.label)+(it.done?' ✓':'')+'</button>';
-  });
-  h+='</div>';
-  return h;
-}
-
 function kalNavHTML(){
   return'<div class="chips" style="justify-content:center;padding:10px 12px 0">'
     +'<button class="chip'+(view.kind==='dag'?' on':'')+'" onclick="goDag()">Dagsvisning</button>'
@@ -8197,11 +8039,6 @@ function lightHex(hex,f){
   return'rgb('+mix(r,242)+','+mix(g,238)+','+mix(b,229)+')';
 }
 function frittResultater(){return [];}
-function projResultIdSet(){
-  var s={};
-  inventories.forEach(function(iv){if((iv.type||'inventar')==='prosjekt')(iv.resultIds||[]).forEach(function(rid){s[rid]=true;});});
-  return s;
-}
 function ganttRows(){
   var rows=[];
   inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&(iv.startDate||iv.endDate);}).forEach(function(iv){
@@ -8711,10 +8548,6 @@ function inventarViewHTML(){
   return h;
 }
 
-function budgetCellHTML(row,qi,field){
-  var v=row[field][qi];
-  return'<input class="inp" type="text" inputmode="numeric" style="width:76px;margin:0;padding:6px 8px;font-size:13px;text-align:right" value="'+(v===null?'':fmtKr(v))+'" placeholder="\u2013" onchange="setBudget(\''+q(row.catId)+'\','+row.year+','+qi+',\''+field+'\',this.value)">';
-}
 function innstillingerViewHTML(){
   var h='<div class="view-title">Innstillinger</div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goPersonlig()">'
@@ -8758,7 +8591,6 @@ function catUsage(catId){
   if(n)u.push(n+' innlegg');
   return u;
 }
-function tagCloudSpread(counts){return cloudWordsHTML(counts,true);}
 // Inline-ordsky for kategoriblokkene — samme ti-mest-brukte-oppførsel, men uten kort og overskrift
 function inlineCloudHTML(counts,key){
   var total=Object.keys(counts).filter(function(w){return counts[w]>0;}).length;
