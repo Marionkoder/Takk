@@ -4323,7 +4323,20 @@ function recommendedPaceHours(it){
   if(remaining<=0)return 0;
   return Math.round(remaining/monthsLeft*10)/10;
 }
-function timeTrackedItems(){return prioritizedTimeItems().filter(function(it){return it.trackHours;});}
+// Bare prosjekter som faktisk står i Planlegging eller Gjennomf\u00f8ring p\u00e5 Kanban-tavla
+// dukker opp som noe \u00e5 f\u00f8re timer p\u00e5 \u2014 en id\u00e9 eller et ferdigstilt prosjekt skal ikke
+// ligge og kreve tid i Loggf\u00f8ring.
+function timeTrackedItems(){
+  return prioritizedTimeItems().filter(function(it){
+    if(!it.trackHours)return false;
+    if(it.kind==='proj'){
+      var iv=invById(it.refId);
+      var fase=iv?kanbanFase(iv):null;
+      if(fase!=='plan'&&fase!=='arbeid')return false;
+    }
+    return true;
+  });
+}
 function moneyTrackedItems(){return prioritizedTimeItems().filter(function(it){return it.moneyRes&&it.moneyRes.amountType;});}
 // Har prosjektet/prosjektet startet innen utgangen av den bladde perioden? Brukes til å filtrere
 // Tid og penger per måned/år, så ting med senere startdato ikke dukker opp for tidlig.
