@@ -1569,30 +1569,11 @@ function listeKortHTML(key,tittel,undertekst,fn){
 }
 function goKreativitet(){view={kind:'kreativitet'};drawerOpen=false;render();}
 function kreativitetViewHTML(){
-  // Bruker den generiske kategorisiden, med verkstedene lagt inn etter ordskya
-  var knitProjs=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt'&&iv.subtype==='strikk';}).length
-    +frittResultater().filter(function(r){return r.subtype==='strikk';}).length;
-  var verksted='<div class="sec-title">Verksteder</div>'
-    +'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goStrikkeverksted()">'
-    +'<div class="entry-body"><div class="entry-text">Strikkeverksted</div>'
-    +'<div class="entry-date">'+knitProjs+' prosjekt'+(knitProjs===1?'':'er')+' \u00b7 garnlager, oppskrifter og utstyr</div></div>'
-    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  return katSideHTML('kreativitet','Kreativitet','kreativitet',verksted);
-}
-function goStrikkeverksted(){view={kind:'strikkeverksted'};drawerOpen=false;render();}
-function strikkeverkstedViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
-    +'<div class="view-title">Strikkeverksted</div>'
-    +'<div class="view-sub">Alt som h\u00f8rer til strikkingen p\u00e5 ett sted.</div>';
-  [['garntyper','goGarntyper'],['strikkeoppskrifter','goStrikkeoppskrifter'],['strikkeutstyr','goStrikkeutstyr']].forEach(function(t){
-    var inv=findFixedList(t[0]);if(!inv)return;
-    var c=invCounts(inv);
-    h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="'+t[1]+'()">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(inv.name)+'</div>'
-      +'<div class="entry-date">'+c.total+' oppf\u00f8ring'+(c.total===1?'':'er')+'</div></div>'
-      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  });
-  return h;
+  // Garntyper og strikkeoppskrifter ligger nå som vanlige listekort, akkurat som
+  // Utstyr og Forbruksvarer gjør på sine kategorisider — ingen egen verksted-hub.
+  var ekstra=listeKortHTML('garntyper','Garntyper','oppslagsverk over garnet du bruker','goGarntyper')
+    +listeKortHTML('strikkeoppskrifter','Strikkeoppskrifter','med automatisk garnstatus','goStrikkeoppskrifter');
+  return katSideHTML('kreativitet','Kreativitet','kreativitet',ekstra);
 }
 function goStrikkeoppskrifter(){view={kind:'strikkeoppskrifter'};drawerOpen=false;render();}
 function goStrikkeutstyr(){view={kind:'strikkeutstyr'};drawerOpen=false;render();}
@@ -1710,9 +1691,7 @@ function printOversikt(invId){
 }
 function fixedListHubHTML(key,title,sub){
   var inv=findFixedList(key);
-  var knitKeys=['garnlager','garntyper','strikkeoppskrifter','strikkeutstyr'];
-  var backFn='goBack()';
-  var h=backFn?'<div style="padding:14px 12px 0"><button class="icon-btn" onclick="'+backFn+'">\u2039</button></div>':'';
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>';
   h+='<div class="view-title">'+esc(title)+'</div>';
   if(sub)h+='<div class="view-sub">'+sub+'</div>';
   if(!inv)return h+'<div class="card"><div class="empty">Lista finnes ikke.</div></div>';
@@ -2421,6 +2400,21 @@ function load(){
       if(glInv)glInv.catId=paLager.id;
     }
     try{localStorage.setItem(SK+'_garnlagerkat1','1');}catch(e){}
+    save();
+  }
+
+  // Strikkeverkstedet avvikles: strikkeutstyr havner under «På lager» sammen med
+  // garnlageret (begge er fysiske ting du oppbevarer). Garntyper og strikkeoppskrifter
+  // er referanselister uten fast plassering, og trenger ingen underkategori.
+  var sv1=false;try{sv1=!!localStorage.getItem(SK+'_strikkeverkstedvekk1');}catch(e){}
+  if(!sv1){
+    var kreCat2=cats.find(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='kreativitet';});
+    if(kreCat2){
+      var paLager2=cats.find(function(c){return c.parentId===kreCat2.id&&(c.name||'').toLowerCase()==='p\u00e5 lager';});
+      var suInv=inventories.find(function(iv){return iv.fixed==='strikkeutstyr';});
+      if(suInv&&paLager2)suInv.catId=paLager2.id;
+    }
+    try{localStorage.setItem(SK+'_strikkeverkstedvekk1','1');}catch(e){}
     save();
   }
 
@@ -4074,6 +4068,39 @@ function projAktiviteter(iv,fase){
   return(iv.items||[]).filter(function(it){return(it.fase||'arbeid')===fase;});
 }
 // Timer som gjenst\u00e5r p\u00e5 et prosjekt \u2014 vises p\u00e5 kortet
+// ── Oppgaver på et prosjekt ──
+// Enklere enn milepæler: ingen dato, ingen fanfare, bare noe å hake av.
+// Delt på plan/gjennomføring — når alt i fasen er avhaket, er prosjektet klart til å flyttes.
+function oppgaverForFase(iv,fase){
+  return(iv.oppgaver||[]).filter(function(o){return o.fase===fase;});
+}
+function oppgaveTimerIgjen(iv,fase){
+  var sum=oppgaverForFase(iv,fase).filter(function(o){return!o.ferdig;})
+    .reduce(function(a,o){return a+(Number(o.timer)||0);},0);
+  return Math.round(sum*10)/10;
+}
+function faseKlar(iv,fase){
+  var o=oppgaverForFase(iv,fase);
+  return o.length>0&&o.every(function(x){return x.ferdig;});
+}
+function toggleOppgave(invId,oppgaveId){
+  var iv=invById(invId);if(!iv)return;
+  var o=(iv.oppgaver||[]).find(function(x){return x.id===oppgaveId;});if(!o)return;
+  o.ferdig=!o.ferdig;
+  save();render();
+}
+function openOppgaveModal(invId,fase){modal={step:'oppgave',form:{invId:invId,fase:fase,navn:'',timer:''}};render();}
+function deleteOppgave(invId,oppgaveId){
+  var iv=invById(invId);if(!iv)return;
+  iv.oppgaver=(iv.oppgaver||[]).filter(function(x){return x.id!==oppgaveId;});
+  save();render();
+}
+function submitOppgave(){
+  var f=mf();var n=(f.navn||'').trim();if(!n)return;
+  var iv=invById(f.invId);if(!iv)return;
+  iv.oppgaver=(iv.oppgaver||[]).concat([{id:'op'+Date.now()+Math.random().toString(36).slice(2,6),navn:n,fase:f.fase,timer:numVal(f.timer)||'',ferdig:false}]);
+  save();closeModal();
+}
 function kanbanTimerIgjen(iv){
   if(!iv.trackHours)return null;
   var tot=Number(iv.hoursTotal)||0;
@@ -4094,7 +4121,7 @@ function kanbanTavleHTML(){
   if(!alle.length)return'<div class="card"><div class="empty">Ingen prosjekter enn\u00e5.</div></div>';
 
   // Ukens timer mot taket, for de to fasene som faktisk har et tak
-  var farger={ide:'#F2E9D8',plan:'',arbeid:'',ferdig:'#DCEEDD'};
+  var farger={ide:'#F2E9D8',plan:'',arbeid:'',ferdig:'#D9E3D6'};
   [['plan','Planlegging',kanbanTakPlan],['arbeid','Gjennomf\u00f8ring',kanbanTakArbeid]].forEach(function(t){
     var brukt=kanbanUkeTimer(t[0]);
     var tak=t[0]==='plan'?kanbanTakPlan:kanbanTakArbeid;
@@ -4117,7 +4144,7 @@ function kanbanTavleHTML(){
     }
     // Ideer og Ferdigstilt f\u00e5r en dempet, m\u00f8rk gr\u00e5brun tekst i stedet for full svart \u2014
     // det er de to fasene der ingenting krever like mye oppmerksomhet akkurat n\u00e5
-    var demp=(f[0]==='ide'||f[0]==='ferdig')?'#5C5248':'var(--ink)';
+    var demp=(f[0]==='ide'||f[0]==='ferdig')?'#7A7166':'var(--ink)';
     iFase.forEach(function(iv){
       var col=catColor((iv.catIds&&iv.catIds[0])||iv.catId)||'var(--line)';
       var t=kanbanTimerIgjen(iv);
@@ -4127,6 +4154,24 @@ function kanbanTavleHTML(){
         +'<div style="font-size:11.5px;font-weight:700;line-height:1.25;cursor:pointer;color:'+demp+'" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</div>'
         +(t!==null?'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(t).replace('.',',')+' t igjen</div>':'')
         +(frist?'<div style="font-size:10px;margin-top:1px;color:'+(forsinket?'var(--red)':'var(--muted)')+'">'+(iv.completedDate?'\u2713 '+fmtDate(iv.completedDate):'frist '+frist)+'</div>':'')
+        +((f[0]==='plan'||f[0]==='arbeid')?(function(){
+            var opp=oppgaverForFase(iv,f[0]);
+            var tIgjen=oppgaveTimerIgjen(iv,f[0]);
+            var klar=faseKlar(iv,f[0]);
+            var oh='';
+            if(opp.length){
+              oh+='<div style="margin-top:4px">'+opp.map(function(o){
+                return'<div style="display:flex;align-items:flex-start;gap:4px;font-size:10px;padding:1px 0;cursor:pointer" onclick="toggleOppgave(\''+q(iv.id)+'\',\''+q(o.id)+'\')">'
+                  +'<span style="flex-shrink:0">'+(o.ferdig?'\u2611':'\u2610')+'</span>'
+                  +'<span style="flex:1;'+(o.ferdig?'text-decoration:line-through;color:var(--muted)':'')+'">'+esc(o.navn)+(o.timer?' <span style="color:var(--muted)">('+String(o.timer).replace('.',',')+'t)</span>':'')+'</span>'
+                  +'</div>';
+              }).join('')+'</div>';
+              if(tIgjen)oh+='<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(tIgjen).replace('.',',')+' t igjen i fasen</div>';
+              if(klar)oh+='<div style="font-size:10.5px;font-weight:700;color:#4E7B5C;margin-top:3px">\u2713 Klar for '+(f[0]==='plan'?'gjennomf\u00f8ring':'ferdigstilling')+'</div>';
+            }
+            oh+='<button class="icon-btn" style="font-size:10px;padding:1px 5px;margin-top:3px" onclick="openOppgaveModal(\''+q(iv.id)+'\',\''+f[0]+'\')">+ oppgave</button>';
+            return oh;
+          })():'')
         +'<div style="display:flex;gap:3px;margin-top:4px">'
         +(fi>0?'<button class="icon-btn" style="font-size:11px;padding:1px 6px" onclick="kanbanFlytt(\''+q(iv.id)+'\',-1)">\u2039</button>':'')
         +(fi<3?'<button class="icon-btn" style="font-size:11px;padding:1px 6px;margin-left:auto" onclick="kanbanFlytt(\''+q(iv.id)+'\',1)">\u203a</button>':'')
@@ -5073,6 +5118,7 @@ function updateSaveBtn(){
   }
   if(step==='mens'||step==='mens_edit')enabled=!!(mf().start||'').trim();
   if(step==='maalingserie'||step==='maalingserie_edit')enabled=!!(mf().navn||'').trim();
+  if(step==='oppgave')enabled=!!(mf().navn||'').trim();
   if(step==='maalingpunkt'||step==='maalingpunkt_edit')enabled=!!mf().dato&&maalingVerdiGyldig(mf().verdi);
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId&&!!mf().subtype;
@@ -5208,6 +5254,14 @@ function modalHTML(){
       +'<div class="hint">Bruk flere referansebaner n\u00e5r noe skal holde seg innenfor et spenn \u2014 for eksempel \u00e9n for \u00f8vre og \u00e9n for nedre grense. Uten noen, monitoreres m\u00e5lingen bare.</div>'
       +'<button class="save-btn" onclick="'+(isEditS?'saveEditMaalingSerie()':'submitMaalingSerie()')+'" '+((f.navn||'').trim()?'':'disabled')+'>Lagre</button>'
       +(isEditS?'<button class="del-full-btn" onclick="deleteMaalingSerie(\''+q(f.id)+'\')">Slett m\u00e5leserie</button>':'');
+
+  } else if(step==='oppgave'){
+    body='<div class="modal-title">Ny oppgave \u2013 '+(f.fase==='plan'?'Planlegging':'Gjennomf\u00f8ring')+'</div>'
+      +'<label class="field-lbl">Oppgave</label>'
+      +'<input class="inp" type="text" value="'+esc(f.navn||'')+'" placeholder="F.eks. Bestille garn" oninput="mf().navn=this.value;updateSaveBtn()">'
+      +'<label class="field-lbl">Anslag i timer <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<input class="inp" type="text" inputmode="decimal" value="'+esc(String(f.timer||''))+'" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\');mf().timer=this.value">'
+      +'<button class="save-btn" onclick="submitOppgave()" '+((f.navn||'').trim()?'':'disabled')+'>Legg til</button>';
 
   } else if(step==='maalingpunkt'||step==='maalingpunkt_edit'){
     var isEditP=step==='maalingpunkt_edit';
@@ -6503,7 +6557,7 @@ function sidebarHTML(){
   h+='<div class="side-month" style="'+toppStil(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   // Kategorisidene: alfabetisk, hver med sin egen kategorifarge — som stripene ellers
   [{n:'folk',navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
-   {n:'kreativitet',navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
+   {n:'kreativitet',navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
    {n:'helse',navn:'Helse',fn:'goHelse()',kat:'helse',kinds:['helse','mens']},
    {n:'matdrikke',navn:'Mat og drikke',fn:'goMatDrikke()',kat:'mat og drikke',kinds:['matdrikke']},
    {n:'hjem',navn:'Hjem',fn:'goHjem2()',kat:'hjem',kinds:['hjemkat']},
@@ -9237,7 +9291,6 @@ function render(){
   else if(view.kind==='utstyrkat')content=katSideHTML('utstyr','Utstyr','kat_utstyr',
     listeKortHTML('utstyr','Utstyrslista','ting du eier, ordnet etter bruk og plassering','goUtstyr')
     +egneListerHTML());
-  else if(view.kind==='strikkeverksted')content=strikkeverkstedViewHTML();
   else if(view.kind==='garnmatch')content=garnmatchViewHTML();
   else if(view.kind==='strikkeprosjekter')content=strikkeprosjekterViewHTML();
   else if(view.kind==='garnlager')content=fixedListHubHTML('garnlager','Garnlager','Garn du har liggende \u2014 inkludert restgarn fra ferdige prosjekter.');
