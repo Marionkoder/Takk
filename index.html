@@ -125,13 +125,13 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 @keyframes starfall{0%{transform:translateY(-14px) rotate(0deg);opacity:0}12%{opacity:1}100%{transform:translateY(150px) rotate(70deg);opacity:0}}
 @keyframes cfall{0%{transform:translateY(-12px) rotate(0deg)}100%{transform:translateY(52px) rotate(340deg)}}
 @media (prefers-reduced-motion:reduce){.confetti i{animation:none;display:none}}
-/* Hele bursdagsdøgnet: okergul bakgrunn og fallende konfetti over hele skjermen,
-   uansett hvilket tema eller hvilken side som vises. */
-body.bursdag-i-dag{--bg:#E7C468}
-.bday-confetti-layer{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:500}
-.bday-confetti-layer i{position:absolute;top:-14px;width:6px;height:11px;border-radius:1px;opacity:.88;
+/* Spesialdager: bare selve banneret f\u00e5r farge og konfetti — resten av appen
+   holder seg til det temaet brukeren har valgt. */
+.spesialdag-banner{position:relative;overflow:hidden}
+.spesialdag-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1}
+.spesialdag-confetti i{position:absolute;top:-14px;width:6px;height:11px;border-radius:1px;opacity:.88;
   animation-name:cfall;animation-timing-function:linear;animation-iteration-count:infinite;animation-duration:3.2s}
-@media (prefers-reduced-motion:reduce){.bday-confetti-layer{display:none}}
+@media (prefers-reduced-motion:reduce){.spesialdag-confetti{display:none}}
 @media (prefers-reduced-motion:reduce){.shimmer::after{animation:none;display:none}}
 @media (prefers-reduced-motion:reduce){.starshower i{animation:none;display:none}}
 .celeb{position:fixed;inset:0;z-index:3000;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
@@ -301,7 +301,7 @@ function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 
 /* ── Kategorifarger: forhåndsdefinert palett, valgfri per hovedkategori, arves av underkategorier ── */
 var CAT_COLORS=[
-  {id:'salvie',name:'Helsegrønn',hex:'#74A491'},
+  {id:'salvie',name:'Kirurggrønn',hex:'#74A491'},
   {id:'furu',name:'Furu',hex:'#4E6B5C'},
   {id:'mose',name:'Mose',hex:'#8A8B5C'},
   {id:'petrol',name:'Petrol',hex:'#4E7B8C'},
@@ -2046,6 +2046,29 @@ function myBdayIsToday(){
   var mb=myBirthday();if(!mb)return false;
   var t=today;return (Number(mb.slice(5,7))===t.getMonth()+1)&&(Number(mb.slice(8,10))===t.getDate());
 }
+// Midlertidige forh\u00e5ndsvisningsbrytere — for \u00e5 se 17. mai- og julefeiringen f\u00f8r selve
+// dagen. Fjernes n\u00e5r begge er sett og godkjent.
+var visTest17Mai=false,visTestJul=false;
+function toggleTest17Mai(){visTest17Mai=!visTest17Mai;save();render();}
+function toggleTestJul(){visTestJul=!visTestJul;save();render();}
+function er17MaiIDag(){return visTest17Mai||(today.getMonth()===4&&today.getDate()===17);}
+function erJulekveldIDag(){return visTestJul||(today.getMonth()===11&&today.getDate()===24);}
+// Hvilken spesialdag som gjelder n\u00e5, om noen — bursdagen har f\u00f8rste prioritet
+// om flere skulle falle sammen
+function spesialDagIDag(){
+  if(myBdayIsToday())return'bursdag';
+  if(er17MaiIDag())return'17mai';
+  if(erJulekveldIDag())return'jul';
+  return null;
+}
+var SPESIALDAG_KONFIG={
+  bursdag:{tekst:'GRATULERER MED DAGEN',bg:'#E7C468',fg:'#3B2E24',
+    confetti:['#DE9273','#74A491','#4E7B8C','#8C5A74','#CC7F33','#8B7A9E','#A34A5E','#9C6B3F']},
+  '17mai':{tekst:'GRATULERER MED DAGEN',bg:'#5B6E85',fg:'#F5F5F2',
+    confetti:['#C8373A','#F5F5F2','#1B3A6B']},
+  jul:{tekst:'GOD JUL',bg:'#1F3D2B',fg:'#F5F0E6',
+    confetti:['#B23A3A','#7A1F1F','#2E9E4F','#F5F0E6']}
+};
 function celebrationSeenKey(){return SK+'_celebseen_'+curYear;}
 function celebrationSeen(){try{return localStorage.getItem(celebrationSeenKey())==='1';}catch(e){return false;}}
 function markCelebrationSeen(){try{localStorage.setItem(celebrationSeenKey(),'1');}catch(e){}}
@@ -2349,6 +2372,8 @@ function load(){
   try{weeklyAvailableHours=Number(localStorage.getItem(SK+'_availhours'))||0;}catch(e){weeklyAvailableHours=0;}
   try{soundOn=localStorage.getItem(SK+'_sound')!=='0';}catch(e){soundOn=true;}
   try{var tp=Number(localStorage.getItem(SK+'_taktplan'));if(tp||tp===0)kanbanTakPlan=tp;}catch(e){}
+  try{visTest17Mai=localStorage.getItem(SK+'_test17mai')==='1';}catch(e){}
+  try{visTestJul=localStorage.getItem(SK+'_testjul')==='1';}catch(e){}
   try{var ta=Number(localStorage.getItem(SK+'_takarbeid'));if(ta||ta===0)kanbanTakArbeid=ta;}catch(e){}
   try{katVis=JSON.parse(localStorage.getItem(SK+'_katvis')||'{}');}catch(e){katVis={};}
   try{showMens=localStorage.getItem(SK+'_mensmeny')!=='0';}catch(e){showMens=true;}
@@ -3072,6 +3097,8 @@ function save(){
   try{localStorage.setItem(SK+'_availhours',String(weeklyAvailableHours));}catch(e){}
   try{localStorage.setItem(SK+'_sound',soundOn?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_taktplan',String(kanbanTakPlan));}catch(e){}
+  try{localStorage.setItem(SK+'_test17mai',visTest17Mai?'1':'0');}catch(e){}
+  try{localStorage.setItem(SK+'_testjul',visTestJul?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_takarbeid',String(kanbanTakArbeid));}catch(e){}
   try{localStorage.setItem(SK+'_katvis',JSON.stringify(katVis));}catch(e){}
   try{localStorage.setItem(SK+'_mensmeny',showMens?'1':'0');}catch(e){}
@@ -3789,6 +3816,17 @@ function personligViewHTML(){
     +'<button class="chip'+(showMens?' on':'')+'" onclick="toggleMensMeny()">'+(showMens?'P\u00e5':'Av')+'</button>'
     +'</div></div>';
 
+  // Midlertidig: forhåndsvis feiringsbannerne før selve dagen. Fjernes når begge er sett.
+  h+='<div class="card" style="padding:12px 14px;margin-top:8px;border-left:3px solid var(--rose)">'
+    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--rose);margin-bottom:6px">Midlertidig \u2014 forh\u00e5ndsvisning</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    +'<div style="flex:1"><div class="entry-text">Vis 17. maifeiring</div></div>'
+    +'<button class="chip'+(visTest17Mai?' on':'')+'" onclick="toggleTest17Mai()">'+(visTest17Mai?'P\u00e5':'Av')+'</button>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="flex:1"><div class="entry-text">Vis julefeiring</div></div>'
+    +'<button class="chip'+(visTestJul?' on':'')+'" onclick="toggleTestJul()">'+(visTestJul?'P\u00e5':'Av')+'</button>'
+    +'</div></div>';
 
   // Min bursdag
   var myb=myBirthday();
@@ -9484,33 +9522,16 @@ function ventelisteViewHTML(){
 }
 
 /* ── Hovedrender ── */
-function bdayConfettiLayerHTML(){
-  var cols=['#DE9273','#74A491','#4E7B8C','#8C5A74','#CC7F33','#8B7A9E','#A34A5E','#9C6B3F'];
+function spesialdagKonfettiHTML(farger){
   var h='';
   for(var i=0;i<22;i++){
-    h+='<i style="left:'+(i*4.6%100)+'%;background:'+cols[i%cols.length]+';'
+    h+='<i style="left:'+(i*4.6%100)+'%;background:'+farger[i%farger.length]+';'
       +'animation-delay:'+((i%9)*0.5).toFixed(2)+'s;animation-duration:'+(2.6+((i%5)*0.5)).toFixed(1)+'s"></i>';
   }
   return h;
 }
-// Setter det okergule bursdagsutseendet — kj\u00f8res fra hver render(), men bygger
-// bare konfettilaget i DOM-en \u00e9n gang, s\u00e5 animasjonen ikke hakker ved hver ny side.
-function settBursdagsUtseende(){
-  var paa=myBdayIsToday();
-  document.body.classList.toggle('bursdag-i-dag',paa);
-  var lag=document.getElementById('bdayConfettiLayer');
-  if(paa&&!lag){
-    var d=document.createElement('div');
-    d.id='bdayConfettiLayer';d.className='bday-confetti-layer';
-    d.innerHTML=bdayConfettiLayerHTML();
-    document.body.appendChild(d);
-  } else if(!paa&&lag){
-    lag.remove();
-  }
-}
 function render(){
   if(pinLocked){renderPinScreen();return;}
-  settBursdagsUtseende();
   if(view&&view.kind==='celebration'){document.getElementById('app').innerHTML=celebrationViewHTML();return;}
   var wasSearch=false,wasQuick=false;
   var wasQTags=false;
@@ -9529,16 +9550,19 @@ function render(){
   window._lastRenderViewKind=view?view.kind:null;
   window._lastRenderView=view?Object.assign({},view):null;
 
+  var dagSpes=spesialDagIDag();
+  var spesConf=dagSpes?SPESIALDAG_KONFIG[dagSpes]:null;
   var topbar='<div class="topbar">'
-    +'<div class="topbar-row">'
-    +'<h1 style="cursor:pointer" onclick="goHjem()">GODE DAGER</h1>'
+    +'<div class="topbar-row'+(spesConf?' spesialdag-banner':'')+'"'+(spesConf?' style="background:'+spesConf.bg+';color:'+spesConf.fg+'"':'')+'>'
+    +(spesConf?'<div class="spesialdag-confetti">'+spesialdagKonfettiHTML(spesConf.confetti)+'</div>':'')
+    +'<h1 style="cursor:pointer;position:relative;z-index:2'+(spesConf?';color:'+spesConf.fg:'')+'" onclick="goHjem()">'+(spesConf?spesConf.tekst:'GODE DAGER')+'</h1>'
     +(editMode
       ?'<button class="icon-btn" onclick="exportTekst()">↓ Tekst</button>'
        +'<button class="icon-btn" onclick="exportJSON()">↓ JSON</button>'
        +'<button class="icon-btn" onclick="importJSON()">↑ Importer</button>'
       :'')
-    +'<button class="edit-btn'+(editMode?' on':'')+'" onclick="setEdit('+(editMode?'false':'true')+')">'+(editMode?'Ferdig':'Rediger')+'</button>'
-    +'<button class="menu-btn" onclick="toggleDrawer()" aria-label="Meny">☰</button>'
+    +'<button class="edit-btn'+(editMode?' on':'')+'" style="position:relative;z-index:2" onclick="setEdit('+(editMode?'false':'true')+')">'+(editMode?'Ferdig':'Rediger')+'</button>'
+    +'<button class="menu-btn" style="position:relative;z-index:2" onclick="toggleDrawer()" aria-label="Meny">☰</button>'
     +'</div>'
     +'<div class="stripe-ribbon"></div>'
     +'<div class="tabs">'
