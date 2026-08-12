@@ -73,7 +73,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15p
 .stripe-ribbon{height:7px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
 .stripe-thin{height:3.5px;border-radius:2px;margin:8px 12px 2px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
 .menu-btn{background:none;border:1px solid var(--line);border-radius:8px;font-size:16px;padding:4px 10px;cursor:pointer;color:var(--ink)}
-h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,var(--ink))}
+h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,var(--ink));font-family:var(--font-heading,inherit)}
 .edit-btn{font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit}
 .edit-btn.on{color:var(--red)}
 .icon-btn{font-size:12px;font-weight:600;color:var(--muted);background:none;border:1px solid var(--line);border-radius:8px;padding:4px 9px;cursor:pointer;font-family:inherit}
@@ -82,8 +82,8 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .tab.on{color:var(--red);border-bottom-color:var(--red)}
 
 /* Innhold */
-.view-title{font-size:21px;font-weight:800;letter-spacing:-.2px;color:var(--title,var(--ink));padding:18px 16px 2px;line-height:1.25}
-.sec-title{font-size:15px;font-weight:700;color:var(--ink);padding:20px 16px 4px}
+.view-title{font-size:21px;font-weight:800;letter-spacing:-.2px;color:var(--title,var(--ink));padding:18px 16px 2px;line-height:1.25;font-family:var(--font-heading,inherit)}
+.sec-title{font-size:15px;font-weight:700;color:var(--ink);padding:20px 16px 4px;font-family:var(--font-heading,inherit)}
 .view-sub{font-size:12px;color:var(--muted);padding:0 16px 8px;line-height:1.55}
 .card{background:var(--card);border-radius:14px;overflow:hidden;margin:8px 12px 4px;border:1px solid var(--line)}
 .entry-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
@@ -1853,6 +1853,15 @@ function mensPeriodeFor(dato){
 }
 // «Menstruasjon over» setter sluttdato til denne dagen. Trykk igjen for å angre,
 // da regnes perioden som pågående på nytt.
+// Eggl\u00f8sningsslim — enkel av/p\u00e5-markering, ingen skala. Det som betyr noe er om du
+// la merke til det, ikke hvor mye.
+function mensSettSlim(dato){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',slim:false};mensDag.push(rad);}
+  rad.slim=!rad.slim;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
 function mensSettSlutt(dato){
   var per=mensPeriodeFor(dato);if(!per)return;
   per.end=(per.end===dato)?'':dato;
@@ -1864,7 +1873,7 @@ function mensStartNy(dato){
   save();render();
 }
 function mensDagMerkerHTML(dato,tittel){
-  var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:''};
+  var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:'',slim:false};
   var per=mensPeriodeFor(dato);
   var erSluttdag=per&&per.end===dato;
   var syklusdag=mensSyklusdagForDato(dato);
@@ -1891,7 +1900,8 @@ function mensDagMerkerHTML(dato,tittel){
     +'<div class="chips"'+((visSlutt||visStart)?' style="margin-bottom:6px"':'')+'>'
     +'<button class="chip'+(rad.fokus==='fokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'fokusert\')">Fokusert</button>'
     +'<button class="chip'+(rad.fokus==='ufokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'ufokusert\')">Ufokusert</button>'
-    +'</div>';
+    +'</div>'
+    +'<div class="chips" style="margin-bottom:6px"><button class="chip'+(rad.slim?' on':'')+'" onclick="mensSettSlim(\''+dato+'\')">'+(rad.slim?'\u2713 ':'')+'Eggl\u00f8sningsslim</button></div>';
   if(visSlutt){
     h+='<div class="chips"><button class="chip'+(erSluttdag?' on':'')+'" onclick="mensSettSlutt(\''+dato+'\')">'+(erSluttdag?'\u2713 Menstruasjon over':'Menstruasjon over')+'</button></div>';
   }
@@ -1938,13 +1948,15 @@ function mensViewHTML(){
       var merker=[r.intensity?mensDraaper(r.intensity):'',
                   r.smerte?(mensLyn(r.smerte)?mensLyn(r.smerte)+' ':'')+MENS_SMERTE[r.smerte-1][1]:'',
                   r.energi==='slapp'?'slapp':r.energi==='energisk'?'energisk':'',
-                  r.fokus==='fokusert'?'fokusert':r.fokus==='ufokusert'?'ufokusert':''].filter(Boolean).join(' \u00b7 ');
+                  r.fokus==='fokusert'?'fokusert':r.fokus==='ufokusert'?'ufokusert':'',
+                  r.slim?'eggl\u00f8sningsslim':''].filter(Boolean).join(' \u00b7 ');
       return'<div class="entry-row" style="cursor:pointer" onclick="goDag(\''+r.date+'\')"><div class="entry-body"><div class="entry-text" style="font-size:13px">'+fmtDate(r.date)+(sd?' <span style="font-size:11px;color:var(--muted)">\u00b7 syklusdag '+sd+'</span>':'')+'</div>'
         +(merker?'<div class="entry-date">'+esc(merker)+'</div>':'')+'</div>'
         +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     }).join('')+'</div>';
   }
 
+  h+=mensSyklusGraferHTML();
   h+='<button class="add-btn" onclick="openMensModal()">+ Registrer</button>';
   var sorted=mensSorted();
   if(!sorted.length){
@@ -2502,6 +2514,24 @@ function load(){
       if(fk)e.cats=[fk.id];
     });
     try{localStorage.setItem(SK+'_persontagsvekk2','1');}catch(e){}
+    save();
+  }
+
+  // Milep\u00e6ler er avviklet — prosjekter bruker n\u00e5 bare oppgaver, delt p\u00e5 fase.
+  // Det som l\u00e5 av gamle milep\u00e6ler flyttes over som oppgaver, s\u00e5 ingenting g\u00e5r tapt.
+  var mv1=false;try{mv1=!!localStorage.getItem(SK+'_milepvekk1');}catch(e){}
+  if(!mv1){
+    inventories.forEach(function(iv){
+      if((iv.type||'inventar')!=='prosjekt')return;
+      if((iv.items||[]).length){
+        iv.oppgaver=(iv.oppgaver||[]).concat((iv.items||[]).map(function(it){
+          return{id:'op'+Date.now()+Math.random().toString(36).slice(2,6),navn:it.name,
+            fase:it.fase==='plan'?'plan':'arbeid',timer:'',ferdig:!!it.have};
+        }));
+      }
+      iv.items=[];
+    });
+    try{localStorage.setItem(SK+'_milepvekk1','1');}catch(e){}
     save();
   }
 
@@ -3096,22 +3126,7 @@ function ageToday(e){
   var had=(e.month<curMonth)||(e.month===curMonth&&(e.day||31)<=today.getDate());
   return(had?curYear:curYear-1)-s;
 }
-function milestonesFor(m,y){
-  var out=[];
-  var pre=y+'-'+pad(m)+'-';
-  inventories.forEach(function(iv){
-    if((iv.type||'inventar')!=='prosjekt')return;
-    (iv.items||[]).forEach(function(it){
-      if(it.date&&it.inCal!==false&&it.date.slice(0,8)===pre)out.push({invId:iv.id,itemId:it.id,day:Number(it.date.slice(8,10)),name:it.name,listName:iv.name,done:!!it.have});
-    });
-  });
-  results.forEach(function(r){
-    (r.milestones||[]).forEach(function(ms){
-      if(ms.date&&ms.date.slice(0,8)===pre)out.push({resultId:r.id,itemId:ms.id,day:Number(ms.date.slice(8,10)),name:ms.name,listName:r.name,done:!!ms.done,kind:'result'});
-    });
-  });
-  return out;
-}
+function milestonesFor(m,y){return[];}
 function milestoneBtnHTML(ms){
   var isRes=ms.kind==='result';
   var click=isRes
@@ -3682,19 +3697,30 @@ function personligViewHTML(){
   var cur=currentBgTone();
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Personlig</div>';
-  // Visuell profil
-  var pid=currentProfile();
-  h+='<div class="sec-title">Visuell profil</div>'
-    +'<div class="view-sub">Hele appens farger og skrift. Bakgrunnstonen under legger seg oppå den du velger her.</div>'
+  // Visuell profil — fargetone og skrift velges hver for seg og mikses fritt
+  var kid=currentFargetone();
+  var fid=currentFontValg();
+  h+='<div class="sec-title">Fargetone</div>'
+    +'<div class="view-sub">Hele appens farger. Bakgrunnstonen under legger seg oppå den du velger her.</div>'
     +'<div class="card" style="padding:10px 12px">';
-  Object.keys(PROFILES).forEach(function(k){
-    var pr=PROFILES[k];var on=pid===k;
-    h+='<div style="display:flex;align-items:center;gap:11px;padding:9px 4px;cursor:pointer;border-bottom:1px solid var(--line)" onclick="setProfile(\''+q(k)+'\')">'
+  Object.keys(FARGETONER).forEach(function(k){
+    var ft2=FARGETONER[k];var on=kid===k;
+    h+='<div style="display:flex;align-items:center;gap:11px;padding:9px 4px;cursor:pointer;border-bottom:1px solid var(--line)" onclick="setFargetone(\''+q(k)+'\')">'
       +'<span style="display:flex;flex-shrink:0;border-radius:8px;overflow:hidden;border:'+(on?'2.5px solid var(--ink)':'1px solid var(--line)')+'">'
-      +pr.swatch.map(function(c){return'<span style="width:20px;height:34px;background:'+c+';display:block"></span>';}).join('')
+      +ft2.swatch.map(function(c){return'<span style="width:20px;height:34px;background:'+c+';display:block"></span>';}).join('')
       +'</span>'
-      +'<span style="flex:1"><span style="font-size:14px;font-weight:'+(on?'700':'600')+';font-family:'+pr.font+'">'+esc(pr.name)+'</span>'
-      +'<div style="font-size:11px;color:var(--muted)">'+esc(pr.desc)+'</div></span>'
+      +'<span style="flex:1;font-size:14px;font-weight:'+(on?'700':'600')+'">'+esc(ft2.navn)+'</span>'
+      +(on?'<span style="color:var(--red);font-weight:700">\u2713</span>':'')
+      +'</div>';
+  });
+  h+='</div>';
+  h+='<div class="sec-title">Skrift</div>'
+    +'<div class="card" style="padding:10px 12px">';
+  Object.keys(FONTER).forEach(function(k){
+    var fnt=FONTER[k];var on=fid===k;
+    h+='<div style="display:flex;align-items:center;gap:11px;padding:9px 4px;cursor:pointer;border-bottom:1px solid var(--line)" onclick="setFontValg(\''+q(k)+'\')">'
+      +'<span style="flex:1;font-size:16px;font-weight:'+(on?'700':'600')+';font-family:'+fnt.stack+'">'+esc(fnt.navn)+'</span>'
+      +(fnt.heading?'<span style="font-size:11px;color:var(--muted);font-family:'+fnt.heading+'">Overskrift smal</span>':'')
       +(on?'<span style="color:var(--red);font-weight:700">\u2713</span>':'')
       +'</div>';
   });
@@ -3957,12 +3983,6 @@ function toggleInvItem(invId,itemId){
   var inv=invById(invId);if(!inv)return;
   var it=(inv.items||[]).find(function(x){return x.id===itemId;});if(!it)return;
   it.have=!it.have;
-  if((inv.type||'inventar')==='prosjekt'){
-    var mNokkel='pms:'+inv.id+':'+it.id;
-    if(it.have)addAchievement('milestone',mNokkel,it.name,inv.goalIds||[],inv.catId?[inv.catId]:[],inv.name);
-    // Angrer du avhakingen, skal feiringen forsvinne med den
-    else achievements=achievements.filter(function(a){return a.key!==mNokkel;});
-  }
   // «Pakket» på en pakkeliste betyr ikke «har» i inventaret — synk bare mellom inventarlister
   if(it.syncId&&(inv.type||'inventar')!=='pakke'){
     inventories.forEach(function(iv){
@@ -4225,6 +4245,85 @@ function prosjektFaseHTML(iv){
       +'</div>';
   });
   return h+'</div>';
+}
+// ── Syklusgrafer: energi, konsentrasjon, blødning og smerte per menssyklus ──
+// Hver syklus er fra én mensstart til dagen før neste — eller til i dag, om det
+// er den siste, pågående syklusen.
+function mensSykluser(){
+  var starter=mens.slice().sort(function(a,b){return a.start<b.start?-1:1;}).map(function(m){return m.start;});
+  var ut=[];
+  for(var i=0;i<starter.length;i++){
+    var start=starter[i];
+    var erSiste=(i===starter.length-1);
+    var lengde=erSiste
+      ? Math.round((new Date(isoDate(today)+'T00:00:00')-new Date(start+'T00:00:00'))/86400000)+1
+      : Math.round((new Date(starter[i+1]+'T00:00:00')-new Date(start+'T00:00:00'))/86400000);
+    ut.push({start:start,lengde:Math.max(1,lengde),pagaende:erSiste});
+  }
+  return ut.reverse(); // nyeste f\u00f8rst
+}
+function mensSyklusPunkter(syklus,felt){
+  var start=new Date(syklus.start+'T00:00:00');
+  var ut=[];
+  mensDag.forEach(function(r){
+    var d=Math.round((new Date(r.date+'T00:00:00')-start)/86400000)+1;
+    if(d<1||d>syklus.lengde)return;
+    var v=null;
+    if(felt==='energi')v=r.energi==='slapp'?-1:r.energi==='energisk'?1:null;
+    else if(felt==='fokus')v=r.fokus==='ufokusert'?-1:r.fokus==='fokusert'?1:null;
+    else if(felt==='intensity')v=r.intensity?Number(r.intensity):null;
+    else if(felt==='smerte')v=r.smerte?Number(r.smerte):null;
+    if(v!==null)ut.push({dag:d,verdi:v});
+  });
+  return ut.sort(function(a,b){return a.dag-b.dag;});
+}
+function mensSyklusGrafSVG(punkter,lengde,minV,maxV,farge,nullLinje){
+  if(!punkter.length)return'<div class="empty" style="font-size:11px;padding:6px 0">Ingen data denne syklusen.</div>';
+  var W=320,H=64,ML=4,MR=4,MT=6,MB=4,plotW=W-ML-MR,plotH=H-MT-MB;
+  var xFor=function(d){return lengde>1?ML+plotW*((d-1)/(lengde-1)):ML+plotW/2;};
+  var yFor=function(v){return MT+plotH-(v-minV)/(maxV-minV)*plotH;};
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:64px;display:block">';
+  if(nullLinje!=null){
+    var y0=yFor(nullLinje);
+    svg+='<line x1="'+ML+'" y1="'+y0+'" x2="'+(W-MR)+'" y2="'+y0+'" style="stroke:var(--line);stroke-width:1"/>';
+  }
+  if(punkter.length>1){
+    var linje=punkter.map(function(p){return xFor(p.dag)+','+yFor(p.verdi);}).join(' ');
+    svg+='<polyline points="'+linje+'" style="fill:none;stroke:'+farge+';stroke-width:2"/>';
+  }
+  punkter.forEach(function(p){
+    svg+='<circle cx="'+xFor(p.dag)+'" cy="'+yFor(p.verdi)+'" r="3" style="fill:'+farge+'"/>';
+  });
+  svg+='</svg>';
+  return svg;
+}
+var mensSyklusIdx=0;
+function mensSyklusValgt(i){mensSyklusIdx=Math.max(0,i);render();}
+function mensSyklusGraferHTML(){
+  var sykluser=mensSykluser();
+  if(!sykluser.length)return'';
+  var idx=Math.min(mensSyklusIdx,sykluser.length-1);
+  var syk=sykluser[idx];
+  var h='<div class="sec-title">Syklusgrafer</div>';
+  h+='<div style="display:flex;gap:8px;padding:0 12px 6px;align-items:center;font-size:12px">'
+    +'<button class="icon-btn" style="font-size:11px" '+(idx<sykluser.length-1?'onclick="mensSyklusValgt('+(idx+1)+')"':'disabled')+'>\u2039 eldre</button>'
+    +'<span style="flex:1;text-align:center;color:var(--muted)">Fra '+fmtDate(syk.start)+(syk.pagaende?' \u00b7 p\u00e5g\u00e5r':'')+' \u00b7 '+syk.lengde+' dager</span>'
+    +'<button class="icon-btn" style="font-size:11px" '+(idx>0?'onclick="mensSyklusValgt('+(idx-1)+')"':'disabled')+'>nyere \u203a</button>'
+    +'</div>';
+  var grafer=[
+    ['energi','Energi',-1,1,'#8C5A74',0],
+    ['fokus','Konsentrasjon',-1,1,'#4E7B8C',0],
+    ['intensity','Bl\u00f8dning',1,4,'#D65372',null],
+    ['smerte','Smerte',1,4,'#CC7F33',null]
+  ];
+  grafer.forEach(function(g){
+    var punkter=mensSyklusPunkter(syk,g[0]);
+    h+='<div class="card" style="padding:8px 10px;margin-bottom:6px">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:2px">'+g[1]+'</div>'
+      +mensSyklusGrafSVG(punkter,syk.lengde,g[2],g[3],g[4],g[5])
+      +'</div>';
+  });
+  return h;
 }
 function toggleProjectDone(invId){
   var inv=invById(invId);if(!inv)return;
@@ -6058,12 +6157,6 @@ function modalHTML(){
       return'<label class="field-lbl">'+esc(fd.name)+'</label>'
         +'<input class="inp" type="text"'+(kind?' inputmode="'+(kind==='int'?'numeric':'decimal')+'" style="width:140px"':'')+' value="'+esc((f.values||{})[fd.id]||'')+'" oninput="'+filt+'mf().values[\''+q(fd.id)+'\']=this.value">';
     }).join('');
-    if((invT.type||'inventar')==='prosjekt'){
-      fieldInputs='<label class="field-lbl">Milep\u00e6lsdato <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-        +'<input class="inp" type="date" style="width:auto" value="'+esc(f.mdate||'')+'" oninput="mf().mdate=this.value;render()">'
-        +(f.mdate?'<div class="chips" style="margin-top:6px"><button class="chip'+(f.inCal?' on':'')+'" onclick="mf().inCal=!mf().inCal;render()">'+(f.inCal?'\u2713 Ligger i kalenderen':'Legg inn i kalenderen')+'</button></div>'
-          +'<div class="hint">Med kalendervalget p\u00e5 vises milep\u00e6len p\u00e5 datoen sin i uke-, m\u00e5neds- og \u00e5rsvisningen, og kan hakes av der.</div>':'');
-    }
     var isProj=(invT.type||'inventar')==='prosjekt';
     body=(function(){
       var dvb=f.values||{};
@@ -6072,14 +6165,9 @@ function modalHTML(){
       return'<div style="margin:-4px -4px 10px;padding:8px 12px;border-radius:10px;background:'+(on?'#FBDFC4':'#EF9152')+';font-size:12px;font-weight:700;color:var(--ink)">'
         +'Beredskap \u00b7 '+(on?'p\u00e5 plass':'mangler')+'</div>';
     })()
-      +'<div class="modal-title">'+(isEditT?(isProj?'Rediger milep\u00e6l':'Rediger punkt'):(isProj?'Ny milep\u00e6l':'Nytt punkt'))+'</div>'
+      +'<div class="modal-title">'+(isEditT?'Rediger punkt':'Nytt punkt')+'</div>'
       +'<label class="field-lbl">'+(invT.fixed==='garntyper'?'Garnnavn':'Navn')+'</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="'+(invT.fixed==='garntyper'?'F.eks. Finull, Peer Gynt \u2026':'F.eks. f\u00f4rede vinterst\u00f8vletter til penbruk \u2026')+'" oninput="mf().name=this.value;updateSaveBtn()">'
-      +(isProj?'<label class="field-lbl">H\u00f8rer til</label>'
-        +'<div class="chips">'
-        +'<button class="chip'+((f.fase||'arbeid')==='plan'?' on':'')+'" onclick="mf().fase=\'plan\';render()">Planlegging</button>'
-        +'<button class="chip'+((f.fase||'arbeid')!=='plan'?' on':'')+'" onclick="mf().fase=\'arbeid\';render()">Gjennomf\u00f8ring</button>'
-        +'</div>':'')
       +((function(){
         var t=invT.type||'inventar';
         if(t==='pakke'||t==='prosjekt'||invT.fixed==='garntyper'||invT.fixed==='strikkeoppskrifter')return'';
@@ -7589,7 +7677,7 @@ function rutinerViewHTML(){
     .sort(function(a,b){return(a.day||99)-(b.day||99)||nbSort(a.name,b.name);});
 
   {
-    h+='<div class="sec-title">Hendelser p\u00e5 dato <span style="font-weight:400;color:var(--rose)">\u00b7 med prosjektmilep\u00e6ler</span></div>';
+    h+='<div class="sec-title">Hendelser p\u00e5 dato</div>';
     var dated=monthEvents.filter(function(e){return e.day;});
     var undated=monthEvents.filter(function(e){return!e.day;});
     h+='<div class="card">'+dayListHTML(m,effY,dated,[],milestonesFor(m,effY))+'</div>';
@@ -7643,10 +7731,10 @@ function rapportNavHTML(){
 function oppnaddViewHTML(){
   var h=rapportNavHTML();
   h+='<div class="view-title">Oppn\u00e5dd</div>'
-    +'<div class="view-sub">Milep\u00e6ler du har n\u00e5dd, prosjekter du har oppn\u00e5dd, prosjekter du har fullf\u00f8rt og rutiner du har holdt lenge.</div>';
+    +'<div class="view-sub">Prosjekter du har oppn\u00e5dd, prosjekter du har fullf\u00f8rt og rutiner du har holdt lenge.</div>';
   var list=achievements.slice().sort(function(a,b){return (b.ts||0)-(a.ts||0);});
   if(!list.length){
-    return h+'<div class="card"><div class="empty">Ingenting her enn\u00e5. N\u00e5r du haker av en milep\u00e6l, fullf\u00f8rer et prosjekt, n\u00e5r et prosjekt eller runder 100 ganger med en rutine, dukker det opp her.</div></div>';
+    return h+'<div class="card"><div class="empty">Ingenting her enn\u00e5. N\u00e5r du fullf\u00f8rer et prosjekt, n\u00e5r et prosjekt eller runder 100 ganger med en rutine, dukker det opp her.</div></div>';
   }
   var now=Date.now();
   h+='<div class="card" style="background:var(--ach-bg);border-color:var(--ach-line)">';
@@ -8079,11 +8167,9 @@ function arsrapportViewHTML(){
   return h;
 }
 
-var PROFILES={
-  kremhvit:{
-    name:'Kremhvit Nunito',
-    desc:'Varm og rolig \u2014 Nunito',
-    font:'"Nunito","Helvetica Neue",Helvetica,Arial,sans-serif',
+var FARGETONER={
+  brun:{
+    navn:'Brun',
     swatch:['#F2EEE5','#B08D7C','#7A4A2E'],
     vars:{'--bg':'#F2EEE5','--card':'#FCFAF4','--ink':'#3B2E24','--red':'#7A4A2E',
       '--salmon':'#F5A38B','--red-soft':'#F7DACC','--rose':'#B08D7C','--amber':'#B86E2A',
@@ -8092,11 +8178,9 @@ var PROFILES={
       '--grp':'#9C6B3F','--ach-bg':'#F7F1DC','--ach-line':'#E6D9B4',
       '--lv1':'#7A2E28','--lv2':'#9C3D2E','--lv3':'#BF5638','--lv4':'#E07348','--lv5':'#FF9466'}
   },
-  lyseblaa:{
-    name:'Lyseblå Poppins',
-    desc:'Kj\u00f8lig og rolig \u2014 Poppins',
-    font:'"Poppins","Helvetica Neue",Helvetica,Arial,sans-serif',
-    // Bunnfarge lys gr\u00e5bl\u00e5, med slate gray og slate blue som gjennomg\u00e5ende toner
+  blaa:{
+    navn:'Bl\u00e5',
+    // Lys gr\u00e5bl\u00e5 bunn, med slate gray og slate blue som gjennomg\u00e5ende toner
     swatch:['#E8ECF1','#6E7F91','#4C5D75'],
     vars:{'--bg':'#E8ECF1','--card':'#F7F9FB','--ink':'#2E3742','--red':'#4C5D75',
       '--salmon':'#8FA0B8','--red-soft':'#DCE3EC','--rose':'#6E7F91','--amber':'#5B6E82',
@@ -8104,23 +8188,61 @@ var PROFILES={
       '--btn':'#D9E0E8','--sel':'#C6D0DC','--sel-line':'#A9B7C7','--title':'#2E3742',
       '--grp':'#5A6B85','--ach-bg':'#EDF1F5','--ach-line':'#D2DBE4',
       '--lv1':'#42536B','--lv2':'#4C5D75','--lv3':'#6E7F97','--lv4':'#8FA0B8','--lv5':'#B3C0D2'}
+  },
+  gronn:{
+    navn:'Gr\u00f8nn',
+    // Dus, gr\u00e5gr\u00f8nn bunn, med gulgr\u00f8nn og postkassegr\u00f8nn som aksenter
+    swatch:['#E9EDE6','#7A8B72','#2E6B45'],
+    vars:{'--bg':'#E9EDE6','--card':'#F5F8F3','--ink':'#2F3B2C','--red':'#2E6B45',
+      '--salmon':'#9CAA3D','--red-soft':'#DCE4D5','--rose':'#7A8B72','--amber':'#8FA83C',
+      '--muted':'#6F7A68','--line':'#D7DED1','--done':'#DCE4D5','--done-line':'#C7D3BC',
+      '--btn':'#D6DECD','--sel':'#C4D0B7','--sel-line':'#A9BA97','--title':'#2F3B2C',
+      '--grp':'#7A8B3C','--ach-bg':'#F1F3E0','--ach-line':'#DCE2C0',
+      '--lv1':'#1F4A30','--lv2':'#2E6B45','--lv3':'#5C8A3E','--lv4':'#8FA83C','--lv5':'#C3D66E'}
+  },
+  rod:{
+    navn:'R\u00f8d',
+    // Lys, varm bunn, med rosa og fersken som aksenter
+    swatch:['#F6EAE6','#C9808A','#A8453A'],
+    vars:{'--bg':'#F6EAE6','--card':'#FCF4F2','--ink':'#4A2A26','--red':'#A8453A',
+      '--salmon':'#DE9273','--red-soft':'#F5DAD1','--rose':'#C9808A','--amber':'#DE9273',
+      '--muted':'#8B6F6A','--line':'#EBD9D4','--done':'#F0DCD5','--done-line':'#E0C2B8',
+      '--btn':'#EDD6CE','--sel':'#E0BFB2','--sel-line':'#CBA093','--title':'#4A2A26',
+      '--grp':'#B5636E','--ach-bg':'#FBEFE9','--ach-line':'#EFD8CA',
+      '--lv1':'#7A2E28','--lv2':'#A8453A','--lv3':'#C97B72','--lv4':'#DE9273','--lv5':'#F0BCA8'}
   }
 };
-function currentProfile(){
-  var id='';try{id=localStorage.getItem(SK+'_profile')||'';}catch(e){}
-  return PROFILES[id]?id:'kremhvit';
+var FONTER={
+  nunito:{navn:'Nunito',stack:'"Nunito","Helvetica Neue",Helvetica,Arial,sans-serif'},
+  poppins:{navn:'Poppins',stack:'"Poppins","Helvetica Neue",Helvetica,Arial,sans-serif'},
+  arial:{navn:'Arial',stack:'Arial,Helvetica,sans-serif',heading:'"Arial Narrow",Arial,Helvetica,sans-serif'}
+};
+function currentFargetone(){
+  var id='';try{id=localStorage.getItem(SK+'_fargetone')||'';}catch(e){}
+  return FARGETONER[id]?id:'brun';
 }
-function profileVars(){return PROFILES[currentProfile()].vars;}
-function setProfile(id){
-  if(!PROFILES[id])return;
-  try{localStorage.setItem(SK+'_profile',id);}catch(e){}
+function currentFontValg(){
+  var id='';try{id=localStorage.getItem(SK+'_fontvalg')||'';}catch(e){}
+  return FONTER[id]?id:'nunito';
+}
+function profileVars(){return FARGETONER[currentFargetone()].vars;}
+function setFargetone(id){
+  if(!FARGETONER[id])return;
+  try{localStorage.setItem(SK+'_fargetone',id);}catch(e){}
+  applyTheme();render();
+}
+function setFontValg(id){
+  if(!FONTER[id])return;
+  try{localStorage.setItem(SK+'_fontvalg',id);}catch(e){}
   applyTheme();render();
 }
 function applyTheme(){
-  var p=PROFILES[currentProfile()];
+  var kt=FARGETONER[currentFargetone()];
+  var ft=FONTER[currentFontValg()];
   var root=document.documentElement;
-  Object.keys(p.vars).forEach(function(k){root.style.setProperty(k,p.vars[k]);});
-  root.style.setProperty('--font',p.font);
+  Object.keys(kt.vars).forEach(function(k){root.style.setProperty(k,kt.vars[k]);});
+  root.style.setProperty('--font',ft.stack);
+  root.style.setProperty('--font-heading',ft.heading||ft.stack);
   applyBgTone();
 }
 function bgToneHex(hex){
@@ -8266,11 +8388,12 @@ function prosjektTidslinjeHTML(){
   var activeProj=allProj.filter(function(iv){return!iv.completedDate;}).sort(byStart);
   var doneProj=allProj.filter(function(iv){return iv.completedDate;}).sort(function(a,b){return(a.completedDate<b.completedDate)?1:-1;});
   var projRow=function(inv){
-    var c=invCounts(inv);
+    var opp=inv.oppgaver||[];
+    var oppHave=opp.filter(function(o){return o.ferdig;}).length;
     var pCat=inv.catId?catById(inv.catId):null;
     return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
       +'<div class="entry-body"><div class="entry-text"'+(inv.completedDate?' style="color:var(--muted)"':'')+'>'+(inv.completedDate?'\u2713 ':'')+esc(dispName(inv))+'</div>'
-      +'<div class="entry-date">'+(pCat?esc(pCat.name)+' \u00b7 ':'')+c.have+' av '+c.total+' milep\u00e6ler'
+      +'<div class="entry-date">'+(pCat?esc(pCat.name)+' \u00b7 ':'')+(opp.length?oppHave+' av '+opp.length+' oppgaver':'ingen oppgaver enn\u00e5')
       +(inv.completedDate?' \u00b7 <span style="color:var(--red)">ferdigstilt '+fmtDate(inv.completedDate)+'</span>'
         :(inv.endDate?' \u00b7 frist '+fmtDate(inv.endDate):''))
       +'</div></div>'
@@ -8278,7 +8401,7 @@ function prosjektTidslinjeHTML(){
       +'</div>';
   };
   if(!allProj.length){
-    h+='<div class="card"><div class="empty">Ingen prosjekter enn\u00e5. Et prosjekt har ramme (datoer, tidsbruk, kategori), faser og milep\u00e6ler.</div></div>';
+    h+='<div class="card"><div class="empty">Ingen prosjekter enn\u00e5. Et prosjekt har ramme (datoer, tidsbruk, kategori), en fase p\u00e5 Kanban-tavla og oppgaver.</div></div>';
   } else {
     if(activeProj.length)h+='<div class="card">'+activeProj.map(projRow).join('')+'</div>';
     if(doneProj.length){
@@ -8389,13 +8512,14 @@ function inventarViewHTML(){
     +'<div class="view-title" style="padding:0;flex:1">'+esc(inv.name)
     +(isPack?' <span style="font-size:11px;font-weight:400;color:var(--rose)">pakkeliste</span>':isProj?' <span style="font-size:11px;font-weight:400;color:var(--rose)">'+prosjekttypeName(inv.subtype).toLowerCase()+'</span>':'')+'</div>'
     +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="openEditInv(\''+q(inv.id)+'\')">\u270e</button>'
-    +'</div>'
-    +'<div class="view-sub">'+c.have+' av '+c.total+(isPack?' pakket':isProj?' milep\u00e6ler n\u00e5dd':'')
-    +(c.missing?' \u00b7 <button class="icon-btn" style="font-size:11px;padding:1px 8px;color:var(--amber)" onclick="toggleInvMissing()">'+(isPack||isProj?'Gjenst\u00e5r':'Mangler')+' \u00b7 '+c.missing+(invShowMissing?' \u2713':'')+'</button>':'')
-    +(links.length?' \u00b7 \u2192 '+esc(links.join(' \u00b7 ')):'')
     +'</div>';
   if(isProj){
-    var frac=c.total?c.have/c.total:0;
+    var alleOpp=inv.oppgaver||[];
+    var oppHave=alleOpp.filter(function(o){return o.ferdig;}).length;
+    var oppTotal=alleOpp.length;
+    h+='<div class="view-sub">'+(oppTotal?oppHave+' av '+oppTotal+' oppgaver gjort':'Ingen oppgaver enn\u00e5')
+      +(links.length?' \u00b7 \u2192 '+esc(links.join(' \u00b7 ')):'')+'</div>';
+    var frac=oppTotal?oppHave/oppTotal:0;
     h+='<div style="margin:8px 12px 0;height:6px;border-radius:3px;background:var(--line);overflow:hidden">'
       +'<div style="height:100%;width:'+Math.round(frac*100)+'%;background:'+(inv.completedDate?'var(--done-line)':'var(--red)')+'"></div></div>';
     if(inv.completedDate){
@@ -8405,9 +8529,12 @@ function inventarViewHTML(){
     } else {
       h+='<div class="chips" style="padding:6px 12px 0">'
         +'<button class="chip" onclick="toggleProjectDone(\''+q(inv.id)+'\')">\u2713 Marker prosjektet som ferdigstilt</button>'
-        +(c.missing?'<span style="font-size:11px;color:var(--muted);align-self:center">'+c.missing+' milep\u00e6l'+(c.missing===1?'':'er')+' gjenst\u00e5r</span>':'')
         +'</div>';
     }
+  } else {
+    h+='<div class="view-sub">'+c.have+' av '+c.total+(isPack?' pakket':'')
+      +(c.missing?' \u00b7 <button class="icon-btn" style="font-size:11px;padding:1px 8px;color:var(--amber)" onclick="toggleInvMissing()">'+(isPack?'Gjenst\u00e5r':'Mangler')+' \u00b7 '+c.missing+(invShowMissing?' \u2713':'')+'</button>':'')
+      +(links.length?' \u00b7 \u2192 '+esc(links.join(' \u00b7 ')):'')+'</div>';
   }
   if(isProj){
     var frameCat=inv.catId?catById(inv.catId):null;
@@ -8568,6 +8695,10 @@ function inventarViewHTML(){
       +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditInvItem(\''+q(inv.id)+'\',\''+q(it.id)+'\')">\u270e</button>'
       +'</div>';
   };
+
+  // Prosjekter bruker ikke lenger den gamle milep\u00e6l/fase-lista — oppgavene i
+  // prosjektFaseHTML (lagt til tidligere i denne funksjonen) dekker dette n\u00e5.
+  if(isProj)return h;
 
   var secs=[].concat(inv.sections||[]);
   if(isProj)secs.sort(function(a,b){return(a.startDate||'9999')<(b.startDate||'9999')?-1:(a.startDate||'9999')>(b.startDate||'9999')?1:nbSort(a.name,b.name);});
@@ -9148,11 +9279,12 @@ function planleggingViewHTML(){
     .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
   if(pInvs.length){
     h+='<div class="card">'+pInvs.map(function(iv){
-      var ic=invCounts(iv);
+      var opp2=iv.oppgaver||[];
+      var opp2Have=opp2.filter(function(o){return o.ferdig;}).length;
       return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
         +'<div class="entry-body"><div class="entry-text"'+(iv.completedDate?' style="opacity:.55"':'')+'>'+esc(dispName(iv))
         +' <span style="font-size:10px;font-weight:400;color:var(--rose)">\u00b7 '+esc(prosjekttypeName(iv.subtype).toLowerCase())+'</span></div>'
-        +'<div class="entry-date">'+ic.have+' av '+ic.total+' milep\u00e6ler'
+        +'<div class="entry-date">'+(opp2.length?opp2Have+' av '+opp2.length+' oppgaver':'ingen oppgaver enn\u00e5')
         +(iv.completedDate?' \u00b7 <span style="color:var(--red)">\u2713 ferdig '+fmtDate(iv.completedDate)+'</span>':(iv.endDate?' \u00b7 frist '+fmtDate(iv.endDate):''))+'</div></div>'
         +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
     }).join('')+'</div>';
