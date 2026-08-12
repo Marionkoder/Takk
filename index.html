@@ -9445,6 +9445,20 @@ function bootPin(){
   if(pinLocked){renderPinScreen();return;}
   if(myBdayIsToday()&&!celebrationSeen()){startCelebration();}
 }
+// «today» ble til nå bare satt \u00e9n gang, ved sidelasting. Sto appen \u00e5pen over midnatt
+// \u2014 f.eks. som PWA \u2014 trodde den fortsatt at det var i g\u00e5r, og en bursdag i dag ble
+// aldri oppdaget. Sjekker derfor p\u00e5 nytt n\u00e5r appen f\u00e5r fokus igjen, og med jevne mellomrom.
+function friskOppDatoen(){
+  var gammelIso=isoDate(today);
+  today=new Date();curYear=today.getFullYear();curMonth=today.getMonth()+1;
+  if(isoDate(today)===gammelIso)return;
+  if(!pinLocked&&myBdayIsToday()&&!celebrationSeen()){startCelebration();}
+  else render();
+}
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible')friskOppDatoen();
+});
+setInterval(friskOppDatoen,60000);
 bootPin();
 </script>
 </body>
