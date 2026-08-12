@@ -1784,6 +1784,8 @@ function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 // Datamodell: {id, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|'', note:'', intensity:1-4|null}
 var MENS_NIVAA=[[1,'Litt'],[2,'Moderat'],[3,'Kraftig'],[4,'Uvanlig kraftig']];
 var MENS_SMERTE=[[1,'Ingen'],[2,'Til \u00e5 leve med'],[3,'Plagsomme'],[4,'Ille']];
+var MENS_ENERGI=[[1,'Veldig slapp'],[2,'Litt slapp'],[3,'Normal energi'],[4,'Energioverskudd']];
+var MENS_KONSENTRASJON=[[1,'Store konsentrasjonsproblemer'],[2,'Litt ukonsentrert'],[3,'Normal konsentrasjon'],[4,'Skjerpet fokus']];
 function mensLyn(n){return Array(Math.max(0,(Number(n)||0)-1)).fill('\u26a1').join('');}
 function mensDraaper(n){return Array(Number(n)||0).fill('\ud83e\ude78').join('');}
 function mensSorted(){return mens.slice().sort(function(a,b){return a.start<b.start?1:-1;});} // nyeste først
@@ -1893,14 +1895,12 @@ function mensDagMerkerHTML(dato,tittel){
       }).join('')+'</div>';
   }
   // Energi og fokus gjennom hele syklusen — det er her m\u00f8nsteret viser seg
-  h+='<div class="chips" style="margin-bottom:6px">'
-    +'<button class="chip'+(rad.energi==='slapp'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'energi\',\'slapp\')">Slapp</button>'
-    +'<button class="chip'+(rad.energi==='energisk'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'energi\',\'energisk\')">Energisk</button>'
-    +'</div>'
-    +'<div class="chips"'+((visSlutt||visStart)?' style="margin-bottom:6px"':'')+'>'
-    +'<button class="chip'+(rad.fokus==='fokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'fokusert\')">Fokusert</button>'
-    +'<button class="chip'+(rad.fokus==='ufokusert'?' on':'')+'" onclick="mensSettDag(\''+dato+'\',\'fokus\',\'ufokusert\')">Ufokusert</button>'
-    +'</div>'
+  h+='<div class="chips" style="margin-bottom:6px">'+MENS_ENERGI.map(function(n){
+      return'<button class="chip'+(Number(rad.energi)===n[0]?' on':'')+'" onclick="mensSettDagEnergi(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div class="chips"'+((visSlutt||visStart)?' style="margin-bottom:6px"':'')+'>'+MENS_KONSENTRASJON.map(function(n){
+      return'<button class="chip'+(Number(rad.fokus)===n[0]?' on':'')+'" onclick="mensSettDagKonsentrasjon(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
+    }).join('')+'</div>'
     +'<div class="chips" style="margin-bottom:6px"><button class="chip'+(rad.slim?' on':'')+'" onclick="mensSettSlim(\''+dato+'\')">'+(rad.slim?'\u2713 ':'')+'Eggl\u00f8sningsslim</button></div>';
   if(visSlutt){
     h+='<div class="chips"><button class="chip'+(erSluttdag?' on':'')+'" onclick="mensSettSlutt(\''+dato+'\')">'+(erSluttdag?'\u2713 Menstruasjon over':'Menstruasjon over')+'</button></div>';
@@ -1947,8 +1947,8 @@ function mensViewHTML(){
       var sd=mensSyklusdagForDato(r.date);
       var merker=[r.intensity?mensDraaper(r.intensity):'',
                   r.smerte?(mensLyn(r.smerte)?mensLyn(r.smerte)+' ':'')+MENS_SMERTE[r.smerte-1][1]:'',
-                  r.energi==='slapp'?'slapp':r.energi==='energisk'?'energisk':'',
-                  r.fokus==='fokusert'?'fokusert':r.fokus==='ufokusert'?'ufokusert':'',
+                  r.energi?MENS_ENERGI[r.energi-1][1]:'',
+                  r.fokus?MENS_KONSENTRASJON[r.fokus-1][1]:'',
                   r.slim?'eggl\u00f8sningsslim':''].filter(Boolean).join(' \u00b7 ');
       return'<div class="entry-row" style="cursor:pointer" onclick="goDag(\''+r.date+'\')"><div class="entry-body"><div class="entry-text" style="font-size:13px">'+fmtDate(r.date)+(sd?' <span style="font-size:11px;color:var(--muted)">\u00b7 syklusdag '+sd+'</span>':'')+'</div>'
         +(merker?'<div class="entry-date">'+esc(merker)+'</div>':'')+'</div>'
@@ -2011,6 +2011,20 @@ function mensSettDagSmerte(dato,niva){
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad.smerte=Number(rad.smerte)===niva?'':niva;
   if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagEnergi(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
+  rad.energi=Number(rad.energi)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagKonsentrasjon(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
+  rad.fokus=Number(rad.fokus)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 // Syklusdag for en vilk\u00e5rlig dato, ikke bare i dag — brukes til \u00e5 se merkene i sammenheng med syklusen
@@ -2328,6 +2342,7 @@ function load(){
   try{mensDag=JSON.parse(localStorage.getItem(SK+'_mensdag')||'[]');}catch(e){mensDag=[];}
   try{maalinger=JSON.parse(localStorage.getItem(SK+'_maalinger')||'[]');}catch(e){maalinger=[];}
   try{kvartalNotat=JSON.parse(localStorage.getItem(SK+'_kvartal')||'{}');}catch(e){kvartalNotat={};}
+  try{mensSyklusNotat=JSON.parse(localStorage.getItem(SK+'_menssyklusnotat')||'{}');}catch(e){mensSyklusNotat={};}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
@@ -2532,6 +2547,20 @@ function load(){
       iv.items=[];
     });
     try{localStorage.setItem(SK+'_milepvekk1','1');}catch(e){}
+    save();
+  }
+
+  // Energi og konsentrasjon gikk fra to trinn til fire. Gamle merker regnes om,
+  // med samme retning som f\u00f8r — «slapp»/«ufokusert» l\u00e5 lavt, «energisk»/«fokusert» h\u00f8yt.
+  var me1=false;try{me1=!!localStorage.getItem(SK+'_mensenerginiva1');}catch(e){}
+  if(!me1){
+    mensDag.forEach(function(r){
+      if(r.energi==='slapp')r.energi=2;
+      else if(r.energi==='energisk')r.energi=4;
+      if(r.fokus==='ufokusert')r.fokus=2;
+      else if(r.fokus==='fokusert')r.fokus=4;
+    });
+    try{localStorage.setItem(SK+'_mensenerginiva1','1');}catch(e){}
     save();
   }
 
@@ -3036,6 +3065,7 @@ function save(){
   try{localStorage.setItem(SK+'_mensdag',JSON.stringify(mensDag));}catch(e){}
   try{localStorage.setItem(SK+'_maalinger',JSON.stringify(maalinger));}catch(e){}
   try{localStorage.setItem(SK+'_kvartal',JSON.stringify(kvartalNotat));}catch(e){}
+  try{localStorage.setItem(SK+'_menssyklusnotat',JSON.stringify(mensSyklusNotat));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
@@ -4269,35 +4299,79 @@ function mensSyklusPunkter(syklus,felt){
     var d=Math.round((new Date(r.date+'T00:00:00')-start)/86400000)+1;
     if(d<1||d>syklus.lengde)return;
     var v=null;
-    if(felt==='energi')v=r.energi==='slapp'?-1:r.energi==='energisk'?1:null;
-    else if(felt==='fokus')v=r.fokus==='ufokusert'?-1:r.fokus==='fokusert'?1:null;
+    if(felt==='energi')v=r.energi?Number(r.energi):null;
+    else if(felt==='fokus')v=r.fokus?Number(r.fokus):null;
     else if(felt==='intensity')v=r.intensity?Number(r.intensity):null;
     else if(felt==='smerte')v=r.smerte?Number(r.smerte):null;
     if(v!==null)ut.push({dag:d,verdi:v});
   });
   return ut.sort(function(a,b){return a.dag-b.dag;});
 }
-function mensSyklusGrafSVG(punkter,lengde,minV,maxV,farge,nullLinje){
-  if(!punkter.length)return'<div class="empty" style="font-size:11px;padding:6px 0">Ingen data denne syklusen.</div>';
-  var W=320,H=64,ML=4,MR=4,MT=6,MB=4,plotW=W-ML-MR,plotH=H-MT-MB;
+function mensSyklusSlimDager(syklus){
+  var start=new Date(syklus.start+'T00:00:00');
+  var ut=[];
+  mensDag.forEach(function(r){
+    if(!r.slim)return;
+    var d=Math.round((new Date(r.date+'T00:00:00')-start)/86400000)+1;
+    if(d>=1&&d<=syklus.lengde)ut.push(d);
+  });
+  return ut;
+}
+// Alle fire faktorene på samme 1–4-skala nå, så de kan tegnes i samme bilde med
+// felles akse. Eggløsningsslim er fortsatt av/på, og vises som søyler i bakgrunnen
+// i stedet for en linje, siden den ikke har noe nivå å tegne en linje mellom.
+var MENS_GRAF_FARGER={
+  intensity:'#D97666',   // rød, blødning
+  energi:'#E0C15A',      // gul, energi
+  smerte:'#5C5248',      // mørk (ikke helt svart), smerte
+  fokus:'#6FA0BC'        // blå, konsentrasjon
+};
+function mensSyklusKombinertGrafSVG(syk){
+  var serier=[
+    ['intensity','Bl\u00f8dning'],
+    ['energi','Energi'],
+    ['smerte','Smerte'],
+    ['fokus','Konsentrasjon']
+  ].map(function(t){return{felt:t[0],navn:t[1],farge:MENS_GRAF_FARGER[t[0]],punkter:mensSyklusPunkter(syk,t[0])};});
+  var slimDager=mensSyklusSlimDager(syk);
+  var noe=serier.some(function(s){return s.punkter.length;})||slimDager.length;
+  if(!noe)return'<div class="empty" style="font-size:11px;padding:6px 0">Ingen data denne syklusen.</div>';
+  var W=320,H=130,ML=6,MR=6,MT=8,MB=6,plotW=W-ML-MR,plotH=H-MT-MB;
+  var lengde=syk.lengde;
   var xFor=function(d){return lengde>1?ML+plotW*((d-1)/(lengde-1)):ML+plotW/2;};
-  var yFor=function(v){return MT+plotH-(v-minV)/(maxV-minV)*plotH;};
-  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:64px;display:block">';
-  if(nullLinje!=null){
-    var y0=yFor(nullLinje);
-    svg+='<line x1="'+ML+'" y1="'+y0+'" x2="'+(W-MR)+'" y2="'+y0+'" style="stroke:var(--line);stroke-width:1"/>';
-  }
-  if(punkter.length>1){
-    var linje=punkter.map(function(p){return xFor(p.dag)+','+yFor(p.verdi);}).join(' ');
-    svg+='<polyline points="'+linje+'" style="fill:none;stroke:'+farge+';stroke-width:2"/>';
-  }
-  punkter.forEach(function(p){
-    svg+='<circle cx="'+xFor(p.dag)+'" cy="'+yFor(p.verdi)+'" r="3" style="fill:'+farge+'"/>';
+  var yFor=function(v){return MT+plotH-(v-1)/3*plotH;}; // skala 1–4
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:130px;display:block">';
+  // Eggl\u00f8sningsslim som lysegr\u00f8nne s\u00f8yler bak alt annet
+  var barW=lengde>1?Math.max(2,plotW/lengde*0.7):8;
+  slimDager.forEach(function(d){
+    svg+='<rect x="'+(xFor(d)-barW/2)+'" y="'+MT+'" width="'+barW+'" height="'+plotH+'" style="fill:#C9E3B8;opacity:.65"/>';
+  });
+  // Fire linjer, 50\u00a0% tykkere enn f\u00f8r (3px i stedet for 2), lysere farger, ingen prikker per dato
+  serier.forEach(function(s){
+    if(s.punkter.length>1){
+      var linje=s.punkter.map(function(p){return xFor(p.dag)+','+yFor(p.verdi);}).join(' ');
+      svg+='<polyline points="'+linje+'" style="fill:none;stroke:'+s.farge+';stroke-width:3;stroke-linecap:round;stroke-linejoin:round"/>';
+    } else if(s.punkter.length===1){
+      // \u00c9tt punkt gir ingen linje \u00e5 tegne — vis det som en kort strek i stedet for en prikk
+      var p=s.punkter[0];
+      svg+='<line x1="'+(xFor(p.dag)-4)+'" y1="'+yFor(p.verdi)+'" x2="'+(xFor(p.dag)+4)+'" y2="'+yFor(p.verdi)+'" style="stroke:'+s.farge+';stroke-width:3;stroke-linecap:round"/>';
+    }
   });
   svg+='</svg>';
-  return svg;
+  var forklaring='<div style="display:flex;flex-wrap:wrap;gap:8px 12px;padding:2px 2px 0;font-size:10px;color:var(--muted)">'
+    +serier.map(function(s){
+      return'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+s.farge+';margin-right:3px;vertical-align:middle"></span>'+s.navn+'</span>';
+    }).join('')
+    +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C9E3B8;margin-right:3px;vertical-align:middle"></span>Eggl\u00f8sningsslim</span>'
+    +'</div>';
+  return svg+forklaring;
 }
 var mensSyklusIdx=0;
+var mensSyklusNotat={};
+function mensSyklusSettNotat(startDato,tekst){
+  mensSyklusNotat[startDato]=tekst;
+  save();
+}
 function mensSyklusValgt(i){mensSyklusIdx=Math.max(0,i);render();}
 function mensSyklusGraferHTML(){
   var sykluser=mensSykluser();
@@ -4310,19 +4384,11 @@ function mensSyklusGraferHTML(){
     +'<span style="flex:1;text-align:center;color:var(--muted)">Fra '+fmtDate(syk.start)+(syk.pagaende?' \u00b7 p\u00e5g\u00e5r':'')+' \u00b7 '+syk.lengde+' dager</span>'
     +'<button class="icon-btn" style="font-size:11px" '+(idx>0?'onclick="mensSyklusValgt('+(idx-1)+')"':'disabled')+'>nyere \u203a</button>'
     +'</div>';
-  var grafer=[
-    ['energi','Energi',-1,1,'#8C5A74',0],
-    ['fokus','Konsentrasjon',-1,1,'#4E7B8C',0],
-    ['intensity','Bl\u00f8dning',1,4,'#D65372',null],
-    ['smerte','Smerte',1,4,'#CC7F33',null]
-  ];
-  grafer.forEach(function(g){
-    var punkter=mensSyklusPunkter(syk,g[0]);
-    h+='<div class="card" style="padding:8px 10px;margin-bottom:6px">'
-      +'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:2px">'+g[1]+'</div>'
-      +mensSyklusGrafSVG(punkter,syk.lengde,g[2],g[3],g[4],g[5])
-      +'</div>';
-  });
+  h+='<div class="card" style="padding:8px 10px">'+mensSyklusKombinertGrafSVG(syk)+'</div>';
+  h+='<div class="card" style="padding:8px 10px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">Merknad om denne syklusen</div>'
+    +'<textarea class="inp" rows="2" style="margin:0" placeholder="F.eks. noe som p\u00e5virket denne syklusen spesielt \u2026" oninput="mensSyklusSettNotat(\''+syk.start+'\',this.value)">'+esc(mensSyklusNotat[syk.start]||'')+'</textarea>'
+    +'</div>';
   return h;
 }
 function toggleProjectDone(invId){
@@ -4894,7 +4960,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -4913,7 +4979,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
