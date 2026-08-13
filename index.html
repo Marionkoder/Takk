@@ -128,6 +128,10 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 /* Spesialdager: bare selve banneret f\u00e5r farge og konfetti — resten av appen
    holder seg til det temaet brukeren har valgt. */
 .spesialdag-banner{position:relative;overflow:hidden}
+/* Jul og 17. mai f\u00e5rger hele appens bakgrunn denne dagen \u2014 bursdagen holder seg
+   bevisst til banneret, som avtalt. */
+body.spesialdag-bg-jul{--bg:#1F3D2B}
+body.spesialdag-bg-17mai{--bg:#5B6E85}
 .spesialdag-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1}
 .spesialdag-confetti i{position:absolute;top:-14px;width:6px;height:11px;border-radius:1px;opacity:.88;
   animation-name:cfall;animation-timing-function:linear;animation-iteration-count:infinite;animation-duration:3.2s}
@@ -2046,9 +2050,10 @@ function myBdayIsToday(){
   var mb=myBirthday();if(!mb)return false;
   var t=today;return (Number(mb.slice(5,7))===t.getMonth()+1)&&(Number(mb.slice(8,10))===t.getDate());
 }
-// Midlertidige forh\u00e5ndsvisningsbrytere — for \u00e5 se 17. mai- og julefeiringen f\u00f8r selve
-// dagen. Fjernes n\u00e5r begge er sett og godkjent.
-var visTest17Mai=false,visTestJul=false;
+// Midlertidige forh\u00e5ndsvisningsbrytere — for \u00e5 se feiringene f\u00f8r selve dagen.
+// Fjernes n\u00e5r alle tre er sett og godkjent.
+var visTestBursdag=false,visTest17Mai=false,visTestJul=false;
+function toggleTestBursdag(){visTestBursdag=!visTestBursdag;save();render();}
 function toggleTest17Mai(){visTest17Mai=!visTest17Mai;save();render();}
 function toggleTestJul(){visTestJul=!visTestJul;save();render();}
 function er17MaiIDag(){return visTest17Mai||(today.getMonth()===4&&today.getDate()===17);}
@@ -2056,17 +2061,17 @@ function erJulekveldIDag(){return visTestJul||(today.getMonth()===11&&today.getD
 // Hvilken spesialdag som gjelder n\u00e5, om noen — bursdagen har f\u00f8rste prioritet
 // om flere skulle falle sammen
 function spesialDagIDag(){
-  if(myBdayIsToday())return'bursdag';
+  if(visTestBursdag||myBdayIsToday())return'bursdag';
   if(er17MaiIDag())return'17mai';
   if(erJulekveldIDag())return'jul';
   return null;
 }
 var SPESIALDAG_KONFIG={
-  bursdag:{tekst:'GRATULERER MED DAGEN',bg:'#E7C468',fg:'#3B2E24',
+  bursdag:{tekst:'GRATULERER MED DAGEN!',bg:'#F2DA82',fg:'#3B2E24',heleApp:false,
     confetti:['#DE9273','#74A491','#4E7B8C','#8C5A74','#CC7F33','#8B7A9E','#A34A5E','#9C6B3F']},
-  '17mai':{tekst:'GRATULERER MED DAGEN',bg:'#5B6E85',fg:'#F5F5F2',
+  '17mai':{tekst:'GRATULERER MED DAGEN!',bg:'#5B6E85',fg:'#F5F5F2',heleApp:true,
     confetti:['#C8373A','#F5F5F2','#1B3A6B']},
-  jul:{tekst:'GOD JUL',bg:'#1F3D2B',fg:'#F5F0E6',
+  jul:{tekst:'GOD JUL!',bg:'#1F3D2B',fg:'#F5F0E6',heleApp:true,
     confetti:['#B23A3A','#7A1F1F','#2E9E4F','#F5F0E6']}
 };
 function celebrationSeenKey(){return SK+'_celebseen_'+curYear;}
@@ -2372,6 +2377,7 @@ function load(){
   try{weeklyAvailableHours=Number(localStorage.getItem(SK+'_availhours'))||0;}catch(e){weeklyAvailableHours=0;}
   try{soundOn=localStorage.getItem(SK+'_sound')!=='0';}catch(e){soundOn=true;}
   try{var tp=Number(localStorage.getItem(SK+'_taktplan'));if(tp||tp===0)kanbanTakPlan=tp;}catch(e){}
+  try{visTestBursdag=localStorage.getItem(SK+'_testbursdag')==='1';}catch(e){}
   try{visTest17Mai=localStorage.getItem(SK+'_test17mai')==='1';}catch(e){}
   try{visTestJul=localStorage.getItem(SK+'_testjul')==='1';}catch(e){}
   try{var ta=Number(localStorage.getItem(SK+'_takarbeid'));if(ta||ta===0)kanbanTakArbeid=ta;}catch(e){}
@@ -3097,6 +3103,7 @@ function save(){
   try{localStorage.setItem(SK+'_availhours',String(weeklyAvailableHours));}catch(e){}
   try{localStorage.setItem(SK+'_sound',soundOn?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_taktplan',String(kanbanTakPlan));}catch(e){}
+  try{localStorage.setItem(SK+'_testbursdag',visTestBursdag?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_test17mai',visTest17Mai?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_testjul',visTestJul?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_takarbeid',String(kanbanTakArbeid));}catch(e){}
@@ -3819,6 +3826,10 @@ function personligViewHTML(){
   // Midlertidig: forhåndsvis feiringsbannerne før selve dagen. Fjernes når begge er sett.
   h+='<div class="card" style="padding:12px 14px;margin-top:8px;border-left:3px solid var(--rose)">'
     +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--rose);margin-bottom:6px">Midlertidig \u2014 forh\u00e5ndsvisning</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    +'<div style="flex:1"><div class="entry-text">Vis bursdagsfeiring</div></div>'
+    +'<button class="chip'+(visTestBursdag?' on':'')+'" onclick="toggleTestBursdag()">'+(visTestBursdag?'P\u00e5':'Av')+'</button>'
+    +'</div>'
     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
     +'<div style="flex:1"><div class="entry-text">Vis 17. maifeiring</div></div>'
     +'<button class="chip'+(visTest17Mai?' on':'')+'" onclick="toggleTest17Mai()">'+(visTest17Mai?'P\u00e5':'Av')+'</button>'
@@ -9552,6 +9563,8 @@ function render(){
 
   var dagSpes=spesialDagIDag();
   var spesConf=dagSpes?SPESIALDAG_KONFIG[dagSpes]:null;
+  document.body.classList.toggle('spesialdag-bg-jul',dagSpes==='jul'&&spesConf.heleApp);
+  document.body.classList.toggle('spesialdag-bg-17mai',dagSpes==='17mai'&&spesConf.heleApp);
   var topbar='<div class="topbar">'
     +'<div class="topbar-row'+(spesConf?' spesialdag-banner':'')+'"'+(spesConf?' style="background:'+spesConf.bg+';color:'+spesConf.fg+'"':'')+'>'
     +(spesConf?'<div class="spesialdag-confetti">'+spesialdagKonfettiHTML(spesConf.confetti)+'</div>':'')
