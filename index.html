@@ -1108,8 +1108,13 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     }).sort(function(a,b){return nbSort(a.name,b.name);});
     // Menstruasjonstrackeren hører hjemme i «Vitale data», ikke i noen liste
     var erVitale=showMens&&(uc.name||'').toLowerCase()==='vitale data';
+    var erInvestering=(uc.name||'').toLowerCase()==='planlagte investeringer';
     var valgte=berItemsForKat(uc.id);
     var berKol=erBeredskapUnder(uc);
+    // Helt tomme underkategorier vises ikke i det hele tatt — med mindre de har
+    // en egen, alltid synlig funksjon (Vitale data, Beredskap-kolonnene, investeringer)
+    var tom=!uInv.length&&!uEvs.length&&!uLager.length&&!uListe.length;
+    if(tom&&!erVitale&&!berKol&&!erInvestering)return;
     // Det vanlige innholdet — lister, prosjekter, rutiner og planer
     var vanlig='';
     if(erVitale){
@@ -1140,7 +1145,9 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     var tomtVanlig='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt eller en plan.</div>';
 
     h+='<div class="sec-title">'+esc(uc.name)+'</div>';
-    if(berKol){
+    if(erInvestering){
+      h+='<div class="card">'+investeringerListeHTML(uc.id)+'</div>';
+    } else if(berKol){
       // To kolonner: utvalgte punkter fra lageret til venstre, det vanlige til høyre
       h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">'
         +'<div style="flex:1;min-width:0">'
@@ -1179,6 +1186,64 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     h+=maalingerKatHTML(uc.id);
   });
   h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openNySubCat(\''+q(cat.id)+'\')">+ Ny underkategori</button></div>';
+  return h;
+}
+// ── Planlagte investeringer: en nummerert prioriteringsliste per underkategori ──
+function investeringerForKat(catId){
+  return investeringer.filter(function(x){return x.catId===catId;});
+}
+// Flytter et punkt opp/ned blant de andre i SAMME underkategori — resten av
+// den globale lista (andre kategoriers punkter) ligger urørt mellom dem.
+function investFlytt(id,retning){
+  var i=investeringer.findIndex(function(x){return x.id===id;});
+  if(i<0)return;
+  var catId=investeringer[i].catId;
+  var j=i+retning;
+  while(j>=0&&j<investeringer.length&&investeringer[j].catId!==catId)j+=retning;
+  if(j<0||j>=investeringer.length)return;
+  var tmp=investeringer[i];investeringer[i]=investeringer[j];investeringer[j]=tmp;
+  save();render();
+}
+function openInvesteringModal(catId){modal={step:'investering',form:{catId:catId,tittel:'',beskrivelse:'',kostnad:''}};render();}
+function openEditInvestering(id){
+  var it=investeringer.find(function(x){return x.id===id;});if(!it)return;
+  modal={step:'investering_edit',form:{id:id,catId:it.catId,tittel:it.tittel,beskrivelse:it.beskrivelse||'',kostnad:String(it.kostnad||'')}};render();
+}
+function submitInvestering(){
+  var f=mf();var t=(f.tittel||'').trim();if(!t)return;
+  investeringer.push({id:'inv'+Date.now()+Math.random().toString(36).slice(2,6),catId:f.catId,tittel:t,beskrivelse:(f.beskrivelse||'').trim(),kostnad:numVal(f.kostnad)||''});
+  save();closeModal();
+}
+function saveEditInvestering(){
+  var f=mf();var t=(f.tittel||'').trim();if(!t)return;
+  var it=investeringer.find(function(x){return x.id===f.id;});if(!it)return;
+  it.tittel=t;it.beskrivelse=(f.beskrivelse||'').trim();it.kostnad=numVal(f.kostnad)||'';
+  save();closeModal();
+}
+function deleteInvestering(){
+  var f=mf();
+  investeringer=investeringer.filter(function(x){return x.id!==f.id;});
+  save();closeModal();
+}
+function investeringerListeHTML(catId){
+  var liste=investeringerForKat(catId);
+  var h='';
+  if(!liste.length){
+    h+='<div class="empty" style="padding:6px 12px">Ingen planlagte investeringer enn\u00e5.</div>';
+  } else {
+    h+=liste.map(function(it,i){
+      return'<div class="entry-row" style="align-items:flex-start;cursor:pointer" onclick="openEditInvestering(\''+q(it.id)+'\')">'
+        +'<span style="flex-shrink:0;font-weight:700;color:var(--rose);width:18px">'+(i+1)+'.</span>'
+        +'<div class="entry-body"><div class="entry-text">'+esc(it.tittel)+'</div>'
+        +(it.beskrivelse?'<div class="entry-date">'+esc(it.beskrivelse)+'</div>':'')
+        +(it.kostnad?'<div class="entry-date">ca. '+fmtKr(it.kostnad)+'</div>':'')+'</div>'
+        +'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">'
+        +(i>0?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="investFlytt(\''+q(it.id)+'\',-1)">\u2191</button>':'')
+        +(i<liste.length-1?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="investFlytt(\''+q(it.id)+'\',1)">\u2193</button>':'')
+        +'</div></div>';
+    }).join('');
+  }
+  h+='<div style="padding:6px 12px 4px"><button class="icon-btn" style="font-size:11px" onclick="openInvesteringModal(\''+q(catId)+'\')">+ Legg til investering</button></div>';
   return h;
 }
 function katVedNavn(navn){
@@ -2371,6 +2436,7 @@ function load(){
   try{maalinger=JSON.parse(localStorage.getItem(SK+'_maalinger')||'[]');}catch(e){maalinger=[];}
   try{kvartalNotat=JSON.parse(localStorage.getItem(SK+'_kvartal')||'{}');}catch(e){kvartalNotat={};}
   try{mensSyklusNotat=JSON.parse(localStorage.getItem(SK+'_menssyklusnotat')||'{}');}catch(e){mensSyklusNotat={};}
+  try{investeringer=JSON.parse(localStorage.getItem(SK+'_investeringer')||'[]');}catch(e){investeringer=[];}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
@@ -2592,6 +2658,17 @@ function load(){
       else if(r.fokus==='fokusert')r.fokus=4;
     });
     try{localStorage.setItem(SK+'_mensenerginiva1','1');}catch(e){}
+    save();
+  }
+
+  // «Planlagte investeringer» opprettes som underkategori på alle hovedkategorier
+  var pi1=false;try{pi1=!!localStorage.getItem(SK+'_planlagtinvest1');}catch(e){}
+  if(!pi1){
+    cats.filter(function(c){return!c.parentId;}).forEach(function(hoved){
+      var finnes=cats.some(function(c){return c.parentId===hoved.id&&(c.name||'').toLowerCase()==='planlagte investeringer';});
+      if(!finnes)cats.push({id:'c_invest_'+hoved.id,name:'Planlagte investeringer',parentId:hoved.id});
+    });
+    try{localStorage.setItem(SK+'_planlagtinvest1','1');}catch(e){}
     save();
   }
 
@@ -3097,6 +3174,7 @@ function save(){
   try{localStorage.setItem(SK+'_maalinger',JSON.stringify(maalinger));}catch(e){}
   try{localStorage.setItem(SK+'_kvartal',JSON.stringify(kvartalNotat));}catch(e){}
   try{localStorage.setItem(SK+'_menssyklusnotat',JSON.stringify(mensSyklusNotat));}catch(e){}
+  try{localStorage.setItem(SK+'_investeringer',JSON.stringify(investeringer));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
@@ -4417,6 +4495,7 @@ function mensSyklusKombinertGrafSVG(syk){
 }
 var mensSyklusIdx=0;
 var mensSyklusNotat={};
+var investeringer=[];
 function mensSyklusSettNotat(startDato,tekst){
   mensSyklusNotat[startDato]=tekst;
   save();
@@ -5009,7 +5088,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -5028,7 +5107,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -5390,6 +5469,7 @@ function updateSaveBtn(){
   if(step==='mens'||step==='mens_edit')enabled=!!(mf().start||'').trim();
   if(step==='maalingserie'||step==='maalingserie_edit')enabled=!!(mf().navn||'').trim();
   if(step==='oppgave')enabled=!!(mf().navn||'').trim();
+  if(step==='investering'||step==='investering_edit')enabled=!!(mf().tittel||'').trim();
   if(step==='maalingpunkt'||step==='maalingpunkt_edit')enabled=!!mf().dato&&maalingVerdiGyldig(mf().verdi);
   if(step==='cat_edit'||step==='goal'||step==='goal_edit'||step==='later'||step==='later_edit')enabled=(mf().name||'').trim().length>0;
   if(step==='result'||step==='result_edit')enabled=(mf().name||'').trim().length>0&&!!mf().valueId&&!!mf().subtype;
@@ -5525,6 +5605,18 @@ function modalHTML(){
       +'<div class="hint">Bruk flere referansebaner n\u00e5r noe skal holde seg innenfor et spenn \u2014 for eksempel \u00e9n for \u00f8vre og \u00e9n for nedre grense. Uten noen, monitoreres m\u00e5lingen bare.</div>'
       +'<button class="save-btn" onclick="'+(isEditS?'saveEditMaalingSerie()':'submitMaalingSerie()')+'" '+((f.navn||'').trim()?'':'disabled')+'>Lagre</button>'
       +(isEditS?'<button class="del-full-btn" onclick="deleteMaalingSerie(\''+q(f.id)+'\')">Slett m\u00e5leserie</button>':'');
+
+  } else if(step==='investering'||step==='investering_edit'){
+    var isEditI2=step==='investering_edit';
+    body='<div class="modal-title">'+(isEditI2?'Rediger investering':'Ny planlagt investering')+'</div>'
+      +'<label class="field-lbl">Tittel</label>'
+      +'<input class="inp" type="text" value="'+esc(f.tittel||'')+'" placeholder="F.eks. Ny symaskin" oninput="mf().tittel=this.value;updateSaveBtn()">'
+      +'<label class="field-lbl">Kort beskrivelse <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<textarea class="inp" rows="2" oninput="mf().beskrivelse=this.value">'+esc(f.beskrivelse||'')+'</textarea>'
+      +'<label class="field-lbl">Antatt kostnad <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+      +'<input class="inp" type="text" inputmode="decimal" value="'+esc(String(f.kostnad||''))+'" placeholder="kr" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\');mf().kostnad=this.value">'
+      +'<button class="save-btn" onclick="'+(isEditI2?'saveEditInvestering()':'submitInvestering()')+'" '+((f.tittel||'').trim()?'':'disabled')+'>Lagre</button>'
+      +(isEditI2?'<button class="del-full-btn" onclick="deleteInvestering()">Slett</button>':'');
 
   } else if(step==='oppgave'){
     body='<div class="modal-title">Ny oppgave \u2013 '+(f.fase==='plan'?'Planlegging':'Gjennomf\u00f8ring')+'</div>'
