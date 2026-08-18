@@ -1127,7 +1127,8 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     var berKol=erBeredskapUnder(uc);
     // Helt tomme underkategorier vises ikke i det hele tatt — med mindre de har
     // en egen, alltid synlig funksjon (Vitale data, Beredskap-kolonnene, investeringer)
-    var tom=!uInv.length&&!uEvs.length&&!uLager.length&&!uListe.length;
+    var uMaal=maalingerForKat(uc.id);
+    var tom=!uInv.length&&!uEvs.length&&!uLager.length&&!uListe.length&&!uMaal.length;
     if(tom&&!erVitale&&!berKol&&!erInvestering)return;
     // Det vanlige innholdet — lister, prosjekter, rutiner og planer
     var vanlig='';
