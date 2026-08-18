@@ -1107,7 +1107,7 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
       return!iv.fixed&&(iv.type||'inventar')==='inventar'&&ic.indexOf(uc.id)>=0;
     }).sort(function(a,b){return nbSort(a.name,b.name);});
     // Menstruasjonstrackeren hører hjemme i «Vitale data», ikke i noen liste
-    var erVitale=showMens&&(uc.name||'').toLowerCase()==='vitale data';
+    var erVitale=showMens&&(uc.name||'').toLowerCase()==='menstruasjon';
     var erInvestering=(uc.name||'').toLowerCase()==='planlagte investeringer';
     var valgte=berItemsForKat(uc.id);
     var berKol=erBeredskapUnder(uc);
@@ -1853,6 +1853,7 @@ function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 // Datamodell: {id, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|'', note:'', intensity:1-4|null}
 var MENS_NIVAA=[[1,'Litt'],[2,'Moderat'],[3,'Kraftig'],[4,'Uvanlig kraftig']];
 var MENS_SMERTE=[[1,'Ingen'],[2,'Til \u00e5 leve med'],[3,'Plagsomme'],[4,'Ille']];
+var MENS_HODEPINE=[[1,'Ingen hodepine'],[2,'Litt hodepine'],[3,'En del hodepine'],[4,'Kraftig hodepine']];
 var MENS_ENERGI=[[1,'Veldig slapp'],[2,'Litt slapp'],[3,'Normal energi'],[4,'Energioverskudd']];
 var MENS_KONSENTRASJON=[[1,'Store konsentrasjonsproblemer'],[2,'Litt ukonsentrert'],[3,'Normal konsentrasjon'],[4,'Skjerpet fokus']];
 function mensLyn(n){return Array(Math.max(0,(Number(n)||0)-1)).fill('\u26a1').join('');}
@@ -1953,7 +1954,7 @@ function mensDagMerkerHTML(dato,tittel){
   var visSlutt=per&&(erSluttdag||(syklusdag&&syklusdag>=3));
   var visStart=!per&&(!syklusdag||syklusdag>=20);
   var h='<div class="sec-title">'+esc(tittel)+'</div><div class="card" style="padding:10px 14px">';
-  // Blødning og smerte gir bare mening under selve menstruasjonen
+  // Bl\u00f8dning, menssmerter og hodepine gir bare mening under selve menstruasjonen
   if(per){
     h+='<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
         return'<button class="chip'+(Number(rad.intensity)===n[0]?' on':'')+'" onclick="mensSettDagIntensity(\''+dato+'\','+n[0]+')">'+mensDraaper(n[0])+' '+n[1]+'</button>';
@@ -1961,6 +1962,9 @@ function mensDagMerkerHTML(dato,tittel){
       +'<div class="chips" style="margin-bottom:6px">'+MENS_SMERTE.map(function(n){
         var lyn=mensLyn(n[0]);
         return'<button class="chip'+(Number(rad.smerte)===n[0]?' on':'')+'" onclick="mensSettDagSmerte(\''+dato+'\','+n[0]+')">'+(lyn?lyn+' ':'')+n[1]+'</button>';
+      }).join('')+'</div>'
+      +'<div class="chips" style="margin-bottom:6px">'+MENS_HODEPINE.map(function(n){
+        return'<button class="chip'+(Number(rad.hodepine)===n[0]?' on':'')+'" onclick="mensSettDagHodepine(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
       }).join('')+'</div>';
   }
   // Energi og fokus gjennom hele syklusen — det er her m\u00f8nsteret viser seg
@@ -2016,6 +2020,7 @@ function mensViewHTML(){
       var sd=mensSyklusdagForDato(r.date);
       var merker=[r.intensity?mensDraaper(r.intensity):'',
                   r.smerte?(mensLyn(r.smerte)?mensLyn(r.smerte)+' ':'')+MENS_SMERTE[r.smerte-1][1]:'',
+                  r.hodepine?MENS_HODEPINE[r.hodepine-1][1]:'',
                   r.energi?MENS_ENERGI[r.energi-1][1]:'',
                   r.fokus?MENS_KONSENTRASJON[r.fokus-1][1]:'',
                   r.slim?'eggl\u00f8sningsslim':''].filter(Boolean).join(' \u00b7 ');
@@ -2065,21 +2070,28 @@ function mensSettDag(dato,felt,verdi){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad[felt]=rad[felt]===verdi?'':verdi;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagIntensity(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad.intensity=Number(rad.intensity)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagSmerte(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad.smerte=Number(rad.smerte)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagHodepine(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',hodepine:''};mensDag.push(rad);}
+  rad.hodepine=Number(rad.hodepine)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagEnergi(dato,niva){
@@ -2669,6 +2681,18 @@ function load(){
       if(!finnes)cats.push({id:'c_invest_'+hoved.id,name:'Planlagte investeringer',parentId:hoved.id});
     });
     try{localStorage.setItem(SK+'_planlagtinvest1','1');}catch(e){}
+    save();
+  }
+
+  // Menstruasjon skilles ut som egen underkategori under Helse, adskilt fra
+  // Vitale data — som n\u00e5 er ledig til andre m\u00e5leserier, som jernlagre eller BMI.
+  var mk1=false;try{mk1=!!localStorage.getItem(SK+'_mensegenkat1');}catch(e){}
+  if(!mk1){
+    var helseCat2=cats.find(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='helse';});
+    if(helseCat2&&!cats.some(function(c){return c.parentId===helseCat2.id&&(c.name||'').toLowerCase()==='menstruasjon';})){
+      cats.push({id:'c_menstruasjon_helse',name:'Menstruasjon',parentId:helseCat2.id});
+    }
+    try{localStorage.setItem(SK+'_mensegenkat1','1');}catch(e){}
     save();
   }
 
@@ -4430,6 +4454,7 @@ function mensSyklusPunkter(syklus,felt){
     else if(felt==='fokus')v=r.fokus?Number(r.fokus):null;
     else if(felt==='intensity')v=r.intensity?Number(r.intensity):null;
     else if(felt==='smerte')v=r.smerte?Number(r.smerte):null;
+    else if(felt==='hodepine')v=r.hodepine?Number(r.hodepine):null;
     if(v!==null)ut.push({dag:d,verdi:v});
   });
   return ut.sort(function(a,b){return a.dag-b.dag;});
@@ -4450,30 +4475,40 @@ function mensSyklusSlimDager(syklus){
 var MENS_GRAF_FARGER={
   intensity:'#D97666',   // rød, blødning
   energi:'#E0C15A',      // gul, energi
-  smerte:'#5C5248',      // mørk (ikke helt svart), smerte
-  fokus:'#6FA0BC'        // blå, konsentrasjon
+  smerte:'#7A2E28',      // mørkerød, menssmerter
+  hodepine:'#1F3A63',    // mørkebl\u00e5, hodepine
+  fokus:'#6FA0BC'        // bl\u00e5, konsentrasjon
 };
 function mensSyklusKombinertGrafSVG(syk){
   var serier=[
     ['intensity','Bl\u00f8dning'],
     ['energi','Energi'],
-    ['smerte','Smerte'],
+    ['smerte','Menssmerter'],
+    ['hodepine','Hodepine'],
     ['fokus','Konsentrasjon']
   ].map(function(t){return{felt:t[0],navn:t[1],farge:MENS_GRAF_FARGER[t[0]],punkter:mensSyklusPunkter(syk,t[0])};});
   var slimDager=mensSyklusSlimDager(syk);
   var noe=serier.some(function(s){return s.punkter.length;})||slimDager.length;
   if(!noe)return'<div class="empty" style="font-size:11px;padding:6px 0">Ingen data denne syklusen.</div>';
-  var W=320,H=130,ML=6,MR=6,MT=8,MB=6,plotW=W-ML-MR,plotH=H-MT-MB;
+  var W=320,H=140,ML=6,MR=6,MT=16,MB=6,plotW=W-ML-MR,plotH=H-MT-MB;
   var lengde=syk.lengde;
   var xFor=function(d){return lengde>1?ML+plotW*((d-1)/(lengde-1)):ML+plotW/2;};
   var yFor=function(v){return MT+plotH-(v-1)/3*plotH;}; // skala 1–4
-  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:130px;display:block">';
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:140px;display:block">';
+  // Syklusdager i liten skrift langs toppen — hver 5. dag, pluss siste dag
+  var steg=lengde<=15?2:lengde<=35?5:10;
+  for(var d=1;d<=lengde;d+=steg){
+    svg+='<text x="'+xFor(d)+'" y="10" text-anchor="middle" style="font-size:7px;fill:var(--muted)">'+d+'</text>';
+  }
+  if((lengde-1)%steg!==0){
+    svg+='<text x="'+xFor(lengde)+'" y="10" text-anchor="middle" style="font-size:7px;fill:var(--muted)">'+lengde+'</text>';
+  }
   // Eggl\u00f8sningsslim som lysegr\u00f8nne s\u00f8yler bak alt annet
   var barW=lengde>1?Math.max(2,plotW/lengde*0.7):8;
   slimDager.forEach(function(d){
     svg+='<rect x="'+(xFor(d)-barW/2)+'" y="'+MT+'" width="'+barW+'" height="'+plotH+'" style="fill:#C9E3B8;opacity:.65"/>';
   });
-  // Fire linjer, 50\u00a0% tykkere enn f\u00f8r (3px i stedet for 2), lysere farger, ingen prikker per dato
+  // Fem linjer, 50\u00a0% tykkere enn f\u00f8r (3px i stedet for 2), lysere farger, ingen prikker per dato
   serier.forEach(function(s){
     if(s.punkter.length>1){
       var linje=s.punkter.map(function(p){return xFor(p.dag)+','+yFor(p.verdi);}).join(' ');
