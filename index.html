@@ -1936,6 +1936,9 @@ function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 var MENS_NIVAA=[[1,'Litt'],[2,'Moderat'],[3,'Kraftig'],[4,'Uvanlig kraftig']];
 var MENS_SMERTE=[[1,'Ingen'],[2,'Til \u00e5 leve med'],[3,'Plagsomme'],[4,'Ille']];
 var MENS_HODEPINE=[[1,'Ingen hodepine'],[2,'Litt hodepine'],[3,'En del hodepine'],[4,'Kraftig hodepine']];
+var MENS_HUMOR=[[1,'Ingen hum\u00f8rsvingninger'],[2,'Litt hum\u00f8rsvingninger'],[3,'En del hum\u00f8rsvingninger'],[4,'Kraftige hum\u00f8rsvingninger']];
+var MENS_HUD=[[1,'Ingen uren hud'],[2,'Litt uren hud'],[3,'En del uren hud'],[4,'Kraftig uren hud']];
+var MENS_OPPBLAAST=[[1,'Ingen oppbl\u00e5sthet'],[2,'Litt oppbl\u00e5sthet'],[3,'En del oppbl\u00e5sthet'],[4,'Kraftig oppbl\u00e5sthet']];
 var MENS_ENERGI=[[1,'Veldig slapp'],[2,'Litt slapp'],[3,'Normal energi'],[4,'Energioverskudd']];
 var MENS_KONSENTRASJON=[[1,'Store konsentrasjonsproblemer'],[2,'Litt ukonsentrert'],[3,'Normal konsentrasjon'],[4,'Skjerpet fokus']];
 function mensLyn(n){return Array(Math.max(0,(Number(n)||0)-1)).fill('\u26a1').join('');}
@@ -2027,7 +2030,7 @@ function mensStartNy(dato){
   save();render();
 }
 function mensDagMerkerHTML(dato,tittel){
-  var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:'',slim:false};
+  var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:'',slim:false,hodepine:'',humor:'',hud:'',oppblaast:''};
   var per=mensPeriodeFor(dato);
   var erSluttdag=per&&per.end===dato;
   var syklusdag=mensSyklusdagForDato(dato);
@@ -2036,7 +2039,7 @@ function mensDagMerkerHTML(dato,tittel){
   var visSlutt=per&&(erSluttdag||(syklusdag&&syklusdag>=3));
   var visStart=!per&&(!syklusdag||syklusdag>=20);
   var h='<div class="sec-title">'+esc(tittel)+'</div><div class="card" style="padding:10px 14px">';
-  // Bl\u00f8dning, menssmerter og hodepine gir bare mening under selve menstruasjonen
+  // Blødning og menssmerter gir bare mening under selve menstruasjonen
   if(per){
     h+='<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
         return'<button class="chip'+(Number(rad.intensity)===n[0]?' on':'')+'" onclick="mensSettDagIntensity(\''+dato+'\','+n[0]+')">'+mensDraaper(n[0])+' '+n[1]+'</button>';
@@ -2044,17 +2047,27 @@ function mensDagMerkerHTML(dato,tittel){
       +'<div class="chips" style="margin-bottom:6px">'+MENS_SMERTE.map(function(n){
         var lyn=mensLyn(n[0]);
         return'<button class="chip'+(Number(rad.smerte)===n[0]?' on':'')+'" onclick="mensSettDagSmerte(\''+dato+'\','+n[0]+')">'+(lyn?lyn+' ':'')+n[1]+'</button>';
-      }).join('')+'</div>'
-      +'<div class="chips" style="margin-bottom:6px">'+MENS_HODEPINE.map(function(n){
-        return'<button class="chip'+(Number(rad.hodepine)===n[0]?' on':'')+'" onclick="mensSettDagHodepine(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
       }).join('')+'</div>';
   }
-  // Energi og fokus gjennom hele syklusen — det er her m\u00f8nsteret viser seg
+  // Hodepine og de premenstruelle plagene gir mening gjennom hele syklusen, ikke
+  // bare under blødning — derfor ligger de her sammen med energi og fokus
   h+='<div class="chips" style="margin-bottom:6px">'+MENS_ENERGI.map(function(n){
       return'<button class="chip'+(Number(rad.energi)===n[0]?' on':'')+'" onclick="mensSettDagEnergi(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
     }).join('')+'</div>'
-    +'<div class="chips"'+((visSlutt||visStart)?' style="margin-bottom:6px"':'')+'>'+MENS_KONSENTRASJON.map(function(n){
+    +'<div class="chips" style="margin-bottom:6px">'+MENS_KONSENTRASJON.map(function(n){
       return'<button class="chip'+(Number(rad.fokus)===n[0]?' on':'')+'" onclick="mensSettDagKonsentrasjon(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div class="chips" style="margin-bottom:6px">'+MENS_HODEPINE.map(function(n){
+      return'<button class="chip'+(Number(rad.hodepine)===n[0]?' on':'')+'" onclick="mensSettDagHodepine(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div class="chips" style="margin-bottom:6px">'+MENS_HUMOR.map(function(n){
+      return'<button class="chip'+(Number(rad.humor)===n[0]?' on':'')+'" onclick="mensSettDagHumor(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div class="chips" style="margin-bottom:6px">'+MENS_HUD.map(function(n){
+      return'<button class="chip'+(Number(rad.hud)===n[0]?' on':'')+'" onclick="mensSettDagHud(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
+    }).join('')+'</div>'
+    +'<div class="chips"'+((visSlutt||visStart)?' style="margin-bottom:6px"':'')+'>'+MENS_OPPBLAAST.map(function(n){
+      return'<button class="chip'+(Number(rad.oppblaast)===n[0]?' on':'')+'" onclick="mensSettDagOppblaast(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
     }).join('')+'</div>'
     +'<div class="chips" style="margin-bottom:6px"><button class="chip'+(rad.slim?' on':'')+'" onclick="mensSettSlim(\''+dato+'\')">'+(rad.slim?'\u2713 ':'')+'Eggl\u00f8sningsslim</button></div>';
   if(visSlutt){
@@ -2103,6 +2116,9 @@ function mensViewHTML(){
       var merker=[r.intensity?mensDraaper(r.intensity):'',
                   r.smerte?(mensLyn(r.smerte)?mensLyn(r.smerte)+' ':'')+MENS_SMERTE[r.smerte-1][1]:'',
                   r.hodepine?MENS_HODEPINE[r.hodepine-1][1]:'',
+                  r.humor?MENS_HUMOR[r.humor-1][1]:'',
+                  r.hud?MENS_HUD[r.hud-1][1]:'',
+                  r.oppblaast?MENS_OPPBLAAST[r.oppblaast-1][1]:'',
                   r.energi?MENS_ENERGI[r.energi-1][1]:'',
                   r.fokus?MENS_KONSENTRASJON[r.fokus-1][1]:'',
                   r.slim?'eggl\u00f8sningsslim':''].filter(Boolean).join(' \u00b7 ');
@@ -2152,28 +2168,49 @@ function mensSettDag(dato,felt,verdi){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad[felt]=rad[felt]===verdi?'':verdi;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.humor&&!rad.hud&&!rad.oppblaast)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagIntensity(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad.intensity=Number(rad.intensity)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.humor&&!rad.hud&&!rad.oppblaast)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagSmerte(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad.smerte=Number(rad.smerte)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.humor&&!rad.hud&&!rad.oppblaast)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagHodepine(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',hodepine:''};mensDag.push(rad);}
   rad.hodepine=Number(rad.hodepine)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.humor&&!rad.hud&&!rad.oppblaast)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagHumor(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',humor:''};mensDag.push(rad);}
+  rad.humor=Number(rad.humor)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.humor&&!rad.hud&&!rad.oppblaast)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagHud(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',hud:''};mensDag.push(rad);}
+  rad.hud=Number(rad.hud)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.humor&&!rad.hud&&!rad.oppblaast)mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagOppblaast(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',oppblaast:''};mensDag.push(rad);}
+  rad.oppblaast=Number(rad.oppblaast)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.humor&&!rad.hud&&!rad.oppblaast)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagEnergi(dato,niva){
@@ -2531,6 +2568,8 @@ function load(){
   try{kvartalNotat=JSON.parse(localStorage.getItem(SK+'_kvartal')||'{}');}catch(e){kvartalNotat={};}
   try{mensSyklusNotat=JSON.parse(localStorage.getItem(SK+'_menssyklusnotat')||'{}');}catch(e){mensSyklusNotat={};}
   try{investeringer=JSON.parse(localStorage.getItem(SK+'_investeringer')||'[]');}catch(e){investeringer=[];}
+  try{skjulteEntries=JSON.parse(localStorage.getItem(SK+'_skjulteentries')||'[]');}catch(e){skjulteEntries=[];}
+  try{mensGrafSynlig=JSON.parse(localStorage.getItem(SK+'_mensgrafsynlig')||'{}');}catch(e){mensGrafSynlig={};}
   try{investGlobalOrder=JSON.parse(localStorage.getItem(SK+'_investglobalrekk')||'[]');}catch(e){investGlobalOrder=[];}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
@@ -3302,6 +3341,8 @@ function save(){
   try{localStorage.setItem(SK+'_kvartal',JSON.stringify(kvartalNotat));}catch(e){}
   try{localStorage.setItem(SK+'_menssyklusnotat',JSON.stringify(mensSyklusNotat));}catch(e){}
   try{localStorage.setItem(SK+'_investeringer',JSON.stringify(investeringer));}catch(e){}
+  try{localStorage.setItem(SK+'_skjulteentries',JSON.stringify(skjulteEntries));}catch(e){}
+  try{localStorage.setItem(SK+'_mensgrafsynlig',JSON.stringify(mensGrafSynlig));}catch(e){}
   try{localStorage.setItem(SK+'_investglobalrekk',JSON.stringify(investGlobalOrder));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
@@ -3353,6 +3394,49 @@ function setEdit(v){editMode=v;render();}
 
 /* ── Dagbok-handlinger ── */
 function deleteEntry(id){entries=entries.filter(function(e){return e.id!==id;});save();render();}
+// ── Skjulte innlegg — for dagbokinnlegg brukeren ikke vil skal vises n\u00e5r
+// appen demonstreres for andre. Flyttes helt ut av entries, s\u00e5 ingen andre
+// steder i appen (s\u00f8k, skyer, lister) trenger \u00e5 filtrere dem bort separat.
+function skjulInnlegg(id){
+  var e=entries.find(function(x){return x.id===id;});if(!e)return;
+  entries=entries.filter(function(x){return x.id!==id;});
+  skjulteEntries.push(e);
+  save();closeModal();
+}
+function visInnleggIgjen(id){
+  var e=skjulteEntries.find(function(x){return x.id===id;});if(!e)return;
+  skjulteEntries=skjulteEntries.filter(function(x){return x.id!==id;});
+  entries.push(e);
+  save();render();
+}
+function apneSkjulteInnlegg(){
+  if(!pinData()){modal={step:'skjultingenkode'};render();return;}
+  modal={step:'skjultpin',form:{buf:'',err:''}};render();
+}
+function skjultPinSiffer(k){
+  var f=mf();
+  if(k==='\u232b'){f.buf=f.buf.slice(0,-1);f.err='';render();return;}
+  if(f.buf.length>=4)return;
+  f.buf+=k;
+  if(f.buf.length===4){
+    var pd=pinData();
+    if(pd&&f.buf===pd.pin){closeModal();goSkjulteInnlegg();}
+    else{f.err='Feil kode.';f.buf='';render();}
+  } else render();
+}
+function goSkjulteInnlegg(){view={kind:'skjulte'};drawerOpen=false;render();}
+function skjulteInnleggViewHTML(){
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div class="view-title">Skjulte innlegg</div>'
+    +'<div class="view-sub">Disse er tatt helt ut av dagboka inntil du viser dem igjen.</div>';
+  if(!skjulteEntries.length)return h+'<div class="card"><div class="empty">Ingen skjulte innlegg.</div></div>';
+  h+='<div class="card">'+skjulteEntries.slice().sort(function(a,b){return b.date<a.date?-1:(b.date>a.date?1:0);}).map(function(e){
+    return'<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(e.text)+'</div>'
+      +'<div class="entry-date">'+fmtDate(e.date)+'</div></div>'
+      +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="visInnleggIgjen(\''+q(e.id)+'\')">Vis igjen</button></div>';
+  }).join('')+'</div>';
+  return h;
+}
 
 /* ── Rutine/hendelse-handlinger ── */
 function toggleRoutine(id,ym){
@@ -4559,6 +4643,9 @@ function mensSyklusPunkter(syklus,felt){
     else if(felt==='intensity')v=r.intensity?Number(r.intensity):null;
     else if(felt==='smerte')v=r.smerte?Number(r.smerte):null;
     else if(felt==='hodepine')v=r.hodepine?Number(r.hodepine):null;
+    else if(felt==='humor')v=r.humor?Number(r.humor):null;
+    else if(felt==='hud')v=r.hud?Number(r.hud):null;
+    else if(felt==='oppblaast')v=r.oppblaast?Number(r.oppblaast):null;
     if(v!==null)ut.push({dag:d,verdi:v});
   });
   return ut.sort(function(a,b){return a.dag-b.dag;});
@@ -4581,7 +4668,10 @@ var MENS_GRAF_FARGER={
   energi:'#E0C15A',      // gul, energi
   smerte:'#7A2E28',      // mørkerød, menssmerter
   hodepine:'#1F3A63',    // mørkebl\u00e5, hodepine
-  fokus:'#6FA0BC'        // bl\u00e5, konsentrasjon
+  fokus:'#6FA0BC',       // bl\u00e5, konsentrasjon
+  humor:'#8C5A74',       // lilla, hum\u00f8rsvingninger
+  hud:'#CC7F33',         // terrakotta, uren hud
+  oppblaast:'#5C8A6B'    // dus gr\u00f8nn, oppbl\u00e5sthet — annen valør enn slim-s\u00f8ylene
 };
 function mensSyklusKombinertGrafSVG(syk){
   var serier=[
@@ -4589,11 +4679,15 @@ function mensSyklusKombinertGrafSVG(syk){
     ['energi','Energi'],
     ['smerte','Menssmerter'],
     ['hodepine','Hodepine'],
-    ['fokus','Konsentrasjon']
-  ].map(function(t){return{felt:t[0],navn:t[1],farge:MENS_GRAF_FARGER[t[0]],punkter:mensSyklusPunkter(syk,t[0])};});
-  var slimDager=mensSyklusSlimDager(syk);
+    ['fokus','Konsentrasjon'],
+    ['humor','Hum\u00f8r'],
+    ['hud','Uren hud'],
+    ['oppblaast','Oppbl\u00e5sthet']
+  ].filter(function(t){return t[0]==='intensity'||mensGrafSynlig[t[0]]!==false;})
+   .map(function(t){return{felt:t[0],navn:t[1],farge:MENS_GRAF_FARGER[t[0]],punkter:mensSyklusPunkter(syk,t[0])};});
+  var slimDager=mensGrafSynlig.slim!==false?mensSyklusSlimDager(syk):[];
   var noe=serier.some(function(s){return s.punkter.length;})||slimDager.length;
-  if(!noe)return'<div class="empty" style="font-size:11px;padding:6px 0">Ingen data denne syklusen.</div>';
+  if(!noe)return'<div class="empty" style="font-size:11px;padding:6px 0">Ingen data denne syklusen \u2014 eller alt er skrudd av under.</div>';
   var W=320,H=140,ML=6,MR=6,MT=16,MB=6,plotW=W-ML-MR,plotH=H-MT-MB;
   var lengde=syk.lengde;
   var xFor=function(d){return lengde>1?ML+plotW*((d-1)/(lengde-1)):ML+plotW/2;};
@@ -4628,13 +4722,21 @@ function mensSyklusKombinertGrafSVG(syk){
     +serier.map(function(s){
       return'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+s.farge+';margin-right:3px;vertical-align:middle"></span>'+s.navn+'</span>';
     }).join('')
-    +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C9E3B8;margin-right:3px;vertical-align:middle"></span>Eggl\u00f8sningsslim</span>'
+    +(mensGrafSynlig.slim!==false?'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C9E3B8;margin-right:3px;vertical-align:middle"></span>Eggl\u00f8sningsslim</span>':'')
     +'</div>';
   return svg+forklaring;
+}
+// Hvilke linjer som vises i den kombinerte grafen — bl\u00f8dning kan aldri skrus av,
+// resten kan brukeren velge bort selv, siden \u00e5tte linjer fort blir mye \u00e5 se p\u00e5 en gang.
+var mensGrafSynlig={};
+function mensGrafToggle(felt){
+  mensGrafSynlig[felt]=mensGrafSynlig[felt]===false?true:false;
+  save();render();
 }
 var mensSyklusIdx=0;
 var mensSyklusNotat={};
 var investeringer=[];
+var skjulteEntries=[];
 var investGlobalOrder=[];
 function mensSyklusSettNotat(startDato,tekst){
   mensSyklusNotat[startDato]=tekst;
@@ -4653,6 +4755,17 @@ function mensSyklusGraferHTML(){
     +'<button class="icon-btn" style="font-size:11px" '+(idx>0?'onclick="mensSyklusValgt('+(idx-1)+')"':'disabled')+'>nyere \u203a</button>'
     +'</div>';
   h+='<div class="card" style="padding:8px 10px">'+mensSyklusKombinertGrafSVG(syk)+'</div>';
+  h+='<div class="card" style="padding:8px 10px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">Vis i grafen</div>'
+    +'<div class="chips">'
+    +[['energi','Energi'],['smerte','Menssmerter'],['hodepine','Hodepine'],['fokus','Konsentrasjon'],
+      ['humor','Hum\u00f8r'],['hud','Uren hud'],['oppblaast','Oppbl\u00e5sthet'],['slim','Eggl\u00f8sningsslim']].map(function(t){
+        var paa=mensGrafSynlig[t[0]]!==false;
+        return'<button class="chip'+(paa?' on':'')+'" onclick="mensGrafToggle(\''+t[0]+'\')">'+t[1]+'</button>';
+      }).join('')
+    +'</div>'
+    +'<div class="hint">Bl\u00f8dning vises alltid.</div>'
+    +'</div>';
   h+='<div class="card" style="padding:8px 10px">'
     +'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">Merknad om denne syklusen</div>'
     +'<textarea class="inp" rows="2" style="margin:0" placeholder="F.eks. noe som p\u00e5virket denne syklusen spesielt \u2026" oninput="mensSyklusSettNotat(\''+syk.start+'\',this.value)">'+esc(mensSyklusNotat[syk.start]||'')+'</textarea>'
@@ -5228,7 +5341,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -5247,7 +5360,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];skjulteEntries=d.skjulteEntries||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -5757,6 +5870,24 @@ function modalHTML(){
       +'<input class="inp" type="text" inputmode="decimal" value="'+esc(String(f.kostnad||''))+'" placeholder="kr" oninput="this.value=this.value.replace(/[^0-9.,]/g,\'\');mf().kostnad=this.value">'
       +'<button class="save-btn" onclick="'+(isEditI2?'saveEditInvestering()':'submitInvestering()')+'" '+((f.tittel||'').trim()?'':'disabled')+'>Lagre</button>'
       +(isEditI2?'<button class="del-full-btn" onclick="deleteInvestering()">Slett</button>':'');
+
+  } else if(step==='skjultpin'){
+    var dots2='';for(var _di=0;_di<4;_di++)dots2+='<span style="display:inline-block;width:12px;height:12px;border-radius:50%;margin:0 5px;border:1.5px solid var(--sel-line);background:'+(_di<(f.buf||'').length?'var(--ink)':'transparent')+'"></span>';
+    body='<div class="modal-title">Skriv inn koden</div>'
+      +'<div class="hint">Samme firesifrede kode som \u00e5pner appen.</div>'
+      +'<div style="text-align:center;margin:14px 0">'+dots2+'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:200px;margin:0 auto">'
+      +['1','2','3','4','5','6','7','8','9','','0','\u232b'].map(function(k){
+        if(k==='')return'<div></div>';
+        return'<button onclick="skjultPinSiffer(\''+k+'\')" style="font-size:17px;width:100%;aspect-ratio:4/5;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-family:inherit">'+k+'</button>';
+      }).join('')
+      +'</div>'
+      +(f.err?'<div style="color:var(--red);text-align:center;font-size:12px;margin-top:10px">'+esc(f.err)+'</div>':'');
+
+  } else if(step==='skjultingenkode'){
+    body='<div class="modal-title">Ingen kode er satt</div>'
+      +'<div class="hint">Du m\u00e5 sette en kode f\u00f8rst, ellers beskytter ikke skjulingen noe.</div>'
+      +'<button class="save-btn" onclick="closeModal();openPinSetup()">Sett kode n\u00e5</button>';
 
   } else if(step==='oppgave'){
     body='<div class="modal-title">Ny oppgave \u2013 '+(f.fase==='plan'?'Planlegging':'Gjennomf\u00f8ring')+'</div>'
@@ -6999,6 +7130,7 @@ function modalHTML(){
           }).join('')+'</div>';
       })()
       +(isEdit?'<button class="del-full-btn" onclick="deleteEntry(\''+q(f.id)+'\');closeModal()">Slett innlegg</button>':'')
+      +(isEdit?'<button class="icon-btn" style="width:100%;margin-top:6px" onclick="skjulInnlegg(\''+q(f.id)+'\')">Skjul dette innlegget</button>':'')
       +'<button class="save-btn" onclick="'+(isEdit?'saveEditEntry()':'submitEntry()')+'" '+(entryValid()?'':'disabled')+'>'+(isEdit?'Lagre endringer':'Lagre')+'</button>';
   }
 
@@ -9171,6 +9303,10 @@ function innstillingerViewHTML(){
     +'<div class="entry-body"><div class="entry-text">PIN-l\u00e5s</div>'
     +'<div class="entry-date">'+(hasPin?'p\u00e5 \u2014 endre eller sl\u00e5 av':'av \u2014 lås appen med en PIN-kode')+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="apneSkjulteInnlegg()">'
+    +'<div class="entry-body"><div class="entry-text">Skjulte innlegg</div>'
+    +'<div class="entry-date">'+skjulteEntries.length+' innlegg tatt ut av dagboka'+(hasPin?'':' \u2014 sett en kode f\u00f8rst')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   return h;
 }
 
@@ -9874,6 +10010,7 @@ function render(){
   else if(view.kind==='arsrapport')content=arsrapportViewHTML();
   else if(view.kind==='inventar')content=inventarViewHTML();
   else if(view.kind==='kanban')content=kanbanViewHTML();
+  else if(view.kind==='skjulte')content=skjulteInnleggViewHTML();
   else if(view.kind==='kvartal')content=kvartalViewHTML();
   else if(view.kind==='budsjett')content=budsjettViewHTML();
   else if(view.kind==='innstillinger')content=innstillingerViewHTML();
