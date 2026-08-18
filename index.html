@@ -1199,6 +1199,7 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     } else {
       h+='<div class="card">'+(vanlig||tomtVanlig)+'</div>';
     }
+    if(erVitale)h+=mensSyklusGraferHTML();
     h+=maalingerKatHTML(uc.id);
   });
   h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openNySubCat(\''+q(cat.id)+'\')">+ Ny underkategori</button></div>';
@@ -2775,6 +2776,26 @@ function load(){
       cats.push({id:'c_menstruasjon_helse',name:'Menstruasjon',parentId:helseCat2.id});
     }
     try{localStorage.setItem(SK+'_mensegenkat1','1');}catch(e){}
+    save();
+  }
+
+  // Vitale data avvikles. Alt som l\u00e5 der (m\u00e5leserier og annet) flyttes opp til
+  // Helse direkte f\u00f8rst, s\u00e5 ingenting blir foreldrel\u00f8st n\u00e5r underkategorien slettes.
+  var vdVekk1=false;try{vdVekk1=!!localStorage.getItem(SK+'_vitaledatavekk1');}catch(e){}
+  if(!vdVekk1){
+    var vdCat=cats.find(function(c){return(c.name||'').toLowerCase()==='vitale data';});
+    if(vdCat){
+      var helseId=vdCat.parentId;
+      maalinger.forEach(function(m){if(m.catId===vdCat.id)m.catId=helseId;});
+      inventories.forEach(function(iv){
+        if(iv.catId===vdCat.id)iv.catId=helseId;
+        if(iv.catIds&&iv.catIds.indexOf(vdCat.id)>=0)iv.catIds=iv.catIds.map(function(x){return x===vdCat.id?helseId:x;});
+      });
+      events.forEach(function(e){if((e.cats||[]).indexOf(vdCat.id)>=0)e.cats=e.cats.map(function(x){return x===vdCat.id?helseId:x;});});
+      routines.forEach(function(r){if((r.cats||[]).indexOf(vdCat.id)>=0)r.cats=r.cats.map(function(x){return x===vdCat.id?helseId:x;});});
+      cats=cats.filter(function(c){return c.id!==vdCat.id;});
+    }
+    try{localStorage.setItem(SK+'_vitaledatavekk1','1');}catch(e){}
     save();
   }
 
