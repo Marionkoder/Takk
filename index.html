@@ -1261,39 +1261,63 @@ function investeringerListeHTML(catId){
   h+='<div style="padding:6px 12px 4px"><button class="icon-btn" style="font-size:11px" onclick="openInvesteringModal(\''+q(catId)+'\')">+ Legg til investering</button></div>';
   return h;
 }
-// Samler investeringer fra ALLE hovedkategorier — brukes bare på Økonomisiden,
-// slik at den kan fungere som ett samlet prioriteringssted på tvers av livsområdene.
-function investeringerAlleKategorier(){
-  var grupper=[];
-  cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(hoved){
-    var uc=cats.find(function(c){return c.parentId===hoved.id&&(c.name||'').toLowerCase()==='planlagte investeringer';});
-    if(!uc)return;
-    var liste=investeringerForKat(uc.id);
-    if(liste.length)grupper.push({hoved:hoved,liste:liste});
+// Global prioritering på Økonomisiden — én flat liste på tvers av kategorier.
+// Regelen: to punkter fra ULIKE kategorier kan alltid bytte plass her. To punkter
+// fra SAMME kategori kan aldri bytte plass her — den rekkefølgen styres bare på
+// kategoriens egen side. Endres den der, reparerer investGlobalListe() seg selv
+// automatisk neste gang den leses, uten å miste hvor i den globale lista de ligger.
+function investGlobalListe(){
+  var alle=investeringer.map(function(x){return x.id;});
+  investGlobalOrder=investGlobalOrder.filter(function(id){return alle.indexOf(id)>=0;});
+  alle.forEach(function(id){if(investGlobalOrder.indexOf(id)<0)investGlobalOrder.push(id);});
+  var posisjonerPerKat={};
+  investGlobalOrder.forEach(function(id,i){
+    var it=investeringer.find(function(x){return x.id===id;});
+    if(!it)return;
+    (posisjonerPerKat[it.catId]=posisjonerPerKat[it.catId]||[]).push(i);
   });
-  return grupper;
+  Object.keys(posisjonerPerKat).forEach(function(catId){
+    var posisjoner=posisjonerPerKat[catId];
+    var lokal=investeringerForKat(catId).map(function(x){return x.id;});
+    posisjoner.forEach(function(pos,k){investGlobalOrder[pos]=lokal[k];});
+  });
+  return investGlobalOrder.map(function(id){return investeringer.find(function(x){return x.id===id;});}).filter(Boolean);
+}
+function investGlobalFlytt(id,retning){
+  investGlobalListe(); // sikrer full, reparert liste f\u00f8r vi flytter noe i den
+  var i=investGlobalOrder.indexOf(id);
+  if(i<0)return;
+  var j=i+retning;
+  if(j<0||j>=investGlobalOrder.length)return;
+  var mitt=investeringer.find(function(x){return x.id===id;});
+  var nabo=investeringer.find(function(x){return x.id===investGlobalOrder[j];});
+  if(!mitt||!nabo||mitt.catId===nabo.catId)return; // samme kategori — styres p\u00e5 kategorisiden
+  var tmp=investGlobalOrder[i];investGlobalOrder[i]=investGlobalOrder[j];investGlobalOrder[j]=tmp;
+  save();render();
 }
 function investeringerAltHTML(){
-  var grupper=investeringerAlleKategorier();
+  var liste=investGlobalListe();
   var h='';
-  if(!grupper.length){
+  if(!liste.length){
     h+='<div class="empty" style="padding:6px 12px">Ingen planlagte investeringer registrert enn\u00e5, i noen kategori.</div>';
   } else {
-    grupper.forEach(function(g){
-      var col=catColor(g.hoved.id)||'var(--line)';
-      h+='<div style="padding:8px 12px 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:'+col+'">'+esc(g.hoved.name)+'</div>';
-      h+=g.liste.map(function(it,i){
-        return'<div class="entry-row" style="align-items:flex-start;cursor:pointer;border-left:3px solid '+col+'" onclick="openEditInvestering(\''+q(it.id)+'\')">'
-          +'<span style="flex-shrink:0;font-weight:700;color:var(--rose);width:18px">'+(i+1)+'.</span>'
-          +'<div class="entry-body"><div class="entry-text">'+esc(it.tittel)+'</div>'
-          +(it.beskrivelse?'<div class="entry-date">'+esc(it.beskrivelse)+'</div>':'')
-          +(it.kostnad?'<div class="entry-date">ca. '+fmtKr(it.kostnad)+'</div>':'')+'</div>'
-          +'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">'
-          +(i>0?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="investFlytt(\''+q(it.id)+'\',-1)">\u2191</button>':'')
-          +(i<g.liste.length-1?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="investFlytt(\''+q(it.id)+'\',1)">\u2193</button>':'')
-          +'</div></div>';
-      }).join('');
-    });
+    h+=liste.map(function(it,i){
+      var uc=cats.find(function(c){return c.id===it.catId;});
+      var hoved=uc?cats.find(function(c){return c.id===uc.parentId;}):null;
+      var col=hoved?(catColor(hoved.id)||'var(--line)'):'var(--line)';
+      var naboOpp=i>0?investeringer.find(function(x){return x.id===investGlobalOrder[i-1];}):null;
+      var naboNed=i<liste.length-1?investeringer.find(function(x){return x.id===investGlobalOrder[i+1];}):null;
+      var kanOpp=naboOpp&&naboOpp.catId!==it.catId;
+      var kanNed=naboNed&&naboNed.catId!==it.catId;
+      return'<div class="entry-row" style="align-items:flex-start;cursor:pointer;border-left:3px solid '+col+'" onclick="openEditInvestering(\''+q(it.id)+'\')">'
+        +'<span style="flex-shrink:0;font-weight:700;color:var(--rose);width:18px">'+(i+1)+'.</span>'
+        +'<div class="entry-body"><div class="entry-text">'+esc(it.tittel)+(hoved?' <span style="font-weight:400;color:var(--muted)">('+esc(hoved.name)+')</span>':'')+'</div>'
+        +(it.kostnad?'<div class="entry-date">ca. '+fmtKr(it.kostnad)+'</div>':'')+'</div>'
+        +'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">'
+        +(kanOpp?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="investGlobalFlytt(\''+q(it.id)+'\',-1)">\u2191</button>':'')
+        +(kanNed?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="investGlobalFlytt(\''+q(it.id)+'\',1)">\u2193</button>':'')
+        +'</div></div>';
+    }).join('');
   }
   h+='<div style="padding:6px 12px 4px"><button class="icon-btn" style="font-size:11px" onclick="openInvesteringModal(\''+q(katVedNavn('\u00f8konomi')?investeringerUnderkatId(katVedNavn('\u00f8konomi').id):'')+'\')">+ Legg til investering under \u00d8konomi</button></div>';
   return h;
@@ -2505,6 +2529,7 @@ function load(){
   try{kvartalNotat=JSON.parse(localStorage.getItem(SK+'_kvartal')||'{}');}catch(e){kvartalNotat={};}
   try{mensSyklusNotat=JSON.parse(localStorage.getItem(SK+'_menssyklusnotat')||'{}');}catch(e){mensSyklusNotat={};}
   try{investeringer=JSON.parse(localStorage.getItem(SK+'_investeringer')||'[]');}catch(e){investeringer=[];}
+  try{investGlobalOrder=JSON.parse(localStorage.getItem(SK+'_investglobalrekk')||'[]');}catch(e){investGlobalOrder=[];}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
@@ -3255,6 +3280,7 @@ function save(){
   try{localStorage.setItem(SK+'_kvartal',JSON.stringify(kvartalNotat));}catch(e){}
   try{localStorage.setItem(SK+'_menssyklusnotat',JSON.stringify(mensSyklusNotat));}catch(e){}
   try{localStorage.setItem(SK+'_investeringer',JSON.stringify(investeringer));}catch(e){}
+  try{localStorage.setItem(SK+'_investglobalrekk',JSON.stringify(investGlobalOrder));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
@@ -4587,6 +4613,7 @@ function mensSyklusKombinertGrafSVG(syk){
 var mensSyklusIdx=0;
 var mensSyklusNotat={};
 var investeringer=[];
+var investGlobalOrder=[];
 function mensSyklusSettNotat(startDato,tekst){
   mensSyklusNotat[startDato]=tekst;
   save();
@@ -5179,7 +5206,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -5198,7 +5225,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
