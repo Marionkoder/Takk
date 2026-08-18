@@ -1160,7 +1160,8 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
 
     h+='<div class="sec-title">'+esc(uc.name)+'</div>';
     if(erInvestering){
-      h+='<div class="card">'+investeringerListeHTML(uc.id)+'</div>';
+      var erOkonomiSide=(cat.name||'').toLowerCase()==='\u00f8konomi';
+      h+='<div class="card">'+(erOkonomiSide?investeringerAltHTML():investeringerListeHTML(uc.id))+'</div>';
     } else if(berKol){
       // To kolonner: utvalgte punkter fra lageret til venstre, det vanlige til høyre
       h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">'
@@ -1259,6 +1260,47 @@ function investeringerListeHTML(catId){
   }
   h+='<div style="padding:6px 12px 4px"><button class="icon-btn" style="font-size:11px" onclick="openInvesteringModal(\''+q(catId)+'\')">+ Legg til investering</button></div>';
   return h;
+}
+// Samler investeringer fra ALLE hovedkategorier — brukes bare på Økonomisiden,
+// slik at den kan fungere som ett samlet prioriteringssted på tvers av livsområdene.
+function investeringerAlleKategorier(){
+  var grupper=[];
+  cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(hoved){
+    var uc=cats.find(function(c){return c.parentId===hoved.id&&(c.name||'').toLowerCase()==='planlagte investeringer';});
+    if(!uc)return;
+    var liste=investeringerForKat(uc.id);
+    if(liste.length)grupper.push({hoved:hoved,liste:liste});
+  });
+  return grupper;
+}
+function investeringerAltHTML(){
+  var grupper=investeringerAlleKategorier();
+  var h='';
+  if(!grupper.length){
+    h+='<div class="empty" style="padding:6px 12px">Ingen planlagte investeringer registrert enn\u00e5, i noen kategori.</div>';
+  } else {
+    grupper.forEach(function(g){
+      var col=catColor(g.hoved.id)||'var(--line)';
+      h+='<div style="padding:8px 12px 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:'+col+'">'+esc(g.hoved.name)+'</div>';
+      h+=g.liste.map(function(it,i){
+        return'<div class="entry-row" style="align-items:flex-start;cursor:pointer;border-left:3px solid '+col+'" onclick="openEditInvestering(\''+q(it.id)+'\')">'
+          +'<span style="flex-shrink:0;font-weight:700;color:var(--rose);width:18px">'+(i+1)+'.</span>'
+          +'<div class="entry-body"><div class="entry-text">'+esc(it.tittel)+'</div>'
+          +(it.beskrivelse?'<div class="entry-date">'+esc(it.beskrivelse)+'</div>':'')
+          +(it.kostnad?'<div class="entry-date">ca. '+fmtKr(it.kostnad)+'</div>':'')+'</div>'
+          +'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">'
+          +(i>0?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="investFlytt(\''+q(it.id)+'\',-1)">\u2191</button>':'')
+          +(i<g.liste.length-1?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="investFlytt(\''+q(it.id)+'\',1)">\u2193</button>':'')
+          +'</div></div>';
+      }).join('');
+    });
+  }
+  h+='<div style="padding:6px 12px 4px"><button class="icon-btn" style="font-size:11px" onclick="openInvesteringModal(\''+q(katVedNavn('\u00f8konomi')?investeringerUnderkatId(katVedNavn('\u00f8konomi').id):'')+'\')">+ Legg til investering under \u00d8konomi</button></div>';
+  return h;
+}
+function investeringerUnderkatId(hovedId){
+  var uc=cats.find(function(c){return c.parentId===hovedId&&(c.name||'').toLowerCase()==='planlagte investeringer';});
+  return uc?uc.id:'';
 }
 function katVedNavn(navn){
   return cats.filter(function(c){return!c.parentId;}).find(function(c){
