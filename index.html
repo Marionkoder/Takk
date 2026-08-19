@@ -1935,14 +1935,14 @@ function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 // Datamodell: {id, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|'', note:'', intensity:1-4|null}
 var MENS_NIVAA=[[1,'Litt'],[2,'Moderat'],[3,'Kraftig'],[4,'Uvanlig kraftig']];
 var MENS_SMERTE=[[1,'Ingen'],[2,'Til \u00e5 leve med'],[3,'Plagsomme'],[4,'Ille']];
-var MENS_HODEPINE=[[1,'Ingen hodepine'],[2,'Litt hodepine'],[3,'En del hodepine'],[4,'Kraftig hodepine']];
-var MENS_HUMOR=[[1,'Ingen hum\u00f8rsvingninger'],[2,'Litt hum\u00f8rsvingninger'],[3,'En del hum\u00f8rsvingninger'],[4,'Kraftige hum\u00f8rsvingninger']];
-var MENS_HUD=[[1,'Ingen uren hud'],[2,'Litt uren hud'],[3,'En del uren hud'],[4,'Kraftig uren hud']];
-var MENS_OPPBLAAST=[[1,'Ingen oppbl\u00e5sthet'],[2,'Litt oppbl\u00e5sthet'],[3,'En del oppbl\u00e5sthet'],[4,'Kraftig oppbl\u00e5sthet']];
-var MENS_KORSRYGG=[[1,'Ingen korsryggsmerter'],[2,'Litt korsryggsmerter'],[3,'En del korsryggsmerter'],[4,'Kraftige korsryggsmerter']];
-var MENS_NAKKE=[[1,'Ingen skulder-/nakkesmerter'],[2,'Litt skulder-/nakkesmerter'],[3,'En del skulder-/nakkesmerter'],[4,'Kraftige skulder-/nakkesmerter']];
-var MENS_ENERGI=[[1,'Veldig slapp'],[2,'Litt slapp'],[3,'Normal energi'],[4,'Energioverskudd']];
-var MENS_KONSENTRASJON=[[1,'Store konsentrasjonsproblemer'],[2,'Litt ukonsentrert'],[3,'Normal konsentrasjon'],[4,'Skjerpet fokus']];
+var MENS_HODEPINE=[[1,'Ingen hodepine','Ingen'],[2,'Litt hodepine','Litt'],[3,'En del hodepine','En del'],[4,'Kraftig hodepine','Kraftig']];
+var MENS_HUMOR=[[1,'Ingen hum\u00f8rsvingninger','Ingen'],[2,'Litt hum\u00f8rsvingninger','Litt'],[3,'En del hum\u00f8rsvingninger','En del'],[4,'Kraftige hum\u00f8rsvingninger','Kraftige']];
+var MENS_HUD=[[1,'Ingen uren hud','Ingen'],[2,'Litt uren hud','Litt'],[3,'En del uren hud','En del'],[4,'Kraftig uren hud','Kraftig']];
+var MENS_OPPBLAAST=[[1,'Ingen oppbl\u00e5sthet','Ingen'],[2,'Litt oppbl\u00e5sthet','Litt'],[3,'En del oppbl\u00e5sthet','En del'],[4,'Kraftig oppbl\u00e5sthet','Kraftig']];
+var MENS_KORSRYGG=[[1,'Ingen korsryggsmerter','Ingen'],[2,'Litt korsryggsmerter','Litt'],[3,'En del korsryggsmerter','En del'],[4,'Kraftige korsryggsmerter','Kraftige']];
+var MENS_NAKKE=[[1,'Ingen skulder-/nakkesmerter','Ingen'],[2,'Litt skulder-/nakkesmerter','Litt'],[3,'En del skulder-/nakkesmerter','En del'],[4,'Kraftige skulder-/nakkesmerter','Kraftige']];
+var MENS_ENERGI=[[1,'Veldig slapp','Veldig slapp'],[2,'Litt slapp','Litt slapp'],[3,'Normal energi','Normal'],[4,'Energioverskudd','Overskudd']];
+var MENS_KONSENTRASJON=[[1,'Store konsentrasjonsproblemer','Store problemer'],[2,'Litt ukonsentrert','Litt ukonsentrert'],[3,'Normal konsentrasjon','Normal'],[4,'Skjerpet fokus','Skjerpet']];
 function mensLyn(n){return Array(Math.max(0,(Number(n)||0)-1)).fill('\u26a1').join('');}
 function mensDraaper(n){return Array(Number(n)||0).fill('\ud83e\ude78').join('');}
 function mensSorted(){return mens.slice().sort(function(a,b){return a.start<b.start?1:-1;});} // nyeste først
@@ -2031,6 +2031,16 @@ function mensStartNy(dato){
   mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:dato,end:'',note:''});
   save();render();
 }
+// Én rad: liten overskrift over knappene, med bare gradueringsordet i hver knapp
+// i stedet for at symptomnavnet gjentas ti ganger på siden
+function mensRadHTML(navn,skala,verdi,dato,settFn,ikonFn){
+  return'<div class="cb-hd" style="padding:6px 0 3px">'+esc(navn)+'</div>'
+    +'<div class="chips" style="margin-bottom:2px">'+skala.map(function(n){
+      var kort=n[2]||n[1];
+      var ikon=ikonFn?ikonFn(n[0])+' ':'';
+      return'<button class="chip'+(Number(verdi)===n[0]?' on':'')+'" onclick="'+settFn+'(\''+dato+'\','+n[0]+')">'+ikon+esc(kort)+'</button>';
+    }).join('')+'</div>';
+}
 function mensDagMerkerHTML(dato,tittel){
   var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:'',slim:false,hodepine:'',humor:'',hud:'',oppblaast:''};
   var per=mensPeriodeFor(dato);
@@ -2045,39 +2055,19 @@ function mensDagMerkerHTML(dato,tittel){
   // komme dager i forveien, akkurat som de andre premenstruelle plagene — derfor
   // ligger den nå sammen med resten, ikke bak blødnings-sperren.
   if(per){
-    h+='<div class="chips" style="margin-bottom:6px">'+MENS_NIVAA.map(function(n){
-        return'<button class="chip'+(Number(rad.intensity)===n[0]?' on':'')+'" onclick="mensSettDagIntensity(\''+dato+'\','+n[0]+')">'+mensDraaper(n[0])+' '+n[1]+'</button>';
-      }).join('')+'</div>';
+    h+=mensRadHTML('Bl\u00f8dning',MENS_NIVAA,rad.intensity,dato,'mensSettDagIntensity',mensDraaper);
   }
-  h+='<div class="chips" style="margin-bottom:6px">'+MENS_SMERTE.map(function(n){
-      var lyn=mensLyn(n[0]);
-      return'<button class="chip'+(Number(rad.smerte)===n[0]?' on':'')+'" onclick="mensSettDagSmerte(\''+dato+'\','+n[0]+')">'+(lyn?lyn+' ':'')+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_ENERGI.map(function(n){
-      return'<button class="chip'+(Number(rad.energi)===n[0]?' on':'')+'" onclick="mensSettDagEnergi(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_KONSENTRASJON.map(function(n){
-      return'<button class="chip'+(Number(rad.fokus)===n[0]?' on':'')+'" onclick="mensSettDagKonsentrasjon(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_HODEPINE.map(function(n){
-      return'<button class="chip'+(Number(rad.hodepine)===n[0]?' on':'')+'" onclick="mensSettDagHodepine(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_KORSRYGG.map(function(n){
-      return'<button class="chip'+(Number(rad.korsrygg)===n[0]?' on':'')+'" onclick="mensSettDagKorsrygg(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_NAKKE.map(function(n){
-      return'<button class="chip'+(Number(rad.nakke)===n[0]?' on':'')+'" onclick="mensSettDagNakke(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_HUMOR.map(function(n){
-      return'<button class="chip'+(Number(rad.humor)===n[0]?' on':'')+'" onclick="mensSettDagHumor(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px">'+MENS_HUD.map(function(n){
-      return'<button class="chip'+(Number(rad.hud)===n[0]?' on':'')+'" onclick="mensSettDagHud(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips"'+((visSlutt||visStart)?' style="margin-bottom:6px"':'')+'>'+MENS_OPPBLAAST.map(function(n){
-      return'<button class="chip'+(Number(rad.oppblaast)===n[0]?' on':'')+'" onclick="mensSettDagOppblaast(\''+dato+'\','+n[0]+')">'+n[1]+'</button>';
-    }).join('')+'</div>'
-    +'<div class="chips" style="margin-bottom:6px"><button class="chip'+(rad.slim?' on':'')+'" onclick="mensSettSlim(\''+dato+'\')">'+(rad.slim?'\u2713 ':'')+'Eggl\u00f8sningsslim</button></div>';
+  h+=mensRadHTML('Menssmerter',MENS_SMERTE,rad.smerte,dato,'mensSettDagSmerte',mensLyn)
+    +mensRadHTML('Energi',MENS_ENERGI,rad.energi,dato,'mensSettDagEnergi')
+    +mensRadHTML('Konsentrasjon',MENS_KONSENTRASJON,rad.fokus,dato,'mensSettDagKonsentrasjon')
+    +mensRadHTML('Hodepine',MENS_HODEPINE,rad.hodepine,dato,'mensSettDagHodepine')
+    +mensRadHTML('Korsrygg',MENS_KORSRYGG,rad.korsrygg,dato,'mensSettDagKorsrygg')
+    +mensRadHTML('Skulder/nakke',MENS_NAKKE,rad.nakke,dato,'mensSettDagNakke')
+    +mensRadHTML('Hum\u00f8r',MENS_HUMOR,rad.humor,dato,'mensSettDagHumor')
+    +mensRadHTML('Uren hud',MENS_HUD,rad.hud,dato,'mensSettDagHud')
+    +mensRadHTML('Oppbl\u00e5sthet',MENS_OPPBLAAST,rad.oppblaast,dato,'mensSettDagOppblaast')
+    +'<div class="cb-hd" style="padding:6px 0 3px">Eggl\u00f8sning</div>'
+    +'<div class="chips"'+((visSlutt||visStart)?'':' style="margin-bottom:2px"')+'><button class="chip'+(rad.slim?' on':'')+'" onclick="mensSettSlim(\''+dato+'\')">'+(rad.slim?'\u2713 ':'')+'Eggl\u00f8sningsslim</button></div>';
   if(visSlutt){
     h+='<div class="chips"><button class="chip'+(erSluttdag?' on':'')+'" onclick="mensSettSlutt(\''+dato+'\')">'+(erSluttdag?'\u2713 Menstruasjon over':'Menstruasjon over')+'</button></div>';
   }
