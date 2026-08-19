@@ -1660,10 +1660,10 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
   var rts=routines.filter(function(r){return inCat(r.cats)&&!iUnder(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(rts.length){
     // Selve avhakingen skjer med knappene lenger opp; her ligger redigering og mengde
-    h+='<div class="sec-title">Rediger rutiner</div><div class="card">'
+    h+='<div class="sec-title">Rutiner</div><div class="card">'
       +rts.map(function(r){
         var m=rutineMengde(r);
-        return'<div class="entry-row tett" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
+        return'<div class="entry-row tett" style="cursor:pointer" onclick="goRutineDetalj(\''+q(r.id)+'\')">'
           +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
           +'<div class="entry-date">'+esc(freqShort(r))
           +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
@@ -4736,13 +4736,9 @@ function mensSyklusKombinertGrafSVG(syk){
   var xFor=function(d){return lengde>1?ML+plotW*((d-1)/(lengde-1)):ML+plotW/2;};
   var yFor=function(v){return MT+plotH-(v-1)/3*plotH;}; // skala 1–4
   var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:140px;display:block">';
-  // Syklusdager i liten skrift langs toppen — hver 5. dag, pluss siste dag
-  var steg=lengde<=15?2:lengde<=35?5:10;
-  for(var d=1;d<=lengde;d+=steg){
-    svg+='<text x="'+xFor(d)+'" y="10" text-anchor="middle" style="font-size:7px;fill:var(--muted)">'+d+'</text>';
-  }
-  if((lengde-1)%steg!==0){
-    svg+='<text x="'+xFor(lengde)+'" y="10" text-anchor="middle" style="font-size:7px;fill:var(--muted)">'+lengde+'</text>';
+  // Syklusdag over hver eneste dag, i liten skrift
+  for(var d=1;d<=lengde;d++){
+    svg+='<text x="'+xFor(d)+'" y="10" text-anchor="middle" style="font-size:6px;fill:var(--muted)">'+d+'</text>';
   }
   // Eggl\u00f8sningsslim som lysegr\u00f8nne s\u00f8yler bak alt annet
   var barW=lengde>1?Math.max(2,plotW/lengde*0.7):8;
@@ -4759,9 +4755,10 @@ function mensSyklusKombinertGrafSVG(syk){
   serier.forEach(function(s,si){
     var forskyv=(si-(serier.length-1)/2)*forskyvSteg;
     s.punkter.forEach(function(p){
+      if(p.verdi<=1)return; // «Ingen» skal ikke gi noe synlig utslag
       var x=xFor(p.dag)+forskyv;
       var y=yFor(p.verdi);
-      svg+='<rect x="'+(x-barBredde/2)+'" y="'+y+'" width="'+barBredde+'" height="'+Math.max(1.5,baseline-y)+'" rx="0.7" style="fill:'+s.farge+'"/>';
+      svg+='<rect x="'+(x-barBredde/2)+'" y="'+y+'" width="'+barBredde+'" height="'+(baseline-y)+'" rx="0.7" style="fill:'+s.farge+'"/>';
     });
   });
   svg+='</svg>';
@@ -5461,6 +5458,32 @@ function openEditEntry(id){
 function openRoutineModal(){
   modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',tags:[],goalIds:[],resultIds:[],equipmentIds:[],freq:'',ease:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
+}
+// Rutine-detaljside: hvordan går det med rutinen, og alle dagbokinnlegg du har
+// knyttet til den (via routineIds-feltet p\u00e5 selve innlegget).
+function entriesForRoutine(routineId){
+  return entries.filter(function(e){return(e.routineIds||[]).indexOf(routineId)>=0;})
+    .sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
+}
+function goRutineDetalj(id){view={kind:'rutinedetalj',id:id};drawerOpen=false;render();}
+function rutineDetaljViewHTML(){
+  var r=routines.find(function(x){return x.id===view.id;});
+  if(!r)return'<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div><div class="card"><div class="empty">Rutinen finnes ikke lenger.</div></div>';
+  var m=rutineMengde(r);
+  var koblede=entriesForRoutine(r.id);
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
+    +'<div class="view-title" style="padding:0;flex:1">'+esc(r.name)+'</div>'
+    +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="openEditRoutine(\''+q(r.id)+'\')">\u270e</button>'
+    +'</div>'
+    +'<div class="view-sub">'+esc(freqShort(r))+(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div>';
+  h+='<div class="sec-title">Dagbokinnlegg om denne rutinen \u00b7 '+koblede.length+'</div>';
+  if(!koblede.length){
+    h+='<div class="card"><div class="empty">Ingen innlegg knyttet til denne rutinen enn\u00e5. Velg rutinen under \u00abKnytt til\u00bb n\u00e5r du skriver et innlegg om den.</div></div>';
+  } else {
+    h+='<div class="card">'+koblede.map(entryRowHTML).join('')+'</div>';
+  }
+  return h;
 }
 function openEditRoutine(id){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
@@ -10051,6 +10074,7 @@ function render(){
   else if(view.kind==='kanban')content=kanbanViewHTML();
   else if(view.kind==='skjulte')content=skjulteInnleggViewHTML();
   else if(view.kind==='tagalle')content=tagAlleViewHTML();
+  else if(view.kind==='rutinedetalj')content=rutineDetaljViewHTML();
   else if(view.kind==='kvartal')content=kvartalViewHTML();
   else if(view.kind==='budsjett')content=budsjettViewHTML();
   else if(view.kind==='innstillinger')content=innstillingerViewHTML();
