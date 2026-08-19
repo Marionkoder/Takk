@@ -1660,10 +1660,10 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
   var rts=routines.filter(function(r){return inCat(r.cats)&&!iUnder(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(rts.length){
     // Selve avhakingen skjer med knappene lenger opp; her ligger redigering og mengde
-    h+='<div class="sec-title">Rutiner</div><div class="card">'
+    h+='<div class="sec-title">Rediger rutiner</div><div class="card">'
       +rts.map(function(r){
         var m=rutineMengde(r);
-        return'<div class="entry-row tett" style="cursor:pointer" onclick="goRutineDetalj(\''+q(r.id)+'\')">'
+        return'<div class="entry-row tett" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
           +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
           +'<div class="entry-date">'+esc(freqShort(r))
           +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
@@ -7120,6 +7120,7 @@ function modalHTML(){
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +'<div class="hint">En rutine er noe som skjer fast flere ganger i \u00e5ret. Skjer det \u00e9n gang i \u00e5ret eller sjeldnere, legges det inn som hendelse.</div>'
+      +(isEditR?'<button class="icon-btn" style="width:100%;margin-top:6px" onclick="closeModal();goRutineDetalj(\''+q(f.id)+'\')">Se '+entriesForRoutine(f.id).length+' dagbokinnlegg om denne rutinen \u2192</button>':'')
       +(isEditR?'<button class="del-full-btn" onclick="deleteRoutine(\''+q(f.id)+'\')">Slett rutine</button>':'')
       +'<button class="save-btn" onclick="'+(isEditR?'saveEditRoutine()':'submitRoutine()')+'" '+(routineValid()?'':'disabled')+'>'+(isEditR?'Lagre endringer':'Lagre rutine')+'</button>';
 
@@ -9900,13 +9901,13 @@ function planleggingViewHTML(){
         :'<div class="entry-date" style="color:var(--amber)">\u26a0\ufe0e mangler kobling</div>';
       if(r.ease)gLine+='<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(r.ease)+'</div>';
 
-      h+='<div class="entry-row"><div class="entry-body">'
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goRutineDetalj(\''+q(r.id)+'\')"><div class="entry-body">'
         +'<div class="entry-text">'+esc(r.name)+'</div>'
         +'<div class="entry-date">'+esc(months)+'</div>'
         +gLine
         +catPillsHTML(r.cats)+'</div>'
         +tagPillsHTML(r.tags)
-        +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="openEditRoutine(\''+q(r.id)+'\')">✎</button>'
+        +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="event.stopPropagation();openEditRoutine(\''+q(r.id)+'\')">✎</button>'
         +'</div>';
     });
     h+='</div>';
