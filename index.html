@@ -8359,27 +8359,17 @@ function oppsummeringViewHTML(){
       var subs=cats.filter(function(c){return c.parentId===mc.id;});
       var subIds=subs.map(function(s){return s.id;});
       var mainCount=entries.filter(function(e){return e.cats.some(function(c){return c===mc.id||subIds.includes(c);});}).length;
-      var subRows=subs.map(function(s){
-        return{name:s.name,count:entries.filter(function(e){return e.cats.includes(s.id);}).length,id:s.id};
-      }).sort(function(a,b){return b.count-a.count||nbSort(a.name,b.name);});
-      rows.push({main:mc,count:mainCount,subs:subRows});
+      rows.push({main:mc,count:mainCount});
     });
     rows.sort(function(a,b){return b.count-a.count||nbSort(a.main.name,b.main.name);});
 
     h+='<div class="sec-title">Kategorier</div><div class="card">';
     rows.forEach(function(r){
-      var subPills=r.subs.map(function(s){
-        var inner=esc(s.name)+' <span style="color:var(--rose)">'+s.count+'</span>';
-        return editMode
-          ?'<button class="freq-pill" onclick="openEditCat(\''+q(s.id)+'\')">✎ '+inner+'</button>'
-          :'<button class="freq-pill'+(selectedCat===s.id?' sel':'')+'" onclick="selectCat(\''+q(s.id)+'\')">'+inner+'</button>';
-      }).join('');
       var catCloud=catTagCloudHTML(r.main.id);
       h+='<div class="freq-block">'
         +'<div class="freq-main"'+(editMode?'':' style="cursor:pointer" onclick="selectCat(\''+q(r.main.id)+'\')"')+'><span'+(selectedCat===r.main.id?' style="color:var(--red)"':'')+'>'+esc(r.main.name)+'</span>'
         +(editMode?'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="openEditCat(\''+q(r.main.id)+'\')">✎</button>':'')
         +'<span class="freq-count" style="margin-left:auto">'+r.count+'</span></div>'
-        +(subPills?'<div class="freq-subs">'+subPills+'</div>':'')
         +catCloud
         +'</div>';
     });
@@ -9898,12 +9888,11 @@ function planleggingViewHTML(){
   }
   if(planTab==='rutiner'){
   h+='<div class="sec-title">Rutiner</div>';
-  h+='<div class="view-sub" style="padding-top:0">Nye rutiner opprettes fra den kategorien de h\u00f8rer til.</div>';
+  h+='<div class="view-sub" style="padding-top:0">Nye rutiner opprettes fra den kategorien de h\u00f8rer til. Gruppert p\u00e5 grunnverdi \u2014 en rutine med flere grunnverdier st\u00e5r under hver av dem.</div>';
   if(!routines.length){
     h+='<div class="card"><div class="empty">Ingen rutiner ennå.</div></div>';
   } else {
-    h+='<div class="card">';
-    routines.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(r){
+    var rutineRadHTML=function(r){
       var months=(r.months||[]).length?(r.months||[]).map(function(m){return MND_FULL[m-1].slice(0,3);}).join(', '):'hver måned';
       if(r.freq==='daily'){
         var rdays=(r.days||[]);
@@ -9923,7 +9912,7 @@ function planleggingViewHTML(){
         :'<div class="entry-date" style="color:var(--amber)">\u26a0\ufe0e mangler kobling</div>';
       if(r.ease)gLine+='<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(r.ease)+'</div>';
 
-      h+='<div class="entry-row" style="cursor:pointer" onclick="goRutineDetalj(\''+q(r.id)+'\')"><div class="entry-body">'
+      return'<div class="entry-row" style="cursor:pointer" onclick="goRutineDetalj(\''+q(r.id)+'\')"><div class="entry-body">'
         +'<div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
         +'<div class="entry-date">'+esc(months)+'</div>'
         +gLine
@@ -9931,8 +9920,18 @@ function planleggingViewHTML(){
         +tagPillsHTML(r.tags)
         +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center" onclick="event.stopPropagation();openEditRoutine(\''+q(r.id)+'\')">✎</button>'
         +'</div>';
+    };
+    goals.forEach(function(g){
+      var knyttet=routines.filter(function(r){return(r.goalIds||[]).indexOf(g.id)>=0;}).sort(function(a,b){return nbSort(a.name,b.name);});
+      if(!knyttet.length)return;
+      h+='<div class="sec-title" style="padding-top:14px">'+esc(g.name)+'</div>'
+        +'<div class="card">'+knyttet.map(rutineRadHTML).join('')+'</div>';
     });
-    h+='</div>';
+    var utenGrunnverdi=routines.filter(function(r){return!(r.goalIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
+    if(utenGrunnverdi.length){
+      h+='<div class="sec-title" style="padding-top:14px">Uten grunnverdi</div>'
+        +'<div class="card">'+utenGrunnverdi.map(rutineRadHTML).join('')+'</div>';
+    }
   }
 
   }
