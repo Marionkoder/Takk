@@ -3388,6 +3388,22 @@ function ukeShift(days){recentDone={};
 function goOppsummering(){view={kind:'oppsummering'};selectedTag=null;selectedCat=null;drawerOpen=false;render();}
 function goPlanlegging(){view={kind:'planlegging'};drawerOpen=false;render();}
 function selectTag(t){selectedTag=(selectedTag===t)?null:t;render();}
+// Én felles hashtag-visning — trykker du på et stikkord noe sted i appen, havner du
+// alltid her, og ser ALLE innlegg merket med det, uansett måned eller kategori.
+// Det var nettopp fraværet av dette — flere ulike, sm\u00e5 filtreringer spredt utover
+// forskjellige sider — som gjorde at innlegg kunne se ut som de manglet enkelte steder.
+function goTagAlle(tag){view={kind:'tagalle',tag:tag};drawerOpen=false;render();}
+function tagAlleViewHTML(){
+  var tag=view.tag;
+  var funnet=entries.filter(function(e){return(e.tags||[]).includes(tag);})
+    .sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div class="view-title">#'+esc(tag)+'</div>'
+    +'<div class="view-sub">'+funnet.length+' innlegg, uansett m\u00e5ned eller kategori.</div>';
+  if(!funnet.length)return h+'<div class="card"><div class="empty">Ingen innlegg med dette stikkordet.</div></div>';
+  h+='<div class="card">'+funnet.map(entryRowHTML).join('')+'</div>';
+  return h;
+}
 var selectedCat=null;
 function selectCat(id){selectedCat=(selectedCat===id)?null:id;render();}
 function setEdit(v){editMode=v;render();}
@@ -5514,8 +5530,6 @@ function cloudWordsHTML(counts,clickable,limit,kompakt){
   // Ved grense: plukk de mest brukte først, men vis dem alfabetisk som ellers
   if(limit&&words.length>limit){
     words=words.slice().sort(function(a,b){return counts[b]-counts[a]||nbSort(a,b);}).slice(0,limit);
-    // Et valgt stikkord må alltid være synlig, ellers forsvinner det man filtrerer på
-    if(clickable&&selectedTag&&counts[selectedTag]>0&&words.indexOf(selectedTag)<0)words.push(selectedTag);
   }
   words.sort(nbSort);
   // Felles skala for ALLE ordskyer: samme ord får samme størrelse overalt
@@ -5531,8 +5545,8 @@ function cloudWordsHTML(counts,clickable,limit,kompakt){
     else if(c>=750){lv=6;size+=8;}
     else if(c>=500){size+=6;}
     else if(c>=250){size+=3;}
-    var cls='cloud-word lv'+lv+(c>10&&c<750?' hot':'')+(clickable&&selectedTag===w?' sel':'');
-    if(clickable)return'<button class="'+cls+'" style="font-size:'+size+'px" onclick="selectTag(\''+q(w)+'\')">#'+esc(w)+'</button>';
+    var cls='cloud-word lv'+lv+(c>10&&c<750?' hot':'');
+    if(clickable)return'<button class="'+cls+'" style="font-size:'+size+'px" onclick="goTagAlle(\''+q(w)+'\')">#'+esc(w)+'</button>';
     return'<span class="'+cls+'" style="font-size:'+size+'px;cursor:default">#'+esc(w)+'</span>';
   }).join('')+'</div>';
 }
@@ -7129,8 +7143,9 @@ function modalHTML(){
             return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormRoutine(\''+q(r.id)+'\')">'+esc(r.name)+'</button>';
           }).join('')+'</div>';
       })()
-      +(isEdit?'<button class="del-full-btn" onclick="deleteEntry(\''+q(f.id)+'\');closeModal()">Slett innlegg</button>':'')
-      +(isEdit?'<button class="icon-btn" style="width:100%;margin-top:6px" onclick="skjulInnlegg(\''+q(f.id)+'\')">Skjul dette innlegget</button>':'')
+      +(isEdit?'<button class="del-full-btn" onclick="'+(f._confirmSlett?'deleteEntry(\''+q(f.id)+'\');closeModal()':'mf()._confirmSlett=true;render()')+'">'+(f._confirmSlett?'\u26a0 Trykk igjen for \u00e5 slette for godt':'Slett innlegg')+'</button>':'')
+      +(isEdit?'<div style="height:14px"></div>':'')
+      +(isEdit?'<button class="icon-btn" style="width:100%" onclick="skjulInnlegg(\''+q(f.id)+'\')">Skjul dette innlegget</button>':'')
       +'<button class="save-btn" onclick="'+(isEdit?'saveEditEntry()':'submitEntry()')+'" '+(entryValid()?'':'disabled')+'>'+(isEdit?'Lagre endringer':'Lagre')+'</button>';
   }
 
@@ -8256,11 +8271,6 @@ function oppsummeringViewHTML(){
     h+='<div class="card"><div class="empty">Ingen stikkord ennå. Legg til stikkord når du skriver innlegg.</div></div>';
   } else {
     h+=cloud;
-    if(selectedTag){
-      var tagged=entries.filter(function(e){return(e.tags||[]).includes(selectedTag);});
-      h+='<div class="sec-title">#'+esc(selectedTag)+' · '+tagged.length+'</div>'
-        +'<div class="card">'+tagged.map(entryRowHTML).join('')+'</div>';
-    }
   }
 
   // Kategorier etter hyppighet
@@ -8302,11 +8312,6 @@ function oppsummeringViewHTML(){
         +'<div class="card" style="padding:6px 14px 10px">'
         +'<div style="font-size:11px;color:var(--muted);padding:2px 0 2px">Stikkord som ikke h\u00f8rer til en kategori.</div>'
         +fritt+'</div>';
-    }
-    if(selectedTag){
-      var tge=entries.filter(function(e){return(e.tags||[]).includes(selectedTag);}).sort(function(a,b){return a.date<b.date?1:-1;});
-      h+='<div class="sec-title">#'+esc(selectedTag)+' · '+tge.length+'</div>'
-        +'<div class="card">'+tge.map(entryRowHTML).join('')+'</div>';
     }
     if(selectedCat&&!editMode){
       var sc=catById(selectedCat);
@@ -8381,6 +8386,9 @@ function rapportViewHTML(){
     +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneR.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+monthRoutines.length+'</span></div><div style="font-size:11px;color:var(--muted)">rutiner</div></div>'
     +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneE.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+mEvents.length+'</span></div><div style="font-size:11px;color:var(--muted)">hendelser</div></div>'
     +'</div></div>';
+  if(monthEntries.length){
+    h+='<div style="padding:8px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="goDagbok('+m+','+y+')">Se innleggene i Dagbok \u2192</button></div>';
+  }
 
   if(!goals.length){
     h+='<div class="card"><div class="empty">Ingen grunnverdier enn\u00e5. Legg til under Oversikt, s\u00e5 bygges rapporten rundt dem.</div></div>';
@@ -8449,8 +8457,8 @@ function rapportViewHTML(){
       h+=secLbl('Takknemlighet')
         +secNote('Koble grunnverdien til hovedkategorier (via \u270e under Oversikt) for \u00e5 se takknemligheten den gir.');
     } else {
-      h+=secLbl('Takknemlighet \u00b7 '+gent.length);
-      h+=gent.length?gent.map(entryRowHTML).join(''):secNote('Ingen innlegg i tilknyttede kategorier denne m\u00e5neden.');
+      h+=secLbl('Takknemlighet \u00b7 '+gent.length)
+        +(gent.length?'':secNote('Ingen innlegg i tilknyttede kategorier denne m\u00e5neden.'));
     }
     h+='</div>';
   });
@@ -8458,11 +8466,10 @@ function rapportViewHTML(){
   var rest=monthEntries.filter(function(e){return!goals.some(function(g){return goalCatMatch(g,e.cats);});});
   if(rest.length){
     h+='<div class="card" style="margin-top:14px">'
-      +'<div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:11px 14px">'
       +'<span style="font-weight:700;flex:1">Utenfor grunnverdiene</span>'
       +'<span style="font-size:12px;color:var(--rose)">'+rest.length+' innlegg</span></div>'
       +secNote('Gleder du ikke har planlagt deg til.')
-      +rest.map(entryRowHTML).join('')
       +'</div>';
   }
 
@@ -10011,6 +10018,7 @@ function render(){
   else if(view.kind==='inventar')content=inventarViewHTML();
   else if(view.kind==='kanban')content=kanbanViewHTML();
   else if(view.kind==='skjulte')content=skjulteInnleggViewHTML();
+  else if(view.kind==='tagalle')content=tagAlleViewHTML();
   else if(view.kind==='kvartal')content=kvartalViewHTML();
   else if(view.kind==='budsjett')content=budsjettViewHTML();
   else if(view.kind==='innstillinger')content=innstillingerViewHTML();
