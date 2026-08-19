@@ -1664,7 +1664,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
       +rts.map(function(r){
         var m=rutineMengde(r);
         return'<div class="entry-row tett" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
-          +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+'</div>'
+          +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
           +'<div class="entry-date">'+esc(freqShort(r))
           +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
           +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
@@ -5461,6 +5461,28 @@ function openRoutineModal(){
 }
 // Rutine-detaljside: hvordan går det med rutinen, og alle dagbokinnlegg du har
 // knyttet til den (via routineIds-feltet p\u00e5 selve innlegget).
+// Gullstjerne på rutiner — avhaking i loggen og dagbokinnlegg tagget til rutinen
+// teller likt inn i \u00e9n samlet sum. F\u00f8rste milep\u00e6l ved 10, s\u00e5 50, deretter en
+// dobling for hver: 100, 200, 400, 800 \u2026
+function rutineMilepaeler(){
+  var ut=[10,50,100],v=100;
+  while(v<200000){v*=2;ut.push(v);}
+  return ut;
+}
+function rutineTotalTelling(r){
+  return(r.log||[]).length+entriesForRoutine(r.id).length;
+}
+function rutineStjerneMilepael(r){
+  var total=rutineTotalTelling(r);
+  var mp=rutineMilepaeler(),naadd=null;
+  for(var i=0;i<mp.length;i++){if(total>=mp[i])naadd=mp[i];else break;}
+  return naadd;
+}
+function rutineStjerneHTML(r){
+  var mp=rutineStjerneMilepael(r);
+  if(!mp)return'';
+  return' <span style="color:#D9A93B;font-size:11px;font-weight:700;white-space:nowrap" title="'+rutineTotalTelling(r)+' ganger totalt \u2014 avhaking og tagget dagboksinnlegg talt sammen">\u2605 '+mp+'</span>';
+}
 function entriesForRoutine(routineId){
   return entries.filter(function(e){return(e.routineIds||[]).indexOf(routineId)>=0;})
     .sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
@@ -5473,7 +5495,7 @@ function rutineDetaljViewHTML(){
   var koblede=entriesForRoutine(r.id);
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
-    +'<div class="view-title" style="padding:0;flex:1">'+esc(r.name)+'</div>'
+    +'<div class="view-title" style="padding:0;flex:1">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
     +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="openEditRoutine(\''+q(r.id)+'\')">\u270e</button>'
     +'</div>'
     +'<div class="view-sub">'+esc(freqShort(r))+(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div>';
@@ -9902,7 +9924,7 @@ function planleggingViewHTML(){
       if(r.ease)gLine+='<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(r.ease)+'</div>';
 
       h+='<div class="entry-row" style="cursor:pointer" onclick="goRutineDetalj(\''+q(r.id)+'\')"><div class="entry-body">'
-        +'<div class="entry-text">'+esc(r.name)+'</div>'
+        +'<div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
         +'<div class="entry-date">'+esc(months)+'</div>'
         +gLine
         +catPillsHTML(r.cats)+'</div>'
