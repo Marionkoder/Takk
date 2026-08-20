@@ -3407,8 +3407,12 @@ var tb={sleep:8,work:40,meals:2,rest:10};
 
 /* ── Navigasjon ── */
 function toggleDrawer(){drawerOpen=!drawerOpen;render();}
-function goArsrapport(y){view={kind:'arsrapport',year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
-function goRapport(m,y){view={kind:'rapport',month:m,year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
+// Rapport, Oppnådd er nå de eneste to fanene. Måned/År/Alltid er en periodevelger
+// på samme side, ikke tre separate faner — de tre gamle sidene gjenbrukes uendret
+// som «kropp» under velgeren.
+var rapportPeriode='maaned';
+function goArsrapport(y){rapportPeriode='aar';view={kind:'rapportsamlet',year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
+function goRapport(m,y){rapportPeriode='maaned';view={kind:'rapportsamlet',month:m,year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
 function goHjem(){recentDone={};view={kind:'hjem',month:curMonth,year:curYear};selectedTag=null;searchQuery='';drawerOpen=false;render();}
 function goDagbok(m,y){view={kind:'dagbok',month:m,year:y};selectedTag=null;searchQuery='';drawerOpen=false;render();}
 function goRutiner(m,catId,y){view={kind:'rutiner',month:m,cat:catId||null,year:y||null};drawerOpen=false;render();}
@@ -3424,7 +3428,7 @@ function ukeShift(days){recentDone={};
   var d=new Date(view.ws);d.setDate(d.getDate()+days);
   view.ws=isoDate(d);render();
 }
-function goOppsummering(){view={kind:'oppsummering'};selectedTag=null;selectedCat=null;drawerOpen=false;render();}
+function goOppsummering(){rapportPeriode='alltid';view={kind:'rapportsamlet'};selectedTag=null;selectedCat=null;drawerOpen=false;render();}
 function goPlanlegging(){view={kind:'planlegging'};drawerOpen=false;render();}
 function selectTag(t){selectedTag=(selectedTag===t)?null:t;render();}
 // Én felles hashtag-visning — trykker du på et stikkord noe sted i appen, havner du
@@ -7293,7 +7297,7 @@ function sidebarHTML(){
   h+='<div class="side-month" style="'+toppStil(view.kind==='om')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
   h+='<div class="side-month" style="'+toppStil(view.kind==='innstillinger'||view.kind==='administrer')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
   h+='<div class="side-month" style="'+toppStil(view.kind==='planlegging')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
-  h+='<div class="side-month" style="'+toppStil(view.kind==='rapport'||view.kind==='arsrapport'||view.kind==='oppsummering'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
+  h+='<div class="side-month" style="'+toppStil(view.kind==='rapportsamlet'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
   // Kategorisidene: alfabetisk, hver med sin egen kategorifarge — som stripene ellers
   [{n:'folk',navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
    {n:'kreativitet',navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
@@ -8316,11 +8320,21 @@ function catPillsHTML(catIds){
 function rapportNavHTML(){
   var k=view.kind;
   return'<div class="chips" style="justify-content:center;padding:10px 12px 0">'
+    +'<button class="chip'+(k==='rapportsamlet'?' on':'')+'" onclick="goRapport(curMonth,curYear)">Rapport</button>'
     +'<button class="chip'+(k==='oppnadd'?' on':'')+'" onclick="goOppnadd()">Oppn\u00e5dd</button>'
-    +'<button class="chip'+(k==='oppsummering'?' on':'')+'" onclick="goOppsummering()">Helhetsbildet</button>'
-    +'<button class="chip'+(k==='rapport'?' on':'')+'" onclick="goRapport(curMonth,curYear)">M\u00e5neden</button>'
-    +'<button class="chip'+(k==='arsrapport'?' on':'')+'" onclick="goArsrapport(curYear)">\u00c5ret</button>'
     +'</div>';
+}
+function rapportSamletViewHTML(){
+  var h=rapportNavHTML();
+  h+='<div class="chips" style="justify-content:center;padding:8px 12px 0">'
+    +'<button class="chip'+(rapportPeriode==='maaned'?' on':'')+'" onclick="goRapport(view.month||curMonth,view.year||curYear)">M\u00e5ned</button>'
+    +'<button class="chip'+(rapportPeriode==='aar'?' on':'')+'" onclick="goArsrapport(view.year||curYear)">\u00c5r</button>'
+    +'<button class="chip'+(rapportPeriode==='alltid'?' on':'')+'" onclick="goOppsummering()">Alltid</button>'
+    +'</div>';
+  if(rapportPeriode==='aar')h+=arsrapportViewHTML();
+  else if(rapportPeriode==='alltid')h+=oppsummeringViewHTML();
+  else h+=rapportViewHTML();
+  return h;
 }
 function oppnaddViewHTML(){
   var h=rapportNavHTML();
@@ -8357,8 +8371,7 @@ function oppnaddViewHTML(){
   return h;
 }
 function oppsummeringViewHTML(){
-  rrTab='rapporter';
-  var h=rrTabsHTML()+rapportNavHTML();
+  var h='';
   var sorted=entries.slice().sort(function(a,b){return a.date<b.date?-1:1;});
   var range=sorted.length?fmtDate(sorted[0].date)+' \u2013 '+fmtDate(sorted[sorted.length-1].date):null;
   h+='<div class="view-title">Helhetsbildet</div>'
@@ -8456,7 +8469,7 @@ function rapportViewHTML(){
   var secLbl=function(t){return'<div style="padding:8px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+t+'</div>';};
   var secNote=function(t){return'<div style="padding:4px 14px 10px;font-size:12px;color:var(--muted)">'+t+'</div>';};
 
-  var h=rapportNavHTML();
+  var h='';
   h+='<div style="display:flex;align-items:center;gap:6px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goRapport('+prevM+','+prevY+')">\u2039</button>'
     +'<div class="view-title" style="padding:0;flex:1">M\u00e5nedsrapport \u00b7 '+cap(MND_FULL[m-1])+' '+y+'</div>'
@@ -8595,7 +8608,7 @@ function arsrapportViewHTML(){
   var secLbl=function(t){return'<div style="padding:8px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+t+'</div>';};
   var secNote=function(t){return'<div style="padding:4px 14px 10px;font-size:12px;color:var(--muted)">'+t+'</div>';};
 
-  var h=rapportNavHTML();
+  var h='';
   h+='<div style="display:flex;align-items:center;gap:6px;padding:14px 12px 0">'
     +'<button class="icon-btn" onclick="goArsrapport('+(y-1)+')">\u2039</button>'
     +'<div class="view-title" style="padding:0;flex:1">\u00c5rsrapport \u00b7 '+y+(fromM>1?' <span style="font-size:12px;font-weight:400;color:var(--rose)">fra juli</span>':'')+'</div>'
@@ -10115,9 +10128,7 @@ function render(){
   else if(view.kind==='gaver')content=gaverViewHTML();
   else if(view.kind==='gaveperson')content=gavePersonViewHTML();
   else if(view.kind==='oppnadd')content=oppnaddViewHTML();
-  else if(view.kind==='oppsummering')content=oppsummeringViewHTML();
-  else if(view.kind==='rapport')content=rapportViewHTML();
-  else if(view.kind==='arsrapport')content=arsrapportViewHTML();
+  else if(view.kind==='rapportsamlet')content=rapportSamletViewHTML();
   else if(view.kind==='inventar')content=inventarViewHTML();
   else if(view.kind==='kanban')content=kanbanViewHTML();
   else if(view.kind==='skjulte')content=skjulteInnleggViewHTML();
