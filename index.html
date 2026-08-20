@@ -8080,12 +8080,6 @@ function dagViewHTML(){
     +(dayMs.length?' '+dayMs.map(milestoneBtnHTML).join(' '):'')
     +'</div></div></div>';
 
-  // Boksen tilpasser seg selv: bl\u00f8dning og smerte bare under mens, energi og fokus alltid
-  if(showMens){
-    var sd=mensSyklusdagForDato(view.d);
-    h+=mensDagMerkerHTML(view.d,sd?'Syklusdag '+sd:'Menstruasjon');
-  }
-
   // Daglige rutiner
   var dtodo=periodTodoItems({wk:weekNum(d),wKey:'w'+weekYear(d)+'-'+pad(weekNum(d)),ym:dy+'-'+pad(dm),m:dm,y:dy,daily:view.d,onlyGroup:'daily'});
   h+='<div class="sec-title">Daglige rutiner <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div>';
