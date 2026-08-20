@@ -372,17 +372,17 @@ function setTagCat(tag,catId){if(catId)tagCats[tag]=catId;else delete tagCats[ta
 // Bytter ut et stikkord overalt det brukes. Er målet et stikkord som alt finnes,
 // blir det en sammenslåing — og et innlegg som hadde begge, ender med ett.
 function byttTagOveralt(fra,til){
-  fra=normTag(fra);til=normTag(til);
+  fra=tagId(fra);til=tagId(til);
   if(!fra||!til||fra===til)return 0;
   var antall=0;
   var bytt=function(liste){
     (liste||[]).forEach(function(x){
       if(!x.tags||!x.tags.length)return;
-      var hadde=x.tags.map(normTag).indexOf(fra)>=0;
+      var hadde=x.tags.map(tagId).indexOf(fra)>=0;
       if(!hadde)return;
       var nye=[];
       x.tags.forEach(function(t){
-        var n=normTag(t)===fra?til:normTag(t);
+        var n=tagId(t)===fra?til:tagId(t);
         if(nye.indexOf(n)<0)nye.push(n); // hindrer duplikat når begge fantes
       });
       x.tags=nye;antall++;
@@ -397,8 +397,8 @@ function byttTagOveralt(fra,til){
 function openTagRename(tag){modal={step:'tagrename',form:{fra:tag,til:tag}};render();}
 function openTagMerge(tag){modal={step:'tagmerge',form:{fra:tag,til:'',sok:''}};render();}
 function submitTagRename(){
-  var f=mf();var til=normTag(f.til||'');
-  if(!til||til===normTag(f.fra))return;
+  var f=mf();var til=tagId(f.til||'');
+  if(!til||til===tagId(f.fra))return;
   byttTagOveralt(f.fra,til);
   save();closeModal();
 }
@@ -2548,6 +2548,10 @@ function toggleGreet(person,year,kind){
 function goGavePerson(person){view={kind:'gaveperson',person:person,_from:(view&&(view.kind==='gaver')?'gaver':view&&view.kind==='folk'?'folk':'bursdagsliste')};drawerOpen=false;render();}
 function giftKindLabel(k){return k==='jul'?'Julegave':k==='annet'?'Annen gave':'Bursdagsgave';}
 function normTag(t){return String(t||'').trim().toLowerCase().replace(/^#/,'').replace(/\s+/g,'');}
+// Som normTag(), men bevarer mellomrom — siden stikkord faktisk kan inneholde dem
+// («jenny berg» og «jennyberg» er to ulike, ekte stikkord, ikke det samme skrevet
+// forskjellig). Brukes der vi skal avgjøre om to stikkord ER det samme.
+function tagId(t){return String(t||'').trim().toLowerCase();}
 function personTagsFor(person){
   // Personlige hashtagger: identifiserer denne personen. Styrer hvilke
   // dagbokinnlegg som vises på personsiden. Gruppetagger holdes utenfor —
@@ -6076,14 +6080,14 @@ function modalHTML(){
       +'<button class="save-btn" onclick="closeModal()">Ferdig</button>';
 
   } else if(step==='tagrename'){
-    var nyN=normTag(f.til||'');
-    var finnesAlt=nyN&&nyN!==normTag(f.fra)&&Object.keys(allTagsPool()).map(normTag).indexOf(nyN)>=0;
+    var nyN=tagId(f.til||'');
+    var finnesAlt=nyN&&nyN!==tagId(f.fra)&&Object.keys(allTagsPool()).map(tagId).indexOf(nyN)>=0;
     body='<div class="modal-title">Endre navn p\u00e5 #'+esc(f.fra)+'</div>'
       +'<label class="field-lbl">Nytt navn</label>'
       +'<input id="modal-sok-inp" class="inp" type="text" value="'+esc(f.til||'')+'" oninput="mf().til=this.value;render()">'
       +(finnesAlt?'<div class="hint" style="color:var(--amber)">#'+esc(nyN)+' finnes fra f\u00f8r \u2014 de to blir sl\u00e5tt sammen.</div>'
         :'<div class="hint">Stikkordet byttes ut overalt: i dagboka, p\u00e5 hendelser, rutiner og prosjekter.</div>')
-      +'<button class="save-btn" onclick="submitTagRename()" '+(nyN&&nyN!==normTag(f.fra)?'':'disabled')+'>Lagre</button>';
+      +'<button class="save-btn" onclick="submitTagRename()" '+(nyN&&nyN!==tagId(f.fra)?'':'disabled')+'>Lagre</button>';
 
   } else if(step==='tagmerge'){
     // Sammenlign eksakt, ikke med normTag() — den fjerner mellomrom, og ville da
@@ -6095,7 +6099,7 @@ function modalHTML(){
       +'<div class="hint">Velg hvilket stikkord #'+esc(f.fra)+' skal bli til. Alt som er merket med #'+esc(f.fra)+' f\u00e5r det nye stikkordet, og #'+esc(f.fra)+' forsvinner.</div>'
       +'<input id="modal-sok-inp" class="inp" type="text" placeholder="S\u00f8k \u2026" value="'+esc(f.sok||'')+'" oninput="mf().sok=this.value;render()">'
       +(alleT.length?'<div style="max-height:44vh;overflow:auto;margin-top:8px">'+alleT.map(function(t){
-          var paa=normTag(f.til)===normTag(t);
+          var paa=tagId(f.til)===tagId(t);
           return'<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);cursor:pointer" onclick="mf().til=\''+q(t)+'\';render()">'
             +'<button class="chk'+(paa?' done':'')+'" style="flex-shrink:0">'+(paa?'\u2713':'')+'</button>'
             +'<span style="flex:1;font-size:13px">#'+esc(t)+'</span></div>';
