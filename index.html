@@ -1132,12 +1132,6 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     if(tom&&!erVitale&&!berKol&&!erInvestering)return;
     // Det vanlige innholdet — lister, prosjekter, rutiner og planer
     var vanlig='';
-    if(erVitale){
-      vanlig+='<div class="entry-row" style="cursor:pointer" onclick="goMens()">'
-        +'<div class="entry-body"><div class="entry-text">Menstruasjon</div>'
-        +'<div class="entry-date">'+esc(mensKortTekst())+'</div></div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    }
     uLager.concat(uListe).forEach(function(iv){
       var c=invCounts(iv);
       vanlig+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
@@ -6013,7 +6007,7 @@ function modalHTML(){
     if(sokP)alleP=alleP.filter(function(it){return(it.name||'').toLowerCase().indexOf(sokP)>=0;});
     body='<div class="modal-title">Velg til '+esc(uk?uk.name:'')+'</div>'
       +'<div class="hint">Hak av punktene fra Beredskapslageret som h\u00f8rer til her. De vises som en egen liste under underkategorien.</div>'
-      +'<input class="inp" type="text" placeholder="S\u00f8k \u2026" value="'+esc(f.sok||'')+'" oninput="mf().sok=this.value;render()">'
+      +'<input id="modal-sok-inp" class="inp" type="text" placeholder="S\u00f8k \u2026" value="'+esc(f.sok||'')+'" oninput="mf().sok=this.value;render()">'
       +(alleP.length?'<div style="max-height:50vh;overflow:auto;margin-top:8px">'+alleP.map(function(it){
           var paa=((it.values||{}).__berkat||'').split(',').indexOf(f.katId)>=0;
           var v=it.values||{};
@@ -6032,18 +6026,20 @@ function modalHTML(){
     var finnesAlt=nyN&&nyN!==normTag(f.fra)&&Object.keys(allTagsPool()).map(normTag).indexOf(nyN)>=0;
     body='<div class="modal-title">Endre navn p\u00e5 #'+esc(f.fra)+'</div>'
       +'<label class="field-lbl">Nytt navn</label>'
-      +'<input class="inp" type="text" value="'+esc(f.til||'')+'" oninput="mf().til=this.value;render()">'
+      +'<input id="modal-sok-inp" class="inp" type="text" value="'+esc(f.til||'')+'" oninput="mf().til=this.value;render()">'
       +(finnesAlt?'<div class="hint" style="color:var(--amber)">#'+esc(nyN)+' finnes fra f\u00f8r \u2014 de to blir sl\u00e5tt sammen.</div>'
         :'<div class="hint">Stikkordet byttes ut overalt: i dagboka, p\u00e5 hendelser, rutiner og prosjekter.</div>')
       +'<button class="save-btn" onclick="submitTagRename()" '+(nyN&&nyN!==normTag(f.fra)?'':'disabled')+'>Lagre</button>';
 
   } else if(step==='tagmerge'){
-    var alleT=Object.keys(allTagsPool()).filter(function(t){return normTag(t)!==normTag(f.fra);}).sort(nbSort);
+    // Sammenlign eksakt, ikke med normTag() — den fjerner mellomrom, og ville da
+    // trodd «gamle venner» og «gamlevenner» var samme stikkord og skjult det ene.
+    var alleT=Object.keys(allTagsPool()).filter(function(t){return t!==f.fra;}).sort(nbSort);
     var sokT=normTag(f.sok||'');
     if(sokT)alleT=alleT.filter(function(t){return normTag(t).indexOf(sokT)>=0;});
     body='<div class="modal-title">Sl\u00e5 sammen #'+esc(f.fra)+'</div>'
       +'<div class="hint">Velg hvilket stikkord #'+esc(f.fra)+' skal bli til. Alt som er merket med #'+esc(f.fra)+' f\u00e5r det nye stikkordet, og #'+esc(f.fra)+' forsvinner.</div>'
-      +'<input class="inp" type="text" placeholder="S\u00f8k \u2026" value="'+esc(f.sok||'')+'" oninput="mf().sok=this.value;render()">'
+      +'<input id="modal-sok-inp" class="inp" type="text" placeholder="S\u00f8k \u2026" value="'+esc(f.sok||'')+'" oninput="mf().sok=this.value;render()">'
       +(alleT.length?'<div style="max-height:44vh;overflow:auto;margin-top:8px">'+alleT.map(function(t){
           var paa=normTag(f.til)===normTag(t);
           return'<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);cursor:pointer" onclick="mf().til=\''+q(t)+'\';render()">'
@@ -10004,6 +10000,10 @@ function render(){
   var wasSearch=false,wasQuick=false;
   var wasQTags=false;
   try{wasSearch=document.activeElement&&document.activeElement.id==='search-inp';wasQuick=document.activeElement&&document.activeElement.id==='quick-inp';wasQTags=document.activeElement&&document.activeElement.id==='quick-tags';}catch(e){}
+  var wasModalSok=false,modalSokPos=0;
+  try{
+    if(document.activeElement&&document.activeElement.id==='modal-sok-inp'){wasModalSok=true;modalSokPos=document.activeElement.selectionStart||0;}
+  }catch(e){}
   var prevMain=document.querySelector('.main');
   var scrollPos=prevMain?prevMain.scrollTop:0;
   var sameView=window._lastRenderViewKind===(view?view.kind:null);
@@ -10129,6 +10129,8 @@ function render(){
   if(qi&&wasQuick){qi.focus();qi.setSelectionRange(qi.value.length,qi.value.length);}
   var qt=document.getElementById('quick-tags');
   if(qt&&wasQTags){qt.focus();qt.setSelectionRange(qt.value.length,qt.value.length);}
+  var msi=document.getElementById('modal-sok-inp');
+  if(msi&&wasModalSok){msi.focus();msi.setSelectionRange(modalSokPos,modalSokPos);}
   var ta=document.querySelector('.modal textarea');
   if(ta&&!ta.value)ta.focus();
 }
