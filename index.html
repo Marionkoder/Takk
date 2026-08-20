@@ -829,13 +829,13 @@ function maalingSerieHTML(serie){
   h+='<div style="padding:4px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openMaalingPunktModal(\''+q(serie.id)+'\')">+ Ny m\u00e5ling</button></div>';
   return h;
 }
-function maalingerKatHTML(catId){
+function maalingerKatHTML(catId,utenOverskrift){
   var serier=maalingerForKat(catId);
   var h='';
-  if(serier.length){
+  if(serier.length&&!utenOverskrift){
     h+='<div class="sec-title">M\u00e5linger</div>';
-    serier.forEach(function(s){h+=maalingSerieHTML(s);});
   }
+  serier.forEach(function(s){h+=maalingSerieHTML(s);});
   h+='<div style="padding:2px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openMaalingSerieModal(\''+q(catId)+'\')">+ Ny m\u00e5leserie</button></div>';
   return h;
 }
@@ -1154,48 +1154,56 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     });
     var tomtVanlig='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt eller en plan.</div>';
 
-    h+='<div class="sec-title">'+esc(uc.name)+'</div>';
-    if(erInvestering){
-      var erOkonomiSide=(cat.name||'').toLowerCase()==='\u00f8konomi';
-      h+='<div class="card">'+(erOkonomiSide?investeringerAltHTML():investeringerListeHTML(uc.id))+'</div>';
-    } else if(berKol){
-      // To kolonner: utvalgte punkter fra lageret til venstre, det vanlige til høyre
-      h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">'
-        +'<div style="flex:1;min-width:0">'
-        +'<div class="card" style="padding:6px 0">'
-        +(valgte.length?(function(){
-            // Gruppert på øverste plasseringsnivå — det er stedet som avgjør behovet her
-            var grupper={},rekke=[];
-            valgte.forEach(function(it){
-              var v=it.values||{};
-              var sted=v.__p1||'Uten plassering';
-              if(!grupper[sted]){grupper[sted]=[];rekke.push(sted);}
-              grupper[sted].push(it);
-            });
-            rekke.sort(function(a,b){
-              if(a==='Uten plassering')return 1;
-              if(b==='Uten plassering')return-1;
-              return nbSort(a,b);
-            });
-            return rekke.map(function(sted){
-              return'<div style="padding:5px 12px 1px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(sted)+'</div>'
-                +grupper[sted].map(function(it){
-                  var bBg=beredBg(it);
-                  return'<div style="padding:2px 12px;font-size:12px;line-height:1.35'+(bBg?';background:'+bBg:'')+'">'+esc(it.name)+'</div>';
-                }).join('');
-            }).join('');
-          })()
-          :'<div class="empty" style="padding:6px 12px">Ingen punkter valgt enn\u00e5.</div>')
-        +'</div>'
-        +'<div style="padding:4px 0 0"><button class="icon-btn" style="font-size:11px" onclick="openBerPick(\''+q(uc.id)+'\')">Velg fra beredskapslageret</button></div>'
-        +'</div>'
-        +'<div style="flex:1;min-width:0"><div class="card">'+(vanlig||tomtVanlig)+'</div></div>'
-        +'</div>';
+    if(erVitale){
+      // Har sin egen fullstendige visning, inkludert overskrift — ingen generisk
+      // «ingenting merket her»-boks skal vises i tillegg
+      h+=mensSyklusGraferHTML(true);
+    } else if(erMaalinger){
+      // Eneste sted måleserier kan opprettes — derfor ingen generisk boks her heller
+      h+='<div class="sec-title">'+esc(uc.name)+'</div>';
+      h+=maalingerKatHTML(uc.id,true);
     } else {
-      h+='<div class="card">'+(vanlig||tomtVanlig)+'</div>';
+      h+='<div class="sec-title">'+esc(uc.name)+'</div>';
+      if(erInvestering){
+        var erOkonomiSide=(cat.name||'').toLowerCase()==='\u00f8konomi';
+        h+='<div class="card">'+(erOkonomiSide?investeringerAltHTML():investeringerListeHTML(uc.id))+'</div>';
+      } else if(berKol){
+        // To kolonner: utvalgte punkter fra lageret til venstre, det vanlige til høyre
+        h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:0 4px">'
+          +'<div style="flex:1;min-width:0">'
+          +'<div class="card" style="padding:6px 0">'
+          +(valgte.length?(function(){
+              // Gruppert på øverste plasseringsnivå — det er stedet som avgjør behovet her
+              var grupper={},rekke=[];
+              valgte.forEach(function(it){
+                var v=it.values||{};
+                var sted=v.__p1||'Uten plassering';
+                if(!grupper[sted]){grupper[sted]=[];rekke.push(sted);}
+                grupper[sted].push(it);
+              });
+              rekke.sort(function(a,b){
+                if(a==='Uten plassering')return 1;
+                if(b==='Uten plassering')return-1;
+                return nbSort(a,b);
+              });
+              return rekke.map(function(sted){
+                return'<div style="padding:5px 12px 1px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+esc(sted)+'</div>'
+                  +grupper[sted].map(function(it){
+                    var bBg=beredBg(it);
+                    return'<div style="padding:2px 12px;font-size:12px;line-height:1.35'+(bBg?';background:'+bBg:'')+'">'+esc(it.name)+'</div>';
+                  }).join('');
+              }).join('');
+            })()
+            :'<div class="empty" style="padding:6px 12px">Ingen punkter valgt enn\u00e5.</div>')
+          +'</div>'
+          +'<div style="padding:4px 0 0"><button class="icon-btn" style="font-size:11px" onclick="openBerPick(\''+q(uc.id)+'\')">Velg fra beredskapslageret</button></div>'
+          +'</div>'
+          +'<div style="flex:1;min-width:0"><div class="card">'+(vanlig||tomtVanlig)+'</div></div>'
+          +'</div>';
+      } else {
+        h+='<div class="card">'+(vanlig||tomtVanlig)+'</div>';
+      }
     }
-    if(erVitale)h+=mensSyklusGraferHTML(true);
-    h+=maalingerKatHTML(uc.id);
   });
   h+='<div style="padding:6px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="openNySubCat(\''+q(cat.id)+'\')">+ Ny underkategori</button></div>';
   return h;
@@ -2844,6 +2852,27 @@ function load(){
     try{localStorage.setItem(SK+'_maalingerkat1','1');}catch(e){}
     save();
   }
+
+  // Selvreparerende: sikrer at ENHVER måleserie ligger under en «Målinger»-
+  // underkategori, uansett hvordan den skulle havnet et annet sted. Kjøres hver
+  // gang, ikke bare \u00e9n gang, siden muligheten til \u00e5 legge til andre steder n\u00e5 er
+  // fjernet — dette fanger bare opp det som lå feil fra f\u00f8r.
+  (function(){
+    var endret=false;
+    var maalingerUcId2={};
+    cats.filter(function(c){return!c.parentId;}).forEach(function(hoved){
+      var uc=cats.find(function(c){return c.parentId===hoved.id&&(c.name||'').toLowerCase()==='m\u00e5linger';});
+      if(uc)maalingerUcId2[hoved.id]=uc.id;
+    });
+    maalinger.forEach(function(m){
+      var c=cats.find(function(x){return x.id===m.catId;});
+      if(!c)return;
+      if((c.name||'').toLowerCase()==='m\u00e5linger')return; // ligger allerede riktig
+      var hovedId=c.parentId?c.parentId:c.id;
+      if(maalingerUcId2[hovedId]&&m.catId!==maalingerUcId2[hovedId]){m.catId=maalingerUcId2[hovedId];endret=true;}
+    });
+    if(endret)save();
+  })();
 
   // Menstruasjon skilles ut som egen underkategori under Helse, adskilt fra
   // Vitale data — som n\u00e5 er ledig til andre m\u00e5leserier, som jernlagre eller BMI.
