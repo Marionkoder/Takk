@@ -1123,13 +1123,14 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     // Menstruasjonstrackeren hører hjemme i «Vitale data», ikke i noen liste
     var erVitale=showMens&&(uc.name||'').toLowerCase()==='menstruasjon';
     var erInvestering=(uc.name||'').toLowerCase()==='planlagte investeringer';
+    var erMaalinger=(uc.name||'').toLowerCase()==='m\u00e5linger';
     var valgte=berItemsForKat(uc.id);
     var berKol=erBeredskapUnder(uc);
     // Helt tomme underkategorier vises ikke i det hele tatt — med mindre de har
-    // en egen, alltid synlig funksjon (Vitale data, Beredskap-kolonnene, investeringer)
+    // en egen, alltid synlig funksjon (Vitale data, Beredskap-kolonnene, investeringer, målinger)
     var uMaal=maalingerForKat(uc.id);
     var tom=!uInv.length&&!uEvs.length&&!uLager.length&&!uListe.length&&!uMaal.length;
-    if(tom&&!erVitale&&!berKol&&!erInvestering)return;
+    if(tom&&!erVitale&&!berKol&&!erInvestering&&!erMaalinger)return;
     // Det vanlige innholdet — lister, prosjekter, rutiner og planer
     var vanlig='';
     uLager.concat(uListe).forEach(function(iv){
@@ -1679,8 +1680,6 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
           +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
       }).join('')+'</div>';
   }
-
-  h+=maalingerKatHTML(cat.id);
 
   return h+katSideSlutt();
 }
@@ -2821,6 +2820,28 @@ function load(){
       if(!finnes)cats.push({id:'c_invest_'+hoved.id,name:'Planlagte investeringer',parentId:hoved.id});
     });
     try{localStorage.setItem(SK+'_planlagtinvest1','1');}catch(e){}
+    save();
+  }
+
+  // «Målinger» opprettes som underkategori på alle hovedkategorier. Alle
+  // eksisterende måleserier flyttes dit — uansett om de før l\u00e5 direkte på en
+  // hovedkategori eller under en annen underkategori — s\u00e5 ingen m\u00e5ling forsvinner,
+  // bare samles p\u00e5 \u00e9tt sted.
+  var mi1=false;try{mi1=!!localStorage.getItem(SK+'_maalingerkat1');}catch(e){}
+  if(!mi1){
+    var maalingerUcId={};
+    cats.filter(function(c){return!c.parentId;}).forEach(function(hoved){
+      var uc=cats.find(function(c){return c.parentId===hoved.id&&(c.name||'').toLowerCase()==='m\u00e5linger';});
+      if(!uc){uc={id:'c_maalinger_'+hoved.id,name:'M\u00e5linger',parentId:hoved.id};cats.push(uc);}
+      maalingerUcId[hoved.id]=uc.id;
+    });
+    maalinger.forEach(function(m){
+      var c=cats.find(function(x){return x.id===m.catId;});
+      if(!c)return; // ukjent kategori — r\u00f8res ikke, heller enn \u00e5 gjette feil
+      var hovedId=c.parentId?c.parentId:c.id;
+      if(maalingerUcId[hovedId])m.catId=maalingerUcId[hovedId];
+    });
+    try{localStorage.setItem(SK+'_maalingerkat1','1');}catch(e){}
     save();
   }
 
