@@ -414,7 +414,6 @@ function goAdministrer(tab){view={kind:'administrer'};if(tab)administrerTab=tab;
 function giftPeople(){
   var names={};
   gifts.forEach(function(g){if(g.received)return;var k=(g.person||'').trim();if(k)names[k]=(names[k]||0)+1;});
-  events.forEach(function(e){if(e.bday&&e.giftPerson)names[(e.name||'').trim()]=names[(e.name||'').trim()]||0;});
   return Object.keys(names).sort(function(a,b){return nbSort(a,b);});
 }
 function giftsFor(person){return gifts.filter(function(g){return!g.received&&(g.person||'').trim()===(person||'').trim();});}
@@ -1779,7 +1778,7 @@ function okonomiHubHTML(){
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBudsjett(curYear)">'
     +'<div class="entry-body"><div class="entry-text">Tid og penger</div>'
-    +'<div class="entry-date">det som er disponibelt til p\u00e5g\u00e5ende prosjekter og prosjekter</div></div>'
+    +'<div class="entry-date">det som er disponibelt til p\u00e5g\u00e5ende prosjekter</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   var ansk=findFixedList('anskaffelser');
   if(ansk){
@@ -3577,11 +3576,27 @@ function tagAlleViewHTML(){
   var tag=view.tag;
   var funnet=entries.filter(function(e){return(e.tags||[]).includes(tag);})
     .sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
+  // Hendelser tas med, men ikke rutiner — en rutine du gjør flere ganger daglig
+  // (som en fast medisin) ville druknet alt annet med hundrevis av treff, uten
+  // at det egentlig er selve gjentakelsen du er takknemlig for.
+  var hendelser=events.filter(function(e){return(e.tags||[]).includes(tag);})
+    .sort(function(a,b){return nbSort(a.name,b.name);});
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">#'+esc(tag)+'</div>'
-    +'<div class="view-sub">'+funnet.length+' innlegg, uansett m\u00e5ned eller kategori.</div>';
-  if(!funnet.length)return h+'<div class="card"><div class="empty">Ingen innlegg med dette stikkordet.</div></div>';
-  h+='<div class="card">'+funnet.map(entryRowHTML).join('')+'</div>';
+    +'<div class="view-sub">'+funnet.length+' innlegg'+(hendelser.length?', '+hendelser.length+' hendelse'+(hendelser.length===1?'':'r'):'')+', uansett m\u00e5ned eller kategori.</div>';
+  if(!funnet.length&&!hendelser.length)return h+'<div class="card"><div class="empty">Ingen innlegg eller hendelser med dette stikkordet.</div></div>';
+  if(hendelser.length){
+    h+='<div class="sec-title">Hendelser</div><div class="card">'+hendelser.map(function(e){
+      return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(e.name)+'</div>'
+        +'<div class="entry-date">plan \u00b7 '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    }).join('')+'</div>';
+  }
+  if(funnet.length){
+    if(hendelser.length)h+='<div class="sec-title">Dagbokinnlegg</div>';
+    h+='<div class="card">'+funnet.map(entryRowHTML).join('')+'</div>';
+  }
   return h;
 }
 var selectedCat=null;
@@ -8191,10 +8206,10 @@ function dagViewHTML(){
   else h+='<div class="card"><div class="empty">Ingen daglige rutiner enn\u00e5.</div></div>';
   h+=routineTimeLogRowsHTML(dtodo.items);
 
-  // Timer i dag — prosjekter og prosjekter (flyttet hit fra Dagbok)
+  // Timer i dag — logging på prosjekter (flyttet hit fra Dagbok)
   var timeItems=timeTrackedItems().filter(function(it){return itemStartedByPeriod(it,dy,dm,'m');});
   if(timeItems.length){
-    h+='<div class="sec-title">Timer \u2014 prosjekter og prosjekter</div><div class="card">';
+    h+='<div class="sec-title">Logg timer p\u00e5 prosjekter</div><div class="card">';
     timeItems.forEach(function(it){
       var tid='tlog_'+it.kind+'_'+it.refId;
       var tToday=isToday?hoursToday(it.kind,it.refId):hoursFor(it.kind,it.refId,dy,dm,'m');
@@ -9768,7 +9783,7 @@ function budsjettViewHTML(){
 
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">Tid og penger</div>'
-    +'<div class="view-sub">Det som er disponibelt av tid og penger til p\u00e5g\u00e5ende prosjekter og prosjekter \u2014 ikke hele privat\u00f8konomien.</div>';
+    +'<div class="view-sub">Det som er disponibelt av tid og penger til p\u00e5g\u00e5ende prosjekter \u2014 ikke hele privat\u00f8konomien.</div>';
 
   h+='<div class="chips" style="padding:8px 12px 0">'
     +'<button class="chip'+(scope==='m'?' on':'')+'" onclick="goBudsjett('+y+',\'m\','+curMonth+')">M\u00e5ned</button>'
