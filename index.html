@@ -413,7 +413,7 @@ function goAdministrer(tab){view={kind:'administrer'};if(tab)administrerTab=tab;
 // gift: {id, person, bdayId(valgfri), kind:'bursdag'|'jul'|'annet', year, what, idea:bool, received:bool, greeting:bool(bursdagshilsen), card:bool(julekort), note}
 function giftPeople(){
   var names={};
-  gifts.forEach(function(g){if(g.received)return;var k=(g.person||'').trim();if(k)names[k]=(names[k]||0)+1;});
+  gifts.forEach(function(g){if(g.received||g.greetMark)return;var k=(g.person||'').trim();if(k)names[k]=(names[k]||0)+1;});
   return Object.keys(names).sort(function(a,b){return nbSort(a,b);});
 }
 function giftsFor(person){return gifts.filter(function(g){return!g.received&&(g.person||'').trim()===(person||'').trim();});}
