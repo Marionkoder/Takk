@@ -1940,6 +1940,7 @@ var MENS_SMERTE=[[1,'Ingen'],[2,'Til \u00e5 leve med'],[3,'Plagsomme'],[4,'Ille'
 var MENS_HODEPINE=[[1,'Ingen hodepine','Ingen'],[2,'Litt hodepine','Litt'],[3,'En del hodepine','En del'],[4,'Kraftig hodepine','Kraftig']];
 var MENS_HUD=[[1,'Ingen uren hud','Ingen'],[2,'Litt uren hud','Litt'],[3,'En del uren hud','En del'],[4,'Kraftig uren hud','Kraftig']];
 var MENS_OPPBLAAST=[[1,'Ingen oppbl\u00e5sthet','Ingen'],[2,'Litt oppbl\u00e5sthet','Litt'],[3,'En del oppbl\u00e5sthet','En del'],[4,'Kraftig oppbl\u00e5sthet','Kraftig']];
+var MENS_KVALME=[[1,'Ingen kvalme','Ingen'],[2,'Litt kvalme','Litt'],[3,'En del kvalme','En del'],[4,'Kraftig kvalme','Kraftig']];
 var MENS_KORSRYGG=[[1,'Ingen korsryggsmerter','Ingen'],[2,'Litt korsryggsmerter','Litt'],[3,'En del korsryggsmerter','En del'],[4,'Kraftige korsryggsmerter','Kraftige']];
 var MENS_NAKKE=[[1,'Ingen skulder-/nakkesmerter','Ingen'],[2,'Litt skulder-/nakkesmerter','Litt'],[3,'En del skulder-/nakkesmerter','En del'],[4,'Kraftige skulder-/nakkesmerter','Kraftige']];
 var MENS_ENERGI=[[1,'Veldig slapp','Veldig slapp'],[2,'Litt slapp','Litt slapp'],[3,'Normal energi','Normal'],[4,'Energioverskudd','Overskudd']];
@@ -2034,16 +2035,41 @@ function mensStartNy(dato){
 }
 // Én rad: liten overskrift over knappene, med bare gradueringsordet i hver knapp
 // i stedet for at symptomnavnet gjentas ti ganger på siden
-function mensRadHTML(navn,skala,verdi,dato,settFn,ikonFn){
-  return'<div class="cb-hd" style="padding:6px 0 3px">'+esc(navn)+'</div>'
-    +'<div class="chips" style="margin-bottom:2px">'+skala.map(function(n){
-      var kort=n[2]||n[1];
-      var ikon=ikonFn?ikonFn(n[0])+' ':'';
-      return'<button class="chip'+(Number(verdi)===n[0]?' on':'')+'" onclick="'+settFn+'(\''+dato+'\','+n[0]+')">'+ikon+esc(kort)+'</button>';
-    }).join('')+'</div>';
+// Kompakt tabell: symptomtype som rad, gradering 1\u20134 som kolonne. Erstatter det
+// som f\u00f8r var ti separate overskrift+knapperad-blokker — samme data, en br\u00f8kdel
+// av plassen. Cellene er sirkler, ikke tekstknapper, siden radnavnet allerede
+// sier hva graderingen gjelder.
+function mensGradTabellHTML(dato,rad,per){
+  var rader=[];
+  if(per)rader.push(['Bl\u00f8dning',MENS_NIVAA,rad.intensity,'mensSettDagIntensity']);
+  rader.push(['Menssmerter',MENS_SMERTE,rad.smerte,'mensSettDagSmerte']);
+  rader.push(['Energi',MENS_ENERGI,rad.energi,'mensSettDagEnergi']);
+  rader.push(['Konsentrasjon',MENS_KONSENTRASJON,rad.fokus,'mensSettDagKonsentrasjon']);
+  rader.push(['Hodepine',MENS_HODEPINE,rad.hodepine,'mensSettDagHodepine']);
+  rader.push(['Korsryggsmerter',MENS_KORSRYGG,rad.korsrygg,'mensSettDagKorsrygg']);
+  rader.push(['Skulder-/nakkesmerter',MENS_NAKKE,rad.nakke,'mensSettDagNakke']);
+  rader.push(['Kvalme',MENS_KVALME,rad.kvalme,'mensSettDagKvalme']);
+  rader.push(['Uren hud',MENS_HUD,rad.hud,'mensSettDagHud']);
+  rader.push(['Oppbl\u00e5sthet',MENS_OPPBLAAST,rad.oppblaast,'mensSettDagOppblaast']);
+
+  var h='<table style="width:100%;border-collapse:collapse;font-size:11.5px">'
+    +'<tr><td></td>'+[1,2,3,4].map(function(n){return'<td style="text-align:center;color:var(--muted);font-size:10px;padding:0 0 3px">'+n+'</td>';}).join('')+'</tr>';
+  rader.forEach(function(r){
+    var navn=r[0],skala=r[1],verdi=r[2],fn=r[3];
+    h+='<tr><td style="padding:3px 6px 3px 0;white-space:nowrap">'+esc(navn)+'</td>'
+      +skala.map(function(n){
+        var valgt=Number(verdi)===n[0];
+        var tittel=n[2]||n[1];
+        return'<td style="text-align:center;padding:2px 0"><button title="'+esc(tittel)+'" onclick="'+fn+'(\''+dato+'\','+n[0]+')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:'+(valgt?'var(--rose)':'transparent')+';padding:0;cursor:pointer"></button></td>';
+      }).join('')
+      +'</tr>';
+  });
+  h+='</table>'
+    +'<div class="hint" style="margin-top:2px">1 = ingen/lavest \u2192 4 = kraftig/h\u00f8yest</div>';
+  return h;
 }
 function mensDagMerkerHTML(dato,tittel){
-  var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:'',slim:false,hodepine:'',humorMerker:[],hud:'',oppblaast:''};
+  var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:'',slim:false,hodepine:'',humorMerker:[],hud:'',oppblaast:'',kvalme:''};
   var per=mensPeriodeFor(dato);
   var erSluttdag=per&&per.end===dato;
   var syklusdag=mensSyklusdagForDato(dato);
@@ -2052,27 +2078,14 @@ function mensDagMerkerHTML(dato,tittel){
   var visSlutt=per&&(erSluttdag||(syklusdag&&syklusdag>=3));
   var visStart=!per&&(!syklusdag||syklusdag>=20);
   var h='<div class="sec-title">'+esc(tittel)+'</div><div class="card" style="padding:10px 14px">';
-  // Blødning gir bare mening under selve menstruasjonen. Menssmerter kan derimot
-  // komme dager i forveien, akkurat som de andre premenstruelle plagene — derfor
-  // ligger den nå sammen med resten, ikke bak blødnings-sperren.
-  if(per){
-    h+=mensRadHTML('Bl\u00f8dning',MENS_NIVAA,rad.intensity,dato,'mensSettDagIntensity',mensDraaper);
-  }
-  h+=mensRadHTML('Menssmerter',MENS_SMERTE,rad.smerte,dato,'mensSettDagSmerte',mensLyn)
-    +mensRadHTML('Energi',MENS_ENERGI,rad.energi,dato,'mensSettDagEnergi')
-    +mensRadHTML('Konsentrasjon',MENS_KONSENTRASJON,rad.fokus,dato,'mensSettDagKonsentrasjon')
-    +mensRadHTML('Hodepine',MENS_HODEPINE,rad.hodepine,dato,'mensSettDagHodepine')
-    +mensRadHTML('Korsryggsmerter',MENS_KORSRYGG,rad.korsrygg,dato,'mensSettDagKorsrygg')
-    +mensRadHTML('Skulder-/nakkesmerter',MENS_NAKKE,rad.nakke,dato,'mensSettDagNakke')
-    +(function(){
+  h+=mensGradTabellHTML(dato,rad,per);
+  h+=(function(){
       var valgt=rad.humorMerker||[];
-      return'<div class="cb-hd" style="padding:6px 0 3px">Hum\u00f8r</div>'
+      return'<div class="cb-hd" style="padding:8px 0 3px">Hum\u00f8r</div>'
         +'<div class="chips" style="margin-bottom:2px">'+MENS_HUMORORD.map(function(ord){
           return'<button class="chip'+(valgt.indexOf(ord)>=0?' on':'')+'" onclick="mensToggleHumorMerke(\''+dato+'\',\''+ord+'\')">'+ord+'</button>';
         }).join('')+'</div>';
     })()
-    +mensRadHTML('Uren hud',MENS_HUD,rad.hud,dato,'mensSettDagHud')
-    +mensRadHTML('Oppbl\u00e5sthet',MENS_OPPBLAAST,rad.oppblaast,dato,'mensSettDagOppblaast')
     +'<div class="cb-hd" style="padding:6px 0 3px">Eggl\u00f8sning</div>'
     +'<div class="chips"'+((visSlutt||visStart)?'':' style="margin-bottom:2px"')+'><button class="chip'+(rad.slim?' on':'')+'" onclick="mensSettSlim(\''+dato+'\')">'+(rad.slim?'\u2713 ':'')+'Eggl\u00f8sningsslim</button></div>';
   if(visSlutt){
@@ -2122,6 +2135,7 @@ function mensViewHTML(){
                   r.smerte?(mensLyn(r.smerte)?mensLyn(r.smerte)+' ':'')+MENS_SMERTE[r.smerte-1][1]:'',
                   r.hodepine?MENS_HODEPINE[r.hodepine-1][1]:'',
                   (r.humorMerker&&r.humorMerker.length)?r.humorMerker.join(', '):'',
+                  r.kvalme?MENS_KVALME[r.kvalme-1][1]:'',
                   r.hud?MENS_HUD[r.hud-1][1]:'',
                   r.oppblaast?MENS_OPPBLAAST[r.oppblaast-1][1]:'',
                   r.korsrygg?MENS_KORSRYGG[r.korsrygg-1][1]:'',
@@ -2175,28 +2189,28 @@ function mensSettDag(dato,felt,verdi){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad[felt]=rad[felt]===verdi?'':verdi;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagIntensity(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad.intensity=Number(rad.intensity)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagSmerte(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
   rad.smerte=Number(rad.smerte)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagHodepine(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',hodepine:''};mensDag.push(rad);}
   rad.hodepine=Number(rad.hodepine)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 // Hum\u00f8r er ikke \u00e9n skala — det er flere akser som kan beveges uavhengig av
@@ -2208,35 +2222,42 @@ function mensToggleHumorMerke(dato,ord){
   rad.humorMerker=rad.humorMerker||[];
   var i=rad.humorMerker.indexOf(ord);
   if(i>=0)rad.humorMerker.splice(i,1);else rad.humorMerker.push(ord);
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.humorMerker.length)mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&!rad.humorMerker.length)mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagHud(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',hud:''};mensDag.push(rad);}
   rad.hud=Number(rad.hud)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagOppblaast(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',oppblaast:''};mensDag.push(rad);}
   rad.oppblaast=Number(rad.oppblaast)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  save();render();
+}
+function mensSettDagKvalme(dato,niva){
+  var rad=mensDagFor(dato);
+  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',kvalme:''};mensDag.push(rad);}
+  rad.kvalme=Number(rad.kvalme)===niva?'':niva;
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagKorsrygg(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',korsrygg:''};mensDag.push(rad);}
   rad.korsrygg=Number(rad.korsrygg)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagNakke(dato,niva){
   var rad=mensDagFor(dato);
   if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',nakke:''};mensDag.push(rad);}
   rad.nakke=Number(rad.nakke)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
+  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
   save();render();
 }
 function mensSettDagEnergi(dato,niva){
@@ -2367,6 +2388,16 @@ function celebrationName(){
   // Bruk et lagret navn hvis det finnes, ellers ingen navn (tom)
   var nm='';try{nm=localStorage.getItem(SK+'_myname')||'';}catch(e){}
   return nm.trim();
+}
+// Norsk genitiv: navn som ender på s, x eller z får bare apostrof (Elias\u2019,
+// Lars\u2019), resten f\u00e5r vanlig s (Jennys, Olas).
+function genitivNavn(navn){
+  var siste=navn.slice(-1).toLowerCase();
+  return navn+(siste==='s'||siste==='x'||siste==='z'?'\u2019':'s');
+}
+function bannerTittel(){
+  var navn=celebrationName();
+  return navn?genitivNavn(navn)+' gode dager':'Gode dager';
 }
 function celebSmallCloud(months){
   // Forminsket ordsky for de tre månedene samlet
@@ -4858,6 +4889,7 @@ function mensSyklusPunkter(syklus,felt){
     else if(felt==='oppblaast')v=r.oppblaast?Number(r.oppblaast):null;
     else if(felt==='korsrygg')v=r.korsrygg?Number(r.korsrygg):null;
     else if(felt==='nakke')v=r.nakke?Number(r.nakke):null;
+    else if(felt==='kvalme')v=r.kvalme?Number(r.kvalme):null;
     if(v!==null)ut.push({dag:d,verdi:v});
   });
   return ut.sort(function(a,b){return a.dag-b.dag;});
@@ -4884,7 +4916,8 @@ var MENS_GRAF_FARGER={
   hud:'#CC7F33',         // terrakotta, uren hud
   oppblaast:'#5C8A6B',   // dus gr\u00f8nn, oppbl\u00e5sthet — annen valør enn slim-s\u00f8ylene
   korsrygg:'#9C7A52',    // varm brun, korsryggsmerter
-  nakke:'#B57A8A'        // dus rosa, skulder-/nakkesmerter
+  nakke:'#B57A8A',        // dus rosa, skulder-/nakkesmerter
+  kvalme:'#8B7BA8'        // dus lilla-gr\u00e5, kvalme — atskilt fra hum\u00f8rets tidligere lilla
 };
 function mensSyklusKombinertGrafSVG(syk){
   var serier=[
@@ -4896,7 +4929,8 @@ function mensSyklusKombinertGrafSVG(syk){
     ['hud','Uren hud'],
     ['oppblaast','Oppbl\u00e5sthet'],
     ['korsrygg','Korsryggsmerter'],
-    ['nakke','Skulder-/nakkesmerter']
+    ['nakke','Skulder-/nakkesmerter'],
+    ['kvalme','Kvalme']
   ].filter(function(t){return t[0]==='intensity'||mensGrafSynlig[t[0]]!==false;})
    .map(function(t){return{felt:t[0],navn:t[1],farge:MENS_GRAF_FARGER[t[0]],punkter:mensSyklusPunkter(syk,t[0])};});
   var slimDager=mensGrafSynlig.slim!==false?mensSyklusSlimDager(syk):[];
@@ -4979,7 +5013,7 @@ function mensSyklusGraferHTML(kompakt){
       +'<div class="chips">'
       +[['energi','Energi'],['smerte','Menssmerter'],['hodepine','Hodepine'],['fokus','Konsentrasjon'],
         ['hud','Uren hud'],['oppblaast','Oppbl\u00e5sthet'],['korsrygg','Korsryggsmerter'],
-        ['nakke','Skulder-/nakkesmerter'],['slim','Eggl\u00f8sningsslim']].map(function(t){
+        ['nakke','Skulder-/nakkesmerter'],['kvalme','Kvalme'],['slim','Eggl\u00f8sningsslim']].map(function(t){
           var paa=mensGrafSynlig[t[0]]!==false;
           return'<button class="chip'+(paa?' on':'')+'" onclick="mensGrafToggle(\''+t[0]+'\')">'+t[1]+'</button>';
         }).join('')
@@ -9620,7 +9654,7 @@ function hashtagsViewHTML(){
 
   // Søk og sortering
   h+='<div style="padding:8px 12px 0">'
-    +'<input class="inp" type="text" style="margin:0" placeholder="S\u00f8k i stikkord \u2026" value="'+esc(tagSok)+'" oninput="setTagSok(this.value)">'
+    +'<input id="taghash-sok-inp" class="inp" type="text" style="margin:0" placeholder="S\u00f8k i stikkord \u2026" value="'+esc(tagSok)+'" oninput="setTagSok(this.value)">'
     +'</div>'
     +'<div class="chips" style="padding:8px 12px 0">'
     +'<button class="chip'+(tagSort==='freq'?' on':'')+'" onclick="tagSort=\'freq\';render()">Mest brukt</button>'
@@ -10183,6 +10217,10 @@ function render(){
   try{
     if(document.activeElement&&document.activeElement.id==='modal-sok-inp'){wasModalSok=true;modalSokPos=document.activeElement.selectionStart||0;}
   }catch(e){}
+  var wasTagHashSok=false,tagHashSokPos=0;
+  try{
+    if(document.activeElement&&document.activeElement.id==='taghash-sok-inp'){wasTagHashSok=true;tagHashSokPos=document.activeElement.selectionStart||0;}
+  }catch(e){}
   var prevMain=document.querySelector('.main');
   var scrollPos=prevMain?prevMain.scrollTop:0;
   var sameView=window._lastRenderViewKind===(view?view.kind:null);
@@ -10308,6 +10346,8 @@ function render(){
   if(qt&&wasQTags){qt.focus();qt.setSelectionRange(qt.value.length,qt.value.length);}
   var msi=document.getElementById('modal-sok-inp');
   if(msi&&wasModalSok){msi.focus();msi.setSelectionRange(modalSokPos,modalSokPos);}
+  var thsi=document.getElementById('taghash-sok-inp');
+  if(thsi&&wasTagHashSok){thsi.focus();thsi.setSelectionRange(tagHashSokPos,tagHashSokPos);}
   var ta=document.querySelector('.modal textarea');
   if(ta&&!ta.value)ta.focus();
 }
@@ -10351,7 +10391,7 @@ function pinRender(){
       +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
       +pad('pinNewDigit'));
   } else {
-    h=box('<div style="font-size:21px;font-weight:800;letter-spacing:.02em;line-height:1.25;margin-bottom:8px;color:var(--title,var(--ink));text-transform:uppercase">Gode dager</div>'
+    h=box('<div style="font-size:21px;font-weight:800;letter-spacing:.02em;line-height:1.25;margin-bottom:8px;color:var(--title,var(--ink));text-transform:uppercase">'+esc(bannerTittel())+'</div>'
       +'<div style="font-size:13px;color:var(--muted);margin-bottom:20px">Skriv PIN-koden</div>'
       +dots(st.buf.length)
       +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
