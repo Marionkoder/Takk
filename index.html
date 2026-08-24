@@ -1732,6 +1732,14 @@ function fjernDatingPerson(id){
   datingPersoner=datingPersoner.filter(function(p){return p.id!==id;});
   save();render();
 }
+function flyttDatingPerson(id,retning){
+  var i=datingPersoner.findIndex(function(p){return p.id===id;});
+  if(i<0)return;
+  var j=i+retning;
+  if(j<0||j>=datingPersoner.length)return;
+  var tmp=datingPersoner[i];datingPersoner[i]=datingPersoner[j];datingPersoner[j]=tmp;
+  save();render();
+}
 function toggleDatingKryss(personId,kriterieId){
   var p=datingPersoner.find(function(x){return x.id===personId;});
   if(!p)return;
@@ -1739,12 +1747,6 @@ function toggleDatingKryss(personId,kriterieId){
   var i=p.kryssIds.indexOf(kriterieId);
   if(i>=0)p.kryssIds.splice(i,1);else p.kryssIds.push(kriterieId);
   save();render();
-}
-function settDatingNotat(personId,tekst){
-  var p=datingPersoner.find(function(x){return x.id===personId;});
-  if(!p)return;
-  p.notat=tekst;
-  save();
 }
 function settDatingNavn(personId,navn){
   var p=datingPersoner.find(function(x){return x.id===personId;});
@@ -1797,11 +1799,14 @@ function datingKriterierViewHTML(){
   }
 
   h+='<div class="sec-title" style="margin-top:14px">Personer</div><div class="card">'
-    +datingPersoner.map(function(p){
+    +datingPersoner.map(function(p,i){
       return'<div class="entry-row" style="align-items:flex-start"><div class="entry-body">'
         +'<input class="inp" type="text" style="font-size:13px;font-weight:600;margin:0;padding:4px 6px" value="'+esc(p.navn)+'" onblur="settDatingNavn(\''+q(p.id)+'\',this.value)">'
         +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(DATING_FASER[p.fase||0])+'</div>'
-        +'<textarea class="inp" rows="1" style="margin:4px 0 0;font-size:12px" placeholder="Notat \u2026" oninput="settDatingNotat(\''+q(p.id)+'\',this.value)">'+esc(p.notat||'')+'</textarea>'
+        +'</div>'
+        +'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">'
+        +(i>0?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="flyttDatingPerson(\''+q(p.id)+'\',-1)">\u2191</button>':'')
+        +(i<datingPersoner.length-1?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="flyttDatingPerson(\''+q(p.id)+'\',1)">\u2193</button>':'')
         +'</div>'
         +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernDatingPerson(\''+q(p.id)+'\')">Fjern</button></div>';
     }).join('')
