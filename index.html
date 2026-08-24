@@ -1759,9 +1759,20 @@ function flyttDatingPerson(id,retning){
 // r\u00f8dt = mangler den. Bruker appens egen palett — --done og --red finnes fra
 // f\u00f8r, gr\u00f8nt og gult er nye, dempede toner i samme stil.
 var DATING_KRYSS_FARGER=['','#E3D9C2','#7A9B76','#D4B354','#8E1F1D'];
-function datingGronneAntall(p){
+// Poengsum per person: n\u00f8dvendige kriterier teller dobbelt av tiltrekkende, og
+// selve fargen rangeres gr\u00f8nn (mye) h\u00f8yest, s\u00e5 gr\u00e5tt (usikker), s\u00e5 gult (noe),
+// s\u00e5 r\u00f8dt (mangler) lavest.
+var DATING_STATUS_POENG={1:2,2:3,3:1,4:0};
+function datingKryssPoeng(p){
   var st=p.kryssStatus||{};
-  return Object.keys(st).filter(function(k){return st[k]===2;}).length;
+  var sum=0;
+  Object.keys(st).forEach(function(kid){
+    var k=datingKriterier.find(function(x){return x.id===kid;});
+    if(!k)return;
+    var vekt=k.type==='tiltrekkende'?1:2;
+    sum+=(DATING_STATUS_POENG[st[kid]]||0)*vekt;
+  });
+  return sum;
 }
 function sykleDatingKryss(personId,kriterieId){
   var p=datingPersoner.find(function(x){return x.id===personId;});
@@ -1803,7 +1814,7 @@ function datingKriterierViewHTML(){
 
   var visPersoner=datingPersoner.slice();
   if(datingSortering==='varighet')visPersoner.sort(function(a,b){return(b.fase||0)-(a.fase||0);});
-  else if(datingSortering==='kryss')visPersoner.sort(function(a,b){return datingGronneAntall(b)-datingGronneAntall(a);});
+  else if(datingSortering==='kryss')visPersoner.sort(function(a,b){return datingKryssPoeng(b)-datingKryssPoeng(a);});
   else if(datingSortering==='alfabetisk')visPersoner.sort(function(a,b){return nbSort(a.navn,b.navn);});
 
   // N\u00f8dvendige kriterier til venstre, tiltrekkende til h\u00f8yre — stabil sortering
@@ -1819,7 +1830,7 @@ function datingKriterierViewHTML(){
       +[['manuell','Manuell'],['varighet','Varighet'],['kryss','Kriterier avhuket'],['alfabetisk','Alfabetisk']].map(function(s){
         return'<button class="chip'+(datingSortering===s[0]?' on':'')+'" onclick="settDatingSortering(\''+s[0]+'\')">'+s[1]+'</button>';
       }).join('')+'</div>';
-    h+='<div class="card" style="overflow-x:auto;padding:8px 6px">'
+    h+='<div id="dating-tabell-scroll" class="card" style="overflow-x:auto;padding:8px 6px">'
       +'<table style="border-collapse:collapse;font-size:11px">'
       +(kriterierSortert.length?'<tr><td colspan="'+(1+DATING_FASER.length+1)+'"></td>'
         +(antNodvendig?'<td colspan="'+antNodvendig+'" style="text-align:center;font-size:8.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">N\u00f8dvendige</td>':'')
@@ -1869,6 +1880,176 @@ function datingKriterierViewHTML(){
     +'<div style="padding:6px 12px 20px;display:flex;gap:6px">'
     +'<input id="dp-nytt-inp" class="inp" style="margin:0;flex:1" type="text" placeholder="Navn \u2026">'
     +'<button class="icon-btn" onclick="leggTilDatingPerson(document.getElementById(\'dp-nytt-inp\').value);document.getElementById(\'dp-nytt-inp\').value=\'\'">+ Legg til</button>'
+    +'</div>';
+  return h;
+}
+// Stillingsrelevans: samme oppsett som Dating-kriterier, tilpasset jobbs\u00f8k —
+// stillinger i stedet for personer, s\u00f8keprosess-stadier i stedet for varighet.
+function leggTilStillingKriterium(navn){
+  navn=(navn||'').trim();if(!navn)return;
+  stillingKriterier.push({id:'sk'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,type:'nodvendig'});
+  save();render();
+}
+function settStillingKriteriumType(id,type){
+  var k=stillingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.type=type;
+  save();render();
+}
+function fjernStillingKriterium(id){
+  stillingKriterier=stillingKriterier.filter(function(k){return k.id!==id;});
+  stillinger.forEach(function(s){if(s.kryssStatus)delete s.kryssStatus[id];});
+  save();render();
+}
+var STILLING_STADIER=['Vurderer','S\u00f8kt','Intervju/tilbud'];
+var stillingSortering='manuell';
+function settStillingSortering(v){stillingSortering=v;save();render();}
+function leggTilStilling(navn){
+  navn=(navn||'').trim();if(!navn)return;
+  stillinger.push({id:'sp'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,kryssStatus:{},stadie:0});
+  save();render();
+}
+function flyttStillingStadie(id){
+  var s=stillinger.find(function(x){return x.id===id;});
+  if(!s)return;
+  s.stadie=Math.min((s.stadie||0)+1,STILLING_STADIER.length-1);
+  save();render();
+}
+function settStillingStadie(id,stadieIndex){
+  var s=stillinger.find(function(x){return x.id===id;});
+  if(!s)return;
+  s.stadie=Math.max(0,Math.min(stadieIndex,STILLING_STADIER.length-1));
+  save();render();
+}
+function fjernStilling(id){
+  stillinger=stillinger.filter(function(s){return s.id!==id;});
+  save();render();
+}
+function flyttStilling(id,retning){
+  var i=stillinger.findIndex(function(s){return s.id===id;});
+  if(i<0)return;
+  var j=i+retning;
+  if(j<0||j>=stillinger.length)return;
+  var tmp=stillinger[i];stillinger[i]=stillinger[j];stillinger[j]=tmp;
+  save();render();
+}
+var STILLING_KRYSS_FARGER=['','#E3D9C2','#7A9B76','#D4B354','#8E1F1D'];
+var STILLING_STATUS_POENG={1:2,2:3,3:1,4:0};
+function stillingKryssPoeng(s){
+  var st=s.kryssStatus||{};
+  var sum=0;
+  Object.keys(st).forEach(function(kid){
+    var k=stillingKriterier.find(function(x){return x.id===kid;});
+    if(!k)return;
+    var vekt=k.type==='tiltrekkende'?1:2;
+    sum+=(STILLING_STATUS_POENG[st[kid]]||0)*vekt;
+  });
+  return sum;
+}
+function sykleStillingKryss(stillingId,kriterieId){
+  var s=stillinger.find(function(x){return x.id===stillingId;});
+  if(!s)return;
+  s.kryssStatus=s.kryssStatus||{};
+  var naa=s.kryssStatus[kriterieId]||0;
+  var neste=(naa+1)%STILLING_KRYSS_FARGER.length;
+  if(neste===0)delete s.kryssStatus[kriterieId];else s.kryssStatus[kriterieId]=neste;
+  save();render();
+}
+function settStillingNavn(id,navn){
+  var s=stillinger.find(function(x){return x.id===id;});
+  if(!s)return;
+  s.navn=(navn||'').trim()||s.navn;
+  save();render();
+}
+function goStillingRelevans(){view={kind:'stillingrelevans'};drawerOpen=false;render();}
+function stillingRelevansViewHTML(){
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div class="view-title">Stillingsrelevans</div>'
+    +'<div class="view-sub">Dine egne kriterier — legg til, endre eller fjern n\u00e5r som helst.</div>';
+
+  h+='<div class="sec-title">Kriterier</div><div class="card">'
+    +stillingKriterier.map(function(k){
+      return'<div class="entry-row tett" style="align-items:flex-start"><div class="entry-body">'
+        +'<div class="entry-text">'+esc(k.navn)+'</div>'
+        +'<div class="chips" style="margin-top:3px">'
+        +'<button class="chip'+(k.type!=='tiltrekkende'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingKriteriumType(\''+q(k.id)+'\',\'nodvendig\')">N\u00f8dvendig</button>'
+        +'<button class="chip'+(k.type==='tiltrekkende'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingKriteriumType(\''+q(k.id)+'\',\'tiltrekkende\')">Tiltrekkende</button>'
+        +'</div></div>'
+        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernStillingKriterium(\''+q(k.id)+'\')">Fjern</button></div>';
+    }).join('')
+    +(stillingKriterier.length?'':'<div class="empty" style="padding:6px 12px">Ingen kriterier enn\u00e5.</div>')
+    +'</div>'
+    +'<div style="padding:6px 12px 0;display:flex;gap:6px">'
+    +'<input id="sk-nytt-inp" class="inp" style="margin:0;flex:1" type="text" placeholder="Nytt kriterium \u2026">'
+    +'<button class="icon-btn" onclick="leggTilStillingKriterium(document.getElementById(\'sk-nytt-inp\').value);document.getElementById(\'sk-nytt-inp\').value=\'\'">+ Legg til</button>'
+    +'</div>';
+
+  var visStillinger=stillinger.slice();
+  if(stillingSortering==='varighet')visStillinger.sort(function(a,b){return(b.stadie||0)-(a.stadie||0);});
+  else if(stillingSortering==='kryss')visStillinger.sort(function(a,b){return stillingKryssPoeng(b)-stillingKryssPoeng(a);});
+  else if(stillingSortering==='alfabetisk')visStillinger.sort(function(a,b){return nbSort(a.navn,b.navn);});
+
+  var kriterierSortert=stillingKriterier.slice().sort(function(a,b){
+    return(a.type==='tiltrekkende'?1:0)-(b.type==='tiltrekkende'?1:0);
+  });
+  var antNodvendig=kriterierSortert.filter(function(k){return k.type!=='tiltrekkende';}).length;
+
+  if(stillinger.length){
+    h+='<div class="sec-title" style="margin-top:14px">Oversikt</div>';
+    h+='<div class="chips" style="padding:0 12px 6px">'
+      +[['manuell','Manuell'],['varighet','Stadie'],['kryss','Kriterier avhuket'],['alfabetisk','Alfabetisk']].map(function(s){
+        return'<button class="chip'+(stillingSortering===s[0]?' on':'')+'" onclick="settStillingSortering(\''+s[0]+'\')">'+s[1]+'</button>';
+      }).join('')+'</div>';
+    h+='<div id="stilling-tabell-scroll" class="card" style="overflow-x:auto;padding:8px 6px">'
+      +'<table style="border-collapse:collapse;font-size:11px">'
+      +(kriterierSortert.length?'<tr><td colspan="'+(1+STILLING_STADIER.length+1)+'"></td>'
+        +(antNodvendig?'<td colspan="'+antNodvendig+'" style="text-align:center;font-size:8.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">N\u00f8dvendige</td>':'')
+        +(kriterierSortert.length-antNodvendig?'<td colspan="'+(kriterierSortert.length-antNodvendig)+'" style="text-align:center;font-size:8.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Tiltrekkende</td>':'')
+        +'</tr>':'')
+      +'<tr><td></td>'+STILLING_STADIER.map(function(f){
+        return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted);white-space:nowrap">'+f+'</td>';
+      }).join('')+'<td></td>'
+      +kriterierSortert.map(function(k){
+        return'<td style="text-align:center;padding:2px 3px;font-size:9px;color:var(--muted);max-width:44px;writing-mode:vertical-rl;text-orientation:mixed">'+esc(k.navn)+'</td>';
+      }).join('')+'</tr>'
+      +visStillinger.map(function(s){
+        var stadie=s.stadie||0;
+        return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1">'+esc(s.navn)+'</td>'
+          +STILLING_STADIER.map(function(f,i){
+            return'<td style="text-align:center;padding:2px"><button title="Sett til '+esc(f)+'" onclick="settStillingStadie(\''+q(s.id)+'\','+i+')" style="width:13px;height:13px;border-radius:50%;border:none;padding:0;cursor:pointer;background:'+(i<=stadie?'var(--rose)':'var(--line)')+'"></button></td>';
+          }).join('')
+          +'<td style="text-align:center;padding:2px">'+(stadie<STILLING_STADIER.length-1?'<button onclick="flyttStillingStadie(\''+q(s.id)+'\')" title="Flytt til '+esc(STILLING_STADIER[stadie+1])+'" style="font-size:12px;padding:1px 6px" class="icon-btn">\u2192</button>':'')+'</td>'
+          +kriterierSortert.map(function(k){
+            var status=(s.kryssStatus||{})[k.id]||0;
+            var farge=STILLING_KRYSS_FARGER[status];
+            return'<td style="text-align:center;padding:2px"><button onclick="sykleStillingKryss(\''+q(s.id)+'\',\''+q(k.id)+'\')" style="width:20px;height:20px;border-radius:4px;border:1.5px solid var(--line);background:'+(farge||'transparent')+';padding:0;cursor:pointer"></button></td>';
+          }).join('')
+          +'</tr>';
+      }).join('')
+      +'</table></div>';
+  }
+
+  h+='<div class="sec-title" style="margin-top:14px">Stillinger</div><div class="card">'
+    +visStillinger.map(function(s){
+      var iEkte=stillinger.indexOf(s);
+      var visPiler=stillingSortering==='manuell';
+      return'<div class="entry-row" style="align-items:flex-start"><div class="entry-body">'
+        +'<input class="inp" type="text" style="font-size:13px;font-weight:600;margin:0;padding:4px 6px" value="'+esc(s.navn)+'" onblur="settStillingNavn(\''+q(s.id)+'\',this.value)">'
+        +'<div class="chips" style="margin-top:3px">'+STILLING_STADIER.map(function(f,i){
+          return'<button class="chip'+(i===(s.stadie||0)?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingStadie(\''+q(s.id)+'\','+i+')">'+f+'</button>';
+        }).join('')+'</div>'
+        +'</div>'
+        +(visPiler?'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">'
+          +(iEkte>0?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="flyttStilling(\''+q(s.id)+'\',-1)">\u2191</button>':'')
+          +(iEkte<stillinger.length-1?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="flyttStilling(\''+q(s.id)+'\',1)">\u2193</button>':'')
+          +'</div>':'')
+        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernStilling(\''+q(s.id)+'\')">Fjern</button></div>';
+    }).join('')
+    +(stillinger.length?'':'<div class="empty" style="padding:6px 12px">Ingen stillinger lagt til enn\u00e5.</div>')
+    +'</div>'
+    +'<div style="padding:6px 12px 20px;display:flex;gap:6px">'
+    +'<input id="sp-nytt-inp" class="inp" style="margin:0;flex:1" type="text" placeholder="F.eks. Utvikler hos Firma AS \u2026">'
+    +'<button class="icon-btn" onclick="leggTilStilling(document.getElementById(\'sp-nytt-inp\').value);document.getElementById(\'sp-nytt-inp\').value=\'\'">+ Legg til</button>'
     +'</div>';
   return h;
 }
@@ -2809,6 +2990,8 @@ function load(){
   try{investeringer=JSON.parse(localStorage.getItem(SK+'_investeringer')||'[]');}catch(e){investeringer=[];}
   try{datingKriterier=JSON.parse(localStorage.getItem(SK+'_datingkriterier')||'[]');}catch(e){datingKriterier=[];}
   try{datingPersoner=JSON.parse(localStorage.getItem(SK+'_datingpersoner')||'[]');}catch(e){datingPersoner=[];}
+  try{stillingKriterier=JSON.parse(localStorage.getItem(SK+'_stillingkriterier')||'[]');}catch(e){stillingKriterier=[];}
+  try{stillinger=JSON.parse(localStorage.getItem(SK+'_stillinger')||'[]');}catch(e){stillinger=[];}
   try{datingSortering=localStorage.getItem(SK+'_datingsortering')||'manuell';}catch(e){datingSortering='manuell';}
   try{skjulteEntries=JSON.parse(localStorage.getItem(SK+'_skjulteentries')||'[]');}catch(e){skjulteEntries=[];}
   try{mensGrafSynlig=JSON.parse(localStorage.getItem(SK+'_mensgrafsynlig')||'{}');}catch(e){mensGrafSynlig={};}
@@ -3762,6 +3945,8 @@ function save(){
   try{localStorage.setItem(SK+'_investeringer',JSON.stringify(investeringer));}catch(e){}
   try{localStorage.setItem(SK+'_datingkriterier',JSON.stringify(datingKriterier));}catch(e){}
   try{localStorage.setItem(SK+'_datingpersoner',JSON.stringify(datingPersoner));}catch(e){}
+  try{localStorage.setItem(SK+'_stillingkriterier',JSON.stringify(stillingKriterier));}catch(e){}
+  try{localStorage.setItem(SK+'_stillinger',JSON.stringify(stillinger));}catch(e){}
   try{localStorage.setItem(SK+'_datingsortering',datingSortering);}catch(e){}
   try{localStorage.setItem(SK+'_skjulteentries',JSON.stringify(skjulteEntries));}catch(e){}
   try{localStorage.setItem(SK+'_mensgrafsynlig',JSON.stringify(mensGrafSynlig));}catch(e){}
@@ -5257,6 +5442,8 @@ var mensSyklusNotat={};
 var investeringer=[];
 var datingKriterier=[];
 var datingPersoner=[];
+var stillingKriterier=[];
+var stillinger=[];
 var skjulteEntries=[];
 var investGlobalOrder=[];
 function mensSyklusSettNotat(startDato,tekst){
@@ -5868,7 +6055,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,stillingKriterier:stillingKriterier,stillinger:stillinger,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -5887,7 +6074,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];datingKriterier=d.datingKriterier||[];datingPersoner=d.datingPersoner||[];skjulteEntries=d.skjulteEntries||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];datingKriterier=d.datingKriterier||[];datingPersoner=d.datingPersoner||[];stillingKriterier=d.stillingKriterier||[];stillinger=d.stillinger||[];skjulteEntries=d.skjulteEntries||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -10528,6 +10715,10 @@ function render(){
   }catch(e){}
   var prevMain=document.querySelector('.main');
   var scrollPos=prevMain?prevMain.scrollTop:0;
+  var prevDatingScroll=document.getElementById('dating-tabell-scroll');
+  var datingScrollLeft=prevDatingScroll?prevDatingScroll.scrollLeft:0;
+  var prevStillingScroll=document.getElementById('stilling-tabell-scroll');
+  var stillingScrollLeft=prevStillingScroll?prevStillingScroll.scrollLeft:0;
   var sameView=window._lastRenderViewKind===(view?view.kind:null);
   // Naviger tilbake til der brukeren faktisk kom fra, ikke et fast overordnet nivå.
   // Hopper over når selve goBack() nettopp har hentet en side fra historikken,
@@ -10581,7 +10772,12 @@ function render(){
     +'<div class="card"><div class="empty">Menstruasjonstrackeren er sl\u00e5tt av. Skru den p\u00e5 igjen under Innstillinger \u2192 Personlig.</div></div>');
   else if(view.kind==='matdrikke')content=katSideHTML('mat og drikke','Mat og drikke','kat_mat');
   else if(view.kind==='hjemkat')content=katSideHTML('hjem','Hjem','kat_hjem');
-  else if(view.kind==='kompetanse')content=katSideHTML('faglig utvikling og trivsel','Faglig utvikling og trivsel','kat_komp');
+  else if(view.kind==='kompetanse')content=katSideHTML('faglig utvikling og trivsel','Faglig utvikling og trivsel','kat_komp',
+    '<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goStillingRelevans()">'
+    +'<div class="entry-body"><div class="entry-text">Stillingsrelevans</div>'
+    +'<div class="entry-date">'+stillinger.length+' stilling'+(stillinger.length===1?'':'er')+', '+stillingKriterier.length+' kriterie'+(stillingKriterier.length===1?'':'r')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>');
+  else if(view.kind==='stillingrelevans')content=stillingRelevansViewHTML();
   else if(view.kind==='natur')content=katSideHTML('natur','Natur','kat_natur');
   else if(view.kind==='opplevelser')content=katSideHTML('opplevelser','Opplevelser','kat_opplevelser');
   else if(view.kind==='dating')content=katSideHTML('dating','Dating','kat_dating',
@@ -10648,6 +10844,10 @@ function render(){
   if(sameView){
     var newMain=document.querySelector('.main');
     if(newMain)newMain.scrollTop=scrollPos;
+    var newDatingScroll=document.getElementById('dating-tabell-scroll');
+    if(newDatingScroll)newDatingScroll.scrollLeft=datingScrollLeft;
+    var newStillingScroll=document.getElementById('stilling-tabell-scroll');
+    if(newStillingScroll)newStillingScroll.scrollLeft=stillingScrollLeft;
   }
 
   var si=document.getElementById('search-inp');
