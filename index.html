@@ -3603,6 +3603,59 @@ function selectTag(t){selectedTag=(selectedTag===t)?null:t;render();}
 // Det var nettopp fraværet av dette — flere ulike, sm\u00e5 filtreringer spredt utover
 // forskjellige sider — som gjorde at innlegg kunne se ut som de manglet enkelte steder.
 function goTagAlle(tag){view={kind:'tagalle',tag:tag};drawerOpen=false;render();}
+// Mønsteranalyse for et stikkord: hva henger sammen med det, og er det faktisk
+// uvanlig ofte — ikke bare mye, siden noe kan være mye brukt overalt uten at det
+// sier noe spesielt om akkurat dette stikkordet. Styrke = andel blant de taggede
+// innleggene delt på andel blant ALLE innlegg. 1 = helt vanlig. Over 1 = henger
+// sammen oftere enn tilfeldig. Under 1 = sjeldnere enn ellers.
+function tagMonsterHTML(tag){
+  var alle=entries;
+  var totalN=alle.length;
+  var tagget=alle.filter(function(e){return(e.tags||[]).includes(tag);});
+  var taggetN=tagget.length;
+  if(taggetN<3||totalN<8)return''; // for lite data til at et mønster sier noe
+
+  function styrkeListe(hentFelt){
+    var tellingTagget={},tellingAlle={};
+    alle.forEach(function(e){(hentFelt(e)||[]).forEach(function(k){tellingAlle[k]=(tellingAlle[k]||0)+1;});});
+    tagget.forEach(function(e){(hentFelt(e)||[]).forEach(function(k){if(k!==tag)tellingTagget[k]=(tellingTagget[k]||0)+1;});});
+    return Object.keys(tellingTagget).map(function(k){
+      var antall=tellingTagget[k];
+      var andelTagget=antall/taggetN;
+      var andelAlle=(tellingAlle[k]||0)/totalN;
+      var styrke=andelAlle>0?andelTagget/andelAlle:null;
+      return{navn:k,antall:antall,styrke:styrke};
+    });
+  }
+
+  function styrkeRadHTML(navn,antall,styrke){
+    var farge=styrke===null?'var(--muted)':(styrke>=1.5?'var(--red)':(styrke<0.7?'var(--muted)':'var(--ink)'));
+    var tekst=styrke===null?'':(styrke>=1.05?'\u00d7'+styrke.toFixed(1)+' vanligere enn ellers':(styrke<=0.95?'\u00d7'+styrke.toFixed(1)+' \u2014 sjeldnere enn ellers':'omtrent som ellers'));
+    return'<div class="entry-row tett"><div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(navn)+'</div></div>'
+      +'<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--muted)">'+antall+' ganger</div>'
+      +(tekst?'<div style="font-size:11px;color:'+farge+'">'+tekst+'</div>':'')+'</div></div>';
+  }
+
+  var tagStyrke=styrkeListe(function(e){return e.tags;})
+    .filter(function(x){return x.antall>=2;})
+    .sort(function(a,b){return(b.styrke||0)-(a.styrke||0);})
+    .slice(0,8);
+  var katStyrke=styrkeListe(function(e){return e.cats;})
+    .map(function(x){var c=catById(x.navn);return{navn:c?c.name:x.navn,antall:x.antall,styrke:x.styrke};})
+    .sort(function(a,b){return b.antall-a.antall;});
+
+  var h='<div class="sec-title">Henger ofte sammen med</div>';
+  if(!tagStyrke.length){
+    h+='<div class="card"><div class="empty" style="padding:6px 12px">Ingen andre stikkord dukker opp nok ganger sammen med dette enn\u00e5.</div></div>';
+  } else {
+    h+='<div class="card">'+tagStyrke.map(function(x){return styrkeRadHTML('#'+x.navn,x.antall,x.styrke);}).join('')+'</div>';
+  }
+  h+='<div class="sec-title">Kategorier</div><div class="card">'
+    +katStyrke.map(function(x){return styrkeRadHTML(x.navn,x.antall,x.styrke);}).join('')
+    +'</div>'
+    +'<div class="hint" style="padding:0 12px 4px">Styrke sammenligner med hvor vanlig noe er i hele dagboka \u2014 en kategori du bruker mye ellers vil ikke telle som spesiell her, selv om antallet er h\u00f8yt.</div>';
+  return h;
+}
 function tagAlleViewHTML(){
   var tag=view.tag;
   var funnet=entries.filter(function(e){return(e.tags||[]).includes(tag);})
@@ -3616,6 +3669,7 @@ function tagAlleViewHTML(){
     +'<div class="view-title">#'+esc(tag)+'</div>'
     +'<div class="view-sub">'+funnet.length+' innlegg'+(hendelser.length?', '+hendelser.length+' hendelse'+(hendelser.length===1?'':'r'):'')+', uansett m\u00e5ned eller kategori.</div>';
   if(!funnet.length&&!hendelser.length)return h+'<div class="card"><div class="empty">Ingen innlegg eller hendelser med dette stikkordet.</div></div>';
+  h+=tagMonsterHTML(tag);
   if(hendelser.length){
     h+='<div class="sec-title">Hendelser</div><div class="card">'+hendelser.map(function(e){
       return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
