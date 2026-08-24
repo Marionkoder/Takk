@@ -1708,24 +1708,38 @@ function goDating(){view={kind:'dating'};drawerOpen=false;render();}
 // fastlåst liste, siden det er nettopp det hun ba om.
 function leggTilDatingKriterium(navn){
   navn=(navn||'').trim();if(!navn)return;
-  datingKriterier.push({id:'dk'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn});
+  datingKriterier.push({id:'dk'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,type:'nodvendig'});
+  save();render();
+}
+function settDatingKriteriumType(id,type){
+  var k=datingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.type=type;
   save();render();
 }
 function fjernDatingKriterium(id){
   datingKriterier=datingKriterier.filter(function(k){return k.id!==id;});
-  datingPersoner.forEach(function(p){p.kryssIds=(p.kryssIds||[]).filter(function(x){return x!==id;});});
+  datingPersoner.forEach(function(p){if(p.kryssStatus)delete p.kryssStatus[id];});
   save();render();
 }
 var DATING_FASER=['0\u20133 mnd','4\u201312 mnd','1 \u00e5r+'];
+var datingSortering='manuell';
+function settDatingSortering(v){datingSortering=v;save();render();}
 function leggTilDatingPerson(navn){
   navn=(navn||'').trim();if(!navn)return;
-  datingPersoner.push({id:'dp'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,kryssIds:[],notat:'',fase:0});
+  datingPersoner.push({id:'dp'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,kryssStatus:{},fase:0});
   save();render();
 }
 function flyttDatingFase(personId){
   var p=datingPersoner.find(function(x){return x.id===personId;});
   if(!p)return;
   p.fase=Math.min((p.fase||0)+1,DATING_FASER.length-1);
+  save();render();
+}
+function settDatingFase(personId,faseIndex){
+  var p=datingPersoner.find(function(x){return x.id===personId;});
+  if(!p)return;
+  p.fase=Math.max(0,Math.min(faseIndex,DATING_FASER.length-1));
   save();render();
 }
 function fjernDatingPerson(id){
@@ -1740,12 +1754,22 @@ function flyttDatingPerson(id,retning){
   var tmp=datingPersoner[i];datingPersoner[i]=datingPersoner[j];datingPersoner[j]=tmp;
   save();render();
 }
-function toggleDatingKryss(personId,kriterieId){
+// Firetrinns fargesyklus per kryss: tomt \u2192 gr\u00e5tt \u2192 gr\u00f8nt \u2192 gult \u2192 r\u00f8dt \u2192 tomt.
+// Gr\u00e5tt/beige = vet ikke/ikke nok data, gr\u00f8nt = mye av egenskapen, gult = noe,
+// r\u00f8dt = mangler den. Bruker appens egen palett — --done og --red finnes fra
+// f\u00f8r, gr\u00f8nt og gult er nye, dempede toner i samme stil.
+var DATING_KRYSS_FARGER=['','#E3D9C2','#7A9B76','#D4B354','#8E1F1D'];
+function datingGronneAntall(p){
+  var st=p.kryssStatus||{};
+  return Object.keys(st).filter(function(k){return st[k]===2;}).length;
+}
+function sykleDatingKryss(personId,kriterieId){
   var p=datingPersoner.find(function(x){return x.id===personId;});
   if(!p)return;
-  p.kryssIds=p.kryssIds||[];
-  var i=p.kryssIds.indexOf(kriterieId);
-  if(i>=0)p.kryssIds.splice(i,1);else p.kryssIds.push(kriterieId);
+  p.kryssStatus=p.kryssStatus||{};
+  var naa=p.kryssStatus[kriterieId]||0;
+  var neste=(naa+1)%DATING_KRYSS_FARGER.length;
+  if(neste===0)delete p.kryssStatus[kriterieId];else p.kryssStatus[kriterieId]=neste;
   save();render();
 }
 function settDatingNavn(personId,navn){
@@ -1762,8 +1786,13 @@ function datingKriterierViewHTML(){
 
   h+='<div class="sec-title">Kriterier</div><div class="card">'
     +datingKriterier.map(function(k){
-      return'<div class="entry-row tett"><div class="entry-body"><div class="entry-text">'+esc(k.navn)+'</div></div>'
-        +'<button class="icon-btn" style="font-size:11px" onclick="fjernDatingKriterium(\''+q(k.id)+'\')">Fjern</button></div>';
+      return'<div class="entry-row tett" style="align-items:flex-start"><div class="entry-body">'
+        +'<div class="entry-text">'+esc(k.navn)+'</div>'
+        +'<div class="chips" style="margin-top:3px">'
+        +'<button class="chip'+(k.type!=='tiltrekkende'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingKriteriumType(\''+q(k.id)+'\',\'nodvendig\')">N\u00f8dvendig</button>'
+        +'<button class="chip'+(k.type==='tiltrekkende'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingKriteriumType(\''+q(k.id)+'\',\'tiltrekkende\')">Tiltrekkende</button>'
+        +'</div></div>'
+        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernDatingKriterium(\''+q(k.id)+'\')">Fjern</button></div>';
     }).join('')
     +(datingKriterier.length?'':'<div class="empty" style="padding:6px 12px">Ingen kriterier enn\u00e5.</div>')
     +'</div>'
@@ -1772,26 +1801,47 @@ function datingKriterierViewHTML(){
     +'<button class="icon-btn" onclick="leggTilDatingKriterium(document.getElementById(\'dk-nytt-inp\').value);document.getElementById(\'dk-nytt-inp\').value=\'\'">+ Legg til</button>'
     +'</div>';
 
+  var visPersoner=datingPersoner.slice();
+  if(datingSortering==='varighet')visPersoner.sort(function(a,b){return(b.fase||0)-(a.fase||0);});
+  else if(datingSortering==='kryss')visPersoner.sort(function(a,b){return datingGronneAntall(b)-datingGronneAntall(a);});
+  else if(datingSortering==='alfabetisk')visPersoner.sort(function(a,b){return nbSort(a.navn,b.navn);});
+
+  // N\u00f8dvendige kriterier til venstre, tiltrekkende til h\u00f8yre — stabil sortering
+  // bevarer r\u00e6kkef\u00f8lgen innad i hver gruppe.
+  var kriterierSortert=datingKriterier.slice().sort(function(a,b){
+    return(a.type==='tiltrekkende'?1:0)-(b.type==='tiltrekkende'?1:0);
+  });
+  var antNodvendig=kriterierSortert.filter(function(k){return k.type!=='tiltrekkende';}).length;
+
   if(datingPersoner.length){
-    h+='<div class="sec-title" style="margin-top:14px">Oversikt</div>'
-      +'<div class="card" style="overflow-x:auto;padding:8px 6px">'
+    h+='<div class="sec-title" style="margin-top:14px">Oversikt</div>';
+    h+='<div class="chips" style="padding:0 12px 6px">'
+      +[['manuell','Manuell'],['varighet','Varighet'],['kryss','Kriterier avhuket'],['alfabetisk','Alfabetisk']].map(function(s){
+        return'<button class="chip'+(datingSortering===s[0]?' on':'')+'" onclick="settDatingSortering(\''+s[0]+'\')">'+s[1]+'</button>';
+      }).join('')+'</div>';
+    h+='<div class="card" style="overflow-x:auto;padding:8px 6px">'
       +'<table style="border-collapse:collapse;font-size:11px">'
+      +(kriterierSortert.length?'<tr><td colspan="'+(1+DATING_FASER.length+1)+'"></td>'
+        +(antNodvendig?'<td colspan="'+antNodvendig+'" style="text-align:center;font-size:8.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">N\u00f8dvendige</td>':'')
+        +(kriterierSortert.length-antNodvendig?'<td colspan="'+(kriterierSortert.length-antNodvendig)+'" style="text-align:center;font-size:8.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Tiltrekkende</td>':'')
+        +'</tr>':'')
       +'<tr><td></td>'+DATING_FASER.map(function(f){
         return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted);white-space:nowrap">'+f+'</td>';
       }).join('')+'<td></td>'
-      +datingKriterier.map(function(k){
+      +kriterierSortert.map(function(k){
         return'<td style="text-align:center;padding:2px 3px;font-size:9px;color:var(--muted);max-width:44px;writing-mode:vertical-rl;text-orientation:mixed">'+esc(k.navn)+'</td>';
       }).join('')+'</tr>'
-      +datingPersoner.map(function(p){
+      +visPersoner.map(function(p){
         var fase=p.fase||0;
-        return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap">'+esc(p.navn)+'</td>'
+        return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1">'+esc(p.navn)+'</td>'
           +DATING_FASER.map(function(f,i){
-            return'<td style="text-align:center;padding:2px"><span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:'+(i<=fase?'var(--rose)':'var(--line)')+'"></span></td>';
+            return'<td style="text-align:center;padding:2px"><button title="Sett til '+esc(f)+'" onclick="settDatingFase(\''+q(p.id)+'\','+i+')" style="width:13px;height:13px;border-radius:50%;border:none;padding:0;cursor:pointer;background:'+(i<=fase?'var(--rose)':'var(--line)')+'"></button></td>';
           }).join('')
           +'<td style="text-align:center;padding:2px">'+(fase<DATING_FASER.length-1?'<button onclick="flyttDatingFase(\''+q(p.id)+'\')" title="Flytt til '+esc(DATING_FASER[fase+1])+'" style="font-size:12px;padding:1px 6px" class="icon-btn">\u2192</button>':'')+'</td>'
-          +datingKriterier.map(function(k){
-            var kryss=(p.kryssIds||[]).indexOf(k.id)>=0;
-            return'<td style="text-align:center;padding:2px"><button onclick="toggleDatingKryss(\''+q(p.id)+'\',\''+q(k.id)+'\')" style="width:20px;height:20px;border-radius:4px;border:1.5px solid var(--line);background:'+(kryss?'var(--rose)':'transparent')+';padding:0;cursor:pointer"></button></td>';
+          +kriterierSortert.map(function(k){
+            var status=(p.kryssStatus||{})[k.id]||0;
+            var farge=DATING_KRYSS_FARGER[status];
+            return'<td style="text-align:center;padding:2px"><button onclick="sykleDatingKryss(\''+q(p.id)+'\',\''+q(k.id)+'\')" style="width:20px;height:20px;border-radius:4px;border:1.5px solid var(--line);background:'+(farge||'transparent')+';padding:0;cursor:pointer"></button></td>';
           }).join('')
           +'</tr>';
       }).join('')
@@ -1799,15 +1849,19 @@ function datingKriterierViewHTML(){
   }
 
   h+='<div class="sec-title" style="margin-top:14px">Personer</div><div class="card">'
-    +datingPersoner.map(function(p,i){
+    +visPersoner.map(function(p){
+      var iEkte=datingPersoner.indexOf(p); // ekte posisjon, for piler som flytter i den lagrede rekkef\u00f8lgen
+      var visPiler=datingSortering==='manuell';
       return'<div class="entry-row" style="align-items:flex-start"><div class="entry-body">'
         +'<input class="inp" type="text" style="font-size:13px;font-weight:600;margin:0;padding:4px 6px" value="'+esc(p.navn)+'" onblur="settDatingNavn(\''+q(p.id)+'\',this.value)">'
-        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(DATING_FASER[p.fase||0])+'</div>'
+        +'<div class="chips" style="margin-top:3px">'+DATING_FASER.map(function(f,i){
+          return'<button class="chip'+(i===(p.fase||0)?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingFase(\''+q(p.id)+'\','+i+')">'+f+'</button>';
+        }).join('')+'</div>'
         +'</div>'
-        +'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">'
-        +(i>0?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="flyttDatingPerson(\''+q(p.id)+'\',-1)">\u2191</button>':'')
-        +(i<datingPersoner.length-1?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="flyttDatingPerson(\''+q(p.id)+'\',1)">\u2193</button>':'')
-        +'</div>'
+        +(visPiler?'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">'
+          +(iEkte>0?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="flyttDatingPerson(\''+q(p.id)+'\',-1)">\u2191</button>':'')
+          +(iEkte<datingPersoner.length-1?'<button class="icon-btn" style="font-size:10px;padding:0 5px" onclick="flyttDatingPerson(\''+q(p.id)+'\',1)">\u2193</button>':'')
+          +'</div>':'')
         +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernDatingPerson(\''+q(p.id)+'\')">Fjern</button></div>';
     }).join('')
     +(datingPersoner.length?'':'<div class="empty" style="padding:6px 12px">Ingen personer lagt til enn\u00e5.</div>')
@@ -2755,6 +2809,7 @@ function load(){
   try{investeringer=JSON.parse(localStorage.getItem(SK+'_investeringer')||'[]');}catch(e){investeringer=[];}
   try{datingKriterier=JSON.parse(localStorage.getItem(SK+'_datingkriterier')||'[]');}catch(e){datingKriterier=[];}
   try{datingPersoner=JSON.parse(localStorage.getItem(SK+'_datingpersoner')||'[]');}catch(e){datingPersoner=[];}
+  try{datingSortering=localStorage.getItem(SK+'_datingsortering')||'manuell';}catch(e){datingSortering='manuell';}
   try{skjulteEntries=JSON.parse(localStorage.getItem(SK+'_skjulteentries')||'[]');}catch(e){skjulteEntries=[];}
   try{mensGrafSynlig=JSON.parse(localStorage.getItem(SK+'_mensgrafsynlig')||'{}');}catch(e){mensGrafSynlig={};}
   try{investGlobalOrder=JSON.parse(localStorage.getItem(SK+'_investglobalrekk')||'[]');}catch(e){investGlobalOrder=[];}
@@ -3053,6 +3108,20 @@ function load(){
       cats.push({id:'c_maalinger_'+datingCat.id,name:'M\u00e5linger',parentId:datingCat.id});
     }
     try{localStorage.setItem(SK+'_dating1','1');}catch(e){}
+    save();
+  }
+
+  // Dating-kryssene var f\u00f8r bare av/p\u00e5 — konverteres til gr\u00f8nt (mye av
+  // egenskapen) i det nye firetrinnssystemet, siden det var det de betydde f\u00f8r.
+  var datingKryssFarge1=false;try{datingKryssFarge1=!!localStorage.getItem(SK+'_datingkryssfarge1');}catch(e){}
+  if(!datingKryssFarge1){
+    datingPersoner.forEach(function(p){
+      if(p.kryssIds&&p.kryssIds.length){
+        p.kryssStatus=p.kryssStatus||{};
+        p.kryssIds.forEach(function(id){if(!p.kryssStatus[id])p.kryssStatus[id]=2;});
+      }
+    });
+    try{localStorage.setItem(SK+'_datingkryssfarge1','1');}catch(e){}
     save();
   }
 
@@ -3693,6 +3762,7 @@ function save(){
   try{localStorage.setItem(SK+'_investeringer',JSON.stringify(investeringer));}catch(e){}
   try{localStorage.setItem(SK+'_datingkriterier',JSON.stringify(datingKriterier));}catch(e){}
   try{localStorage.setItem(SK+'_datingpersoner',JSON.stringify(datingPersoner));}catch(e){}
+  try{localStorage.setItem(SK+'_datingsortering',datingSortering);}catch(e){}
   try{localStorage.setItem(SK+'_skjulteentries',JSON.stringify(skjulteEntries));}catch(e){}
   try{localStorage.setItem(SK+'_mensgrafsynlig',JSON.stringify(mensGrafSynlig));}catch(e){}
   try{localStorage.setItem(SK+'_investglobalrekk',JSON.stringify(investGlobalOrder));}catch(e){}
