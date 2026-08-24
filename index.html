@@ -1716,9 +1716,16 @@ function fjernDatingKriterium(id){
   datingPersoner.forEach(function(p){p.kryssIds=(p.kryssIds||[]).filter(function(x){return x!==id;});});
   save();render();
 }
+var DATING_FASER=['0\u20133 mnd','4\u201312 mnd','1 \u00e5r+'];
 function leggTilDatingPerson(navn){
   navn=(navn||'').trim();if(!navn)return;
-  datingPersoner.push({id:'dp'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,kryssIds:[],notat:''});
+  datingPersoner.push({id:'dp'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,kryssIds:[],notat:'',fase:0});
+  save();render();
+}
+function flyttDatingFase(personId){
+  var p=datingPersoner.find(function(x){return x.id===personId;});
+  if(!p)return;
+  p.fase=Math.min((p.fase||0)+1,DATING_FASER.length-1);
   save();render();
 }
 function fjernDatingPerson(id){
@@ -1739,6 +1746,12 @@ function settDatingNotat(personId,tekst){
   p.notat=tekst;
   save();
 }
+function settDatingNavn(personId,navn){
+  var p=datingPersoner.find(function(x){return x.id===personId;});
+  if(!p)return;
+  p.navn=(navn||'').trim()||p.navn;
+  save();render();
+}
 function goDatingKriterier(){view={kind:'datingkriterier'};drawerOpen=false;render();}
 function datingKriterierViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
@@ -1757,15 +1770,23 @@ function datingKriterierViewHTML(){
     +'<button class="icon-btn" onclick="leggTilDatingKriterium(document.getElementById(\'dk-nytt-inp\').value);document.getElementById(\'dk-nytt-inp\').value=\'\'">+ Legg til</button>'
     +'</div>';
 
-  if(datingKriterier.length&&datingPersoner.length){
+  if(datingPersoner.length){
     h+='<div class="sec-title" style="margin-top:14px">Oversikt</div>'
       +'<div class="card" style="overflow-x:auto;padding:8px 6px">'
       +'<table style="border-collapse:collapse;font-size:11px">'
-      +'<tr><td></td>'+datingKriterier.map(function(k){
+      +'<tr><td></td>'+DATING_FASER.map(function(f){
+        return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted);white-space:nowrap">'+f+'</td>';
+      }).join('')+'<td></td>'
+      +datingKriterier.map(function(k){
         return'<td style="text-align:center;padding:2px 3px;font-size:9px;color:var(--muted);max-width:44px;writing-mode:vertical-rl;text-orientation:mixed">'+esc(k.navn)+'</td>';
       }).join('')+'</tr>'
       +datingPersoner.map(function(p){
+        var fase=p.fase||0;
         return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap">'+esc(p.navn)+'</td>'
+          +DATING_FASER.map(function(f,i){
+            return'<td style="text-align:center;padding:2px"><span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:'+(i<=fase?'var(--rose)':'var(--line)')+'"></span></td>';
+          }).join('')
+          +'<td style="text-align:center;padding:2px">'+(fase<DATING_FASER.length-1?'<button onclick="flyttDatingFase(\''+q(p.id)+'\')" title="Flytt til '+esc(DATING_FASER[fase+1])+'" style="font-size:12px;padding:1px 6px" class="icon-btn">\u2192</button>':'')+'</td>'
           +datingKriterier.map(function(k){
             var kryss=(p.kryssIds||[]).indexOf(k.id)>=0;
             return'<td style="text-align:center;padding:2px"><button onclick="toggleDatingKryss(\''+q(p.id)+'\',\''+q(k.id)+'\')" style="width:20px;height:20px;border-radius:4px;border:1.5px solid var(--line);background:'+(kryss?'var(--rose)':'transparent')+';padding:0;cursor:pointer"></button></td>';
@@ -1778,7 +1799,8 @@ function datingKriterierViewHTML(){
   h+='<div class="sec-title" style="margin-top:14px">Personer</div><div class="card">'
     +datingPersoner.map(function(p){
       return'<div class="entry-row" style="align-items:flex-start"><div class="entry-body">'
-        +'<div class="entry-text">'+esc(p.navn)+'</div>'
+        +'<input class="inp" type="text" style="font-size:13px;font-weight:600;margin:0;padding:4px 6px" value="'+esc(p.navn)+'" onblur="settDatingNavn(\''+q(p.id)+'\',this.value)">'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(DATING_FASER[p.fase||0])+'</div>'
         +'<textarea class="inp" rows="1" style="margin:4px 0 0;font-size:12px" placeholder="Notat \u2026" oninput="settDatingNotat(\''+q(p.id)+'\',this.value)">'+esc(p.notat||'')+'</textarea>'
         +'</div>'
         +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernDatingPerson(\''+q(p.id)+'\')">Fjern</button></div>';
