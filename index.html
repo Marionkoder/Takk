@@ -436,7 +436,7 @@ var KAT_SIDER=[
   {n:'okonomi',navn:'\u00d8konomi'},{n:'beredskap',navn:'Beredskap'},{n:'utstyr',navn:'Utstyr'},
   {n:'opplevelser',navn:'Opplevelser'},{n:'dating',navn:'Dating'}
 ];
-var KAT_STANDARD={folk:true,utstyr:true,opplevelser:true};
+var KAT_STANDARD={folk:true,utstyr:true,opplevelser:true,dating:true};
 var katVis={};
 function katPaa(n){return katVis[n]===undefined?!!KAT_STANDARD[n]:!!katVis[n];}
 function toggleKatSide(n){
@@ -1703,6 +1703,102 @@ function goUtstyrKat(){view={kind:'utstyrkat'};drawerOpen=false;render();}
 function goReiser(){view={kind:'reiser'};drawerOpen=false;render();}
 function goOpplevelser(){view={kind:'opplevelser'};drawerOpen=false;render();}
 function goDating(){view={kind:'dating'};drawerOpen=false;render();}
+// Dating-kriterier: helt fritt redigerbart oppsett. Kriteriene (kolonnene) og
+// personene (radene) legges til, endres og fjernes av brukeren selv — ingen
+// fastlåst liste, siden det er nettopp det hun ba om.
+function leggTilDatingKriterium(navn){
+  navn=(navn||'').trim();if(!navn)return;
+  datingKriterier.push({id:'dk'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn});
+  save();render();
+}
+function fjernDatingKriterium(id){
+  datingKriterier=datingKriterier.filter(function(k){return k.id!==id;});
+  datingPersoner.forEach(function(p){p.kryssIds=(p.kryssIds||[]).filter(function(x){return x!==id;});});
+  save();render();
+}
+function leggTilDatingPerson(navn){
+  navn=(navn||'').trim();if(!navn)return;
+  datingPersoner.push({id:'dp'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,kryssIds:[],notat:''});
+  save();render();
+}
+function fjernDatingPerson(id){
+  datingPersoner=datingPersoner.filter(function(p){return p.id!==id;});
+  save();render();
+}
+function toggleDatingKryss(personId,kriterieId){
+  var p=datingPersoner.find(function(x){return x.id===personId;});
+  if(!p)return;
+  p.kryssIds=p.kryssIds||[];
+  var i=p.kryssIds.indexOf(kriterieId);
+  if(i>=0)p.kryssIds.splice(i,1);else p.kryssIds.push(kriterieId);
+  save();render();
+}
+function settDatingNotat(personId,tekst){
+  var p=datingPersoner.find(function(x){return x.id===personId;});
+  if(!p)return;
+  p.notat=tekst;
+  save();
+}
+function goDatingKriterier(){view={kind:'datingkriterier'};drawerOpen=false;render();}
+function datingKriterierViewHTML(){
+  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div class="view-title">Kriterier</div>'
+    +'<div class="view-sub">Dine egne — legg til, endre eller fjern n\u00e5r som helst.</div>';
+
+  h+='<div class="sec-title">Kriterier</div><div class="card">'
+    +datingKriterier.map(function(k){
+      return'<div class="entry-row tett"><div class="entry-body"><div class="entry-text">'+esc(k.navn)+'</div></div>'
+        +'<button class="icon-btn" style="font-size:11px" onclick="fjernDatingKriterium(\''+q(k.id)+'\')">Fjern</button></div>';
+    }).join('')
+    +(datingKriterier.length?'':'<div class="empty" style="padding:6px 12px">Ingen kriterier enn\u00e5.</div>')
+    +'</div>'
+    +'<div style="padding:6px 12px 0;display:flex;gap:6px">'
+    +'<input id="dk-nytt-inp" class="inp" style="margin:0;flex:1" type="text" placeholder="Nytt kriterium \u2026">'
+    +'<button class="icon-btn" onclick="leggTilDatingKriterium(document.getElementById(\'dk-nytt-inp\').value);document.getElementById(\'dk-nytt-inp\').value=\'\'">+ Legg til</button>'
+    +'</div>';
+
+  if(datingKriterier.length&&datingPersoner.length){
+    h+='<div class="sec-title" style="margin-top:14px">Oversikt</div>'
+      +'<div class="card" style="overflow-x:auto;padding:8px 6px">'
+      +'<table style="border-collapse:collapse;font-size:11px">'
+      +'<tr><td></td>'+datingKriterier.map(function(k){
+        return'<td style="text-align:center;padding:2px 3px;font-size:9px;color:var(--muted);max-width:44px;writing-mode:vertical-rl;text-orientation:mixed">'+esc(k.navn)+'</td>';
+      }).join('')+'</tr>'
+      +datingPersoner.map(function(p){
+        return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap">'+esc(p.navn)+'</td>'
+          +datingKriterier.map(function(k){
+            var kryss=(p.kryssIds||[]).indexOf(k.id)>=0;
+            return'<td style="text-align:center;padding:2px"><button onclick="toggleDatingKryss(\''+q(p.id)+'\',\''+q(k.id)+'\')" style="width:20px;height:20px;border-radius:4px;border:1.5px solid var(--line);background:'+(kryss?'var(--rose)':'transparent')+';padding:0;cursor:pointer"></button></td>';
+          }).join('')
+          +'</tr>';
+      }).join('')
+      +'</table></div>';
+  }
+
+  h+='<div class="sec-title" style="margin-top:14px">Personer</div><div class="card">'
+    +datingPersoner.map(function(p){
+      return'<div class="entry-row" style="align-items:flex-start"><div class="entry-body">'
+        +'<div class="entry-text">'+esc(p.navn)+'</div>'
+        +'<textarea class="inp" rows="1" style="margin:4px 0 0;font-size:12px" placeholder="Notat \u2026" oninput="settDatingNotat(\''+q(p.id)+'\',this.value)">'+esc(p.notat||'')+'</textarea>'
+        +'</div>'
+        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernDatingPerson(\''+q(p.id)+'\')">Fjern</button></div>';
+    }).join('')
+    +(datingPersoner.length?'':'<div class="empty" style="padding:6px 12px">Ingen personer lagt til enn\u00e5.</div>')
+    +'</div>'
+    +'<div style="padding:6px 12px 20px;display:flex;gap:6px">'
+    +'<input id="dp-nytt-inp" class="inp" style="margin:0;flex:1" type="text" placeholder="Navn \u2026">'
+    +'<button class="icon-btn" onclick="leggTilDatingPerson(document.getElementById(\'dp-nytt-inp\').value);document.getElementById(\'dp-nytt-inp\').value=\'\'">+ Legg til</button>'
+    +'</div>';
+  return h;
+}
+// Generisk side for enhver hovedkategori brukeren har opprettet selv — trenger
+// ingen egen goXxx()-funksjon eller rutingslinje for hver ny kategori.
+function goBrukerKat(id){view={kind:'brukerkat',id:id};drawerOpen=false;render();}
+function katSideByIdHTML(id){
+  var cat=catById(id);
+  if(!cat)return'<div class="card"><div class="empty">Kategorien finnes ikke lenger.</div></div>';
+  return katSideHTML(cat.name.toLowerCase(),cat.name,'kat_'+id);
+}
 function pakkelisteKortHTML(){
   var packs=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')==='pakke';})
     .sort(function(a,b){return nbSort(a.name,b.name);});
@@ -2630,6 +2726,8 @@ function load(){
   try{kvartalNotat=JSON.parse(localStorage.getItem(SK+'_kvartal')||'{}');}catch(e){kvartalNotat={};}
   try{mensSyklusNotat=JSON.parse(localStorage.getItem(SK+'_menssyklusnotat')||'{}');}catch(e){mensSyklusNotat={};}
   try{investeringer=JSON.parse(localStorage.getItem(SK+'_investeringer')||'[]');}catch(e){investeringer=[];}
+  try{datingKriterier=JSON.parse(localStorage.getItem(SK+'_datingkriterier')||'[]');}catch(e){datingKriterier=[];}
+  try{datingPersoner=JSON.parse(localStorage.getItem(SK+'_datingpersoner')||'[]');}catch(e){datingPersoner=[];}
   try{skjulteEntries=JSON.parse(localStorage.getItem(SK+'_skjulteentries')||'[]');}catch(e){skjulteEntries=[];}
   try{mensGrafSynlig=JSON.parse(localStorage.getItem(SK+'_mensgrafsynlig')||'{}');}catch(e){mensGrafSynlig={};}
   try{investGlobalOrder=JSON.parse(localStorage.getItem(SK+'_investglobalrekk')||'[]');}catch(e){investGlobalOrder=[];}
@@ -3566,6 +3664,8 @@ function save(){
   try{localStorage.setItem(SK+'_kvartal',JSON.stringify(kvartalNotat));}catch(e){}
   try{localStorage.setItem(SK+'_menssyklusnotat',JSON.stringify(mensSyklusNotat));}catch(e){}
   try{localStorage.setItem(SK+'_investeringer',JSON.stringify(investeringer));}catch(e){}
+  try{localStorage.setItem(SK+'_datingkriterier',JSON.stringify(datingKriterier));}catch(e){}
+  try{localStorage.setItem(SK+'_datingpersoner',JSON.stringify(datingPersoner));}catch(e){}
   try{localStorage.setItem(SK+'_skjulteentries',JSON.stringify(skjulteEntries));}catch(e){}
   try{localStorage.setItem(SK+'_mensgrafsynlig',JSON.stringify(mensGrafSynlig));}catch(e){}
   try{localStorage.setItem(SK+'_investglobalrekk',JSON.stringify(investGlobalOrder));}catch(e){}
@@ -5058,6 +5158,8 @@ function mensGrafToggle(felt){
 var mensSyklusIdx=0;
 var mensSyklusNotat={};
 var investeringer=[];
+var datingKriterier=[];
+var datingPersoner=[];
 var skjulteEntries=[];
 var investGlobalOrder=[];
 function mensSyklusSettNotat(startDato,tekst){
@@ -5669,7 +5771,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -5688,7 +5790,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];skjulteEntries=d.skjulteEntries||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];datingKriterier=d.datingKriterier||[];datingPersoner=d.datingPersoner||[];skjulteEntries=d.skjulteEntries||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -5953,11 +6055,23 @@ function saveNewCat(){
   var f=mf();
   var mainName=(f._newMain||'').trim();if(!mainName)return;
   var mc={id:'c'+Date.now()+Math.random().toString(36).slice(2,6),name:mainName};
-  if(f._newParent)mc.parentId=f._newParent;
+  var erFrittstaaendeHovedkat=!f._newParent&&!modal._prevStep;
+  if(f._newParent){
+    mc.parentId=f._newParent;
+  } else if(f._newColor){
+    mc.color=f._newColor;
+  }
   cats.push(mc);
+  if(erFrittstaaendeHovedkat){
+    // Samme mal som resten av appens hovedkategorier — Planlagte investeringer
+    // og M\u00e5linger f\u00f8lger automatisk med, s\u00e5 brukeren ikke trenger \u00e5 be om det.
+    cats.push({id:'c_invest_'+mc.id,name:'Planlagte investeringer',parentId:mc.id});
+    cats.push({id:'c_maalinger_'+mc.id,name:'M\u00e5linger',parentId:mc.id});
+  }
   if(mf().cats)mf().cats=[].concat(mf().cats,[mc.id]);
   if(mf().catIds)mf().catIds=[].concat(mf().catIds,[mc.id]);
   save();
+  if(erFrittstaaendeHovedkat){closeModal();goBrukerKat(mc.id);return;}
   if(!modal._prevStep){closeModal();return;}
   modal.step=modal._prevStep;
   render();
@@ -6506,6 +6620,14 @@ function modalHTML(){
             return'<button class="chip'+(f._newParent===m.id?' on':'')+'" onclick="mf()._newParent=\''+q(m.id)+'\';render()">Under '+esc(m.name)+'</button>';
           }).join('')+'</div>';
       })()
+      +(f._newParent?'':'<label class="field-lbl">Farge <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
+        +'<div class="chips" style="gap:8px">'
+        +'<button class="col-sw none'+(!f._newColor?' on':'')+'" title="Ingen farge" onclick="mf()._newColor=\'\';render()">✕</button>'
+        +CAT_COLORS.map(function(cc){
+          return'<button class="col-sw'+(f._newColor===cc.id?' on':'')+'" style="background:'+cc.hex+'" title="'+cc.name+'" onclick="mf()._newColor=\''+cc.id+'\';render()"></button>';
+        }).join('')
+        +'</div>')
+      +(f._newParent||modal._prevStep?'':'<div class="hint">Blir en egen hovedkategori i menyen, med Planlagte investeringer og M\u00e5linger klare — samme mal som resten av appen bruker.</div>')
       +'<button class="save-btn" onclick="saveNewCat()" '+((f._newMain||'').trim()?'':'disabled')+'>Legg til</button>';
 
   } else if(step==='cat_edit'){
@@ -7580,6 +7702,18 @@ function sidebarHTML(){
       +'padding-left:10px;text-transform:uppercase;letter-spacing:.03em'+(paa?';font-weight:800':'')+'" onclick="'+k.fn+'">'
       +'<span class="s-arrow"></span>'+esc(k.navn)+'</div>';
   });
+  // Hovedkategorier brukeren har opprettet selv, som ikke er en del av den faste
+  // lista over — vises alltid, ikke styrt av av/på-bryterne i Personlig
+  var kjenteHovedkatNavn=['folk','kreativitet','helse','mat og drikke','hjem','faglig utvikling og trivsel','natur','\u00f8konomi','beredskap','utstyr','opplevelser','dating'];
+  cats.filter(function(c){return!c.parentId&&kjenteHovedkatNavn.indexOf((c.name||'').toLowerCase())<0;})
+    .sort(function(a,b){return nbSort(a.name,b.name);})
+    .forEach(function(c){
+      var col2=catColor(c.id);
+      var paa2=view.kind==='brukerkat'&&view.id===c.id;
+      h+='<div class="side-month" style="'+(col2?'background:'+col2+';color:#F2EEE5;':'')
+        +'padding-left:10px;text-transform:uppercase;letter-spacing:.03em'+(paa2?';font-weight:800':'')+'" onclick="goBrukerKat(\''+c.id+'\')">'
+        +'<span class="s-arrow"></span>'+esc(c.name)+'</div>';
+    });
   return h;
 }
 
@@ -10353,7 +10487,13 @@ function render(){
   else if(view.kind==='kompetanse')content=katSideHTML('faglig utvikling og trivsel','Faglig utvikling og trivsel','kat_komp');
   else if(view.kind==='natur')content=katSideHTML('natur','Natur','kat_natur');
   else if(view.kind==='opplevelser')content=katSideHTML('opplevelser','Opplevelser','kat_opplevelser');
-  else if(view.kind==='dating')content=katSideHTML('dating','Dating','kat_dating');
+  else if(view.kind==='dating')content=katSideHTML('dating','Dating','kat_dating',
+    '<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goDatingKriterier()">'
+    +'<div class="entry-body"><div class="entry-text">Kriterier</div>'
+    +'<div class="entry-date">'+datingPersoner.length+' person'+(datingPersoner.length===1?'':'er')+', '+datingKriterier.length+' kriterie'+(datingKriterier.length===1?'':'r')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>');
+  else if(view.kind==='datingkriterier')content=datingKriterierViewHTML();
+  else if(view.kind==='brukerkat')content=katSideByIdHTML(view.id);
   else if(view.kind==='okonomikat')content=katSideHTML('\u00f8konomi','\u00d8konomi','kat_okonomi',
     '<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBudsjett()">'
     +'<div class="entry-body"><div class="entry-text">Tid og penger</div>'
