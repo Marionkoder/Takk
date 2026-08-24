@@ -434,7 +434,7 @@ var KAT_SIDER=[
   {n:'matdrikke',navn:'Mat og drikke'},{n:'hjem',navn:'Hjem'},{n:'kompetanse',navn:'Faglig utvikling og trivsel'},
   {n:'natur',navn:'Natur'},
   {n:'okonomi',navn:'\u00d8konomi'},{n:'beredskap',navn:'Beredskap'},{n:'utstyr',navn:'Utstyr'},
-  {n:'opplevelser',navn:'Opplevelser'}
+  {n:'opplevelser',navn:'Opplevelser'},{n:'dating',navn:'Dating'}
 ];
 var KAT_STANDARD={folk:true,utstyr:true,opplevelser:true};
 var katVis={};
@@ -1702,6 +1702,7 @@ function goBeredskapKat(){view={kind:'beredskapkat'};drawerOpen=false;render();}
 function goUtstyrKat(){view={kind:'utstyrkat'};drawerOpen=false;render();}
 function goReiser(){view={kind:'reiser'};drawerOpen=false;render();}
 function goOpplevelser(){view={kind:'opplevelser'};drawerOpen=false;render();}
+function goDating(){view={kind:'dating'};drawerOpen=false;render();}
 function pakkelisteKortHTML(){
   var packs=inventories.filter(function(iv){return!iv.fixed&&(iv.type||'inventar')==='pakke';})
     .sort(function(a,b){return nbSort(a.name,b.name);});
@@ -2909,6 +2910,24 @@ function load(){
       cats.push({id:'c_maalinger_'+oppCat.id,name:'M\u00e5linger',parentId:oppCat.id});
     }
     try{localStorage.setItem(SK+'_opplevelser1','1');}catch(e){}
+    save();
+  }
+
+  // «Dating» opprettes som ny hovedkategori — atskilt fra Folk, siden den handler
+  // om et avgrenset, m\u00e5lrettet s\u00f8k etter en partner, ikke stabile relasjoner i
+  // privatlivet. Farge: Bringeb\u00e6r — m\u00f8rkere og mer rosa enn Folks Gammelrosa.
+  var dating1=false;try{dating1=!!localStorage.getItem(SK+'_dating1');}catch(e){}
+  if(!dating1){
+    var datingCat=cats.find(function(c){return!c.parentId&&(c.name||'').toLowerCase()==='dating';});
+    if(!datingCat){datingCat={id:'c_dating',name:'Dating',color:'bringebaer'};cats.push(datingCat);}
+    else if(!datingCat.color)datingCat.color='bringebaer';
+    if(!cats.some(function(c){return c.parentId===datingCat.id&&(c.name||'').toLowerCase()==='planlagte investeringer';})){
+      cats.push({id:'c_invest_'+datingCat.id,name:'Planlagte investeringer',parentId:datingCat.id});
+    }
+    if(!cats.some(function(c){return c.parentId===datingCat.id&&(c.name||'').toLowerCase()==='m\u00e5linger';})){
+      cats.push({id:'c_maalinger_'+datingCat.id,name:'M\u00e5linger',parentId:datingCat.id});
+    }
+    try{localStorage.setItem(SK+'_dating1','1');}catch(e){}
     save();
   }
 
@@ -7549,7 +7568,8 @@ function sidebarHTML(){
    {n:'okonomi',navn:'\u00d8konomi',fn:'goOkonomiKat()',kat:'\u00f8konomi',kinds:['okonomikat','okonomi','budsjett','forbruksvarer']},
    {n:'beredskap',navn:'Beredskap',fn:'goBeredskapKat()',kat:'beredskap',kinds:['beredskapkat','beredskap']},
    {n:'utstyr',navn:'Utstyr',fn:'goUtstyrKat()',kat:'utstyr',kinds:['utstyrkat','utstyr']},
-   {n:'opplevelser',navn:'Opplevelser',fn:'goOpplevelser()',kat:'opplevelser',kinds:['opplevelser']}]
+   {n:'opplevelser',navn:'Opplevelser',fn:'goOpplevelser()',kat:'opplevelser',kinds:['opplevelser']},
+   {n:'dating',navn:'Dating',fn:'goDating()',kat:'dating',kinds:['dating']}]
   .filter(function(k){return katPaa(k.n);})
   .sort(function(a,b){return nbSort(a.navn,b.navn);})
   .forEach(function(k){
@@ -10333,6 +10353,7 @@ function render(){
   else if(view.kind==='kompetanse')content=katSideHTML('faglig utvikling og trivsel','Faglig utvikling og trivsel','kat_komp');
   else if(view.kind==='natur')content=katSideHTML('natur','Natur','kat_natur');
   else if(view.kind==='opplevelser')content=katSideHTML('opplevelser','Opplevelser','kat_opplevelser');
+  else if(view.kind==='dating')content=katSideHTML('dating','Dating','kat_dating');
   else if(view.kind==='okonomikat')content=katSideHTML('\u00f8konomi','\u00d8konomi','kat_okonomi',
     '<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBudsjett()">'
     +'<div class="entry-body"><div class="entry-text">Tid og penger</div>'
