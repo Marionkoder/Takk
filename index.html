@@ -1706,27 +1706,16 @@ function goDating(){view={kind:'dating'};drawerOpen=false;render();}
 // Dating-kriterier: helt fritt redigerbart oppsett. Kriteriene (kolonnene) og
 // personene (radene) legges til, endres og fjernes av brukeren selv — ingen
 // fastlåst liste, siden det er nettopp det hun ba om.
+// Tre kriterietyper, felles for Dating og Stillingsrelevans. Erstatter det
+// gamle systemet med separat type/vekt/dealbreaker — n\u00f8dvendig fungerer n\u00e5 som
+// dealbreaker automatisk, ikke som et eget valgfritt merke.
+var KRIT_TYPER=['nodvendig','viktig','onskelig'];
+var KRIT_TYPE_NAVN={nodvendig:'N\u00f8dvendig',viktig:'Viktig',onskelig:'\u00d8nskelig'};
+var KRIT_TYPE_VEKT={nodvendig:3,viktig:2,onskelig:1};
+function neste3Type(t){return KRIT_TYPER[(KRIT_TYPER.indexOf(t)+1)%3];}
 function leggTilDatingKriterium(navn){
   navn=(navn||'').trim();if(!navn)return;
-  datingKriterier.push({id:'dk'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,type:'nodvendig',vekt:1,dealbreaker:false,faseRelevans:'utvalg',fasthet:'fast'});
-  save();render();
-}
-function settDatingKriteriumType(id,type){
-  var k=datingKriterier.find(function(x){return x.id===id;});
-  if(!k)return;
-  k.type=type;
-  save();render();
-}
-function settDatingKriteriumVekt(id,vekt){
-  var k=datingKriterier.find(function(x){return x.id===id;});
-  if(!k)return;
-  k.vekt=vekt;
-  save();render();
-}
-function toggleDatingDealbreaker(id){
-  var k=datingKriterier.find(function(x){return x.id===id;});
-  if(!k)return;
-  k.dealbreaker=!k.dealbreaker;
+  datingKriterier.push({id:'dk'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,type:'nodvendig',faseRelevans:'utvalg',fasthet:'fast'});
   save();render();
 }
 function settDatingKriteriumFaseRelevans(id,v){
@@ -1744,13 +1733,7 @@ function settDatingKriteriumFasthet(id,v){
 function syklDatingKriteriumType(id){
   var k=datingKriterier.find(function(x){return x.id===id;});
   if(!k)return;
-  k.type=k.type==='tiltrekkende'?'nodvendig':'tiltrekkende';
-  save();render();
-}
-function syklDatingKriteriumVekt(id){
-  var k=datingKriterier.find(function(x){return x.id===id;});
-  if(!k)return;
-  k.vekt=((k.vekt||1)%3)+1;
+  k.type=neste3Type(k.type);
   save();render();
 }
 function syklDatingKriteriumFaseRelevans(id){
@@ -1828,17 +1811,15 @@ function datingKryssPoeng(p){
   Object.keys(st).forEach(function(kid){
     var k=datingKriterier.find(function(x){return x.id===kid;});
     if(!k)return;
-    var typeVekt=k.type==='tiltrekkende'?1:2;
-    var egenVekt=k.vekt||1;
-    sum+=(DATING_STATUS_POENG[st[kid]]||0)*typeVekt*egenVekt;
+    sum+=(DATING_STATUS_POENG[st[kid]]||0)*(KRIT_TYPE_VEKT[k.type]||1);
   });
   return sum;
 }
-// Er noe et satt dealbreaker-kriterium, og det st\u00e5r p\u00e5 r\u00f8dt (mangler) — da skal
-// ingen mengde gr\u00f8nne andre steder kunne overstyre det i sorteringen.
-function datingHarDealbreaker(p){
+// Et n\u00f8dvendig kriterium kan ikke st\u00e5 p\u00e5 r\u00f8dt — da utg\u00e5r personen, automatisk,
+// uten noe eget dealbreaker-merke \u00e5 sette.
+function datingUtgar(p){
   var st=p.kryssStatus||{};
-  return datingKriterier.some(function(k){return k.dealbreaker&&st[k.id]===4;});
+  return datingKriterier.some(function(k){return k.type==='nodvendig'&&st[k.id]===4;});
 }
 function sykleDatingKryss(personId,kriterieId){
   var p=datingPersoner.find(function(x){return x.id===personId;});
@@ -1864,6 +1845,7 @@ function datingKriterierViewHTML(){
   // Tre niv\u00e5er, samme prinsipp som Stillingsrelevans: aktive \u00f8verst, avsluttede
   // forhold som referanse under der, avsluttet uten \u00e5 ha blitt et forhold nederst.
   function datingReferanseTier(p){
+    if(datingUtgar(p))return 3;
     if(!p.avsluttet)return 0;
     return(p.fase||0)>=1?1:2;
   }
@@ -1873,7 +1855,7 @@ function datingKriterierViewHTML(){
     if(at!==bt)return at-bt;
     if(datingSortering==='varighet')return(b.fase||0)-(a.fase||0);
     if(datingSortering==='kryss'){
-      var aDb=datingHarDealbreaker(a),bDb=datingHarDealbreaker(b);
+      var aDb=datingUtgar(a),bDb=datingUtgar(b);
       if(aDb!==bDb)return aDb?1:-1;
       return datingKryssPoeng(b)-datingKryssPoeng(a);
     }
@@ -1886,11 +1868,7 @@ function datingKriterierViewHTML(){
   var kriterierSortert=datingKriterier.slice().sort(function(a,b){
     var fa=a.faseRelevans==='etablert'?1:0,fb=b.faseRelevans==='etablert'?1:0;
     if(fa!==fb)return fa-fb;
-    var da=a.dealbreaker?0:1,db=b.dealbreaker?0:1;
-    if(da!==db)return da-db;
-    var va=-(a.vekt||1),vb=-(b.vekt||1);
-    if(va!==vb)return va-vb;
-    return(a.type==='tiltrekkende'?1:0)-(b.type==='tiltrekkende'?1:0);
+    return KRIT_TYPER.indexOf(a.type)-KRIT_TYPER.indexOf(b.type);
   });
   var antUtvalg=kriterierSortert.filter(function(k){return k.faseRelevans!=='etablert';}).length;
 
@@ -1914,7 +1892,7 @@ function datingKriterierViewHTML(){
       }).join('')+'</tr>'
       +visPersoner.map(function(p){
         var fase=p.fase||0;
-        return'<tr style="'+(p.avsluttet?'opacity:.5':'')+'"><td style="padding:3px 6px 3px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1">'+(datingHarDealbreaker(p)?'\u26a0 ':'')+esc(p.navn)+'</td>'
+        return'<tr style="'+(p.avsluttet?'opacity:.5':'')+'"><td style="padding:3px 6px 3px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1">'+(datingUtgar(p)?'\u26a0 ':'')+esc(p.navn)+'</td>'
           +DATING_FASER.map(function(f,i){
             return'<td style="text-align:center;padding:2px"><button title="Sett til '+esc(f)+'" onclick="settDatingFase(\''+q(p.id)+'\','+i+')" style="width:13px;height:13px;border-radius:50%;border:none;padding:0;cursor:pointer;background:'+(i<=fase?'var(--rose)':'var(--line)')+'"></button></td>';
           }).join('')
@@ -1935,21 +1913,17 @@ function datingKriterierViewHTML(){
   // Kriterielista sorteres for lesbarhet — dealbreakere \u00f8verst, s\u00e5 n\u00f8dvendige,
   // s\u00e5 tiltrekkende. P\u00e5virker bare visningsrekkef\u00f8lgen her, ikke selve dataene.
   var kriterierForListe=datingKriterier.slice().sort(function(a,b){
-    var da=a.dealbreaker?0:1,db=b.dealbreaker?0:1;
-    if(da!==db)return da-db;
-    return(a.type==='tiltrekkende'?1:0)-(b.type==='tiltrekkende'?1:0);
+    return KRIT_TYPER.indexOf(a.type)-KRIT_TYPER.indexOf(b.type);
   });
   h+='<div class="sec-title" style="margin-top:14px">Kriterier</div>'
     +'<div class="card" style="overflow-x:auto;padding:8px 6px">'
     +'<table style="border-collapse:collapse;font-size:11px;width:100%">'
     +'<tr><td></td>'
-    +['Type','Vekt','\u26a0','Fase','Fasthet'].map(function(t){return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted)">'+t+'</td>';}).join('')
+    +['Type','Fase','Fasthet'].map(function(t){return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted)">'+t+'</td>';}).join('')
     +'<td></td></tr>'
     +kriterierForListe.map(function(k){
       return'<tr><td style="padding:3px 6px 3px 0;font-size:12px;max-width:120px">'+esc(k.navn)+'</td>'
-        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklDatingKriteriumType(\''+q(k.id)+'\')">'+(k.type==='tiltrekkende'?'Tiltr':'N\u00f8dv')+'</button></td>'
-        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 8px" onclick="syklDatingKriteriumVekt(\''+q(k.id)+'\')">'+(k.vekt||1)+'</button></td>'
-        +'<td style="text-align:center;padding:2px"><button class="chip'+(k.dealbreaker?' on':'')+'" style="font-size:10px;padding:2px 6px" onclick="toggleDatingDealbreaker(\''+q(k.id)+'\')">\u26a0</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip'+(k.type==='nodvendig'?' on':'')+'" style="font-size:10px;padding:2px 6px" onclick="syklDatingKriteriumType(\''+q(k.id)+'\')">'+KRIT_TYPE_NAVN[k.type]+'</button></td>'
         +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklDatingKriteriumFaseRelevans(\''+q(k.id)+'\')">'+(k.faseRelevans==='etablert'?'Forhold':'Dating')+'</button></td>'
         +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklDatingKriteriumFasthet(\''+q(k.id)+'\')">'+(k.fasthet==='situasjonsbetinget'?'Situa':'Fast')+'</button></td>'
         +'<td style="text-align:center;padding:2px"><button class="icon-btn" style="font-size:10px;padding:1px 6px" onclick="fjernDatingKriterium(\''+q(k.id)+'\')">Fjern</button></td>'
@@ -1968,7 +1942,7 @@ function datingKriterierViewHTML(){
       var iEkte=datingPersoner.indexOf(p); // ekte posisjon, for piler som flytter i den lagrede rekkef\u00f8lgen
       var visPiler=datingSortering==='manuell';
       return'<div class="entry-row" style="align-items:flex-start'+(p.avsluttet?';opacity:.6':'')+'"><div class="entry-body">'
-        +(datingHarDealbreaker(p)?'<div style="font-size:10px;color:var(--red);font-weight:700;margin-bottom:2px">\u26a0 Dealbreaker-kriterium st\u00e5r p\u00e5 r\u00f8dt</div>':'')
+        +(datingUtgar(p)?'<div style="font-size:10px;color:var(--red);font-weight:700;margin-bottom:2px">\u26a0 N\u00f8dvendig kriterium mangler \u2014 utg\u00e5r</div>':'')
         +'<input class="inp" type="text" style="font-size:13px;font-weight:600;margin:0;padding:4px 6px" value="'+esc(p.navn)+'" onblur="settDatingNavn(\''+q(p.id)+'\',this.value)">'
         +'<div class="chips" style="margin-top:3px">'+DATING_FASER.map(function(f,i){
           return'<button class="chip'+(i===(p.fase||0)?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingFase(\''+q(p.id)+'\','+i+')">'+f+'</button>';
@@ -1994,25 +1968,7 @@ function datingKriterierViewHTML(){
 // stillinger i stedet for personer, s\u00f8keprosess-stadier i stedet for varighet.
 function leggTilStillingKriterium(navn){
   navn=(navn||'').trim();if(!navn)return;
-  stillingKriterier.push({id:'sk'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,type:'nodvendig',faseRelevans:'utvalg',fasthet:'fast',vekt:1,dealbreaker:false});
-  save();render();
-}
-function settStillingKriteriumVekt(id,vekt){
-  var k=stillingKriterier.find(function(x){return x.id===id;});
-  if(!k)return;
-  k.vekt=vekt;
-  save();render();
-}
-function toggleStillingDealbreaker(id){
-  var k=stillingKriterier.find(function(x){return x.id===id;});
-  if(!k)return;
-  k.dealbreaker=!k.dealbreaker;
-  save();render();
-}
-function settStillingKriteriumType(id,type){
-  var k=stillingKriterier.find(function(x){return x.id===id;});
-  if(!k)return;
-  k.type=type;
+  stillingKriterier.push({id:'sk'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,type:'nodvendig',faseRelevans:'utvalg',fasthet:'fast'});
   save();render();
 }
 function settStillingKriteriumFaseRelevans(id,v){
@@ -2030,13 +1986,7 @@ function settStillingKriteriumFasthet(id,v){
 function syklStillingKriteriumType(id){
   var k=stillingKriterier.find(function(x){return x.id===id;});
   if(!k)return;
-  k.type=k.type==='tiltrekkende'?'nodvendig':'tiltrekkende';
-  save();render();
-}
-function syklStillingKriteriumVekt(id){
-  var k=stillingKriterier.find(function(x){return x.id===id;});
-  if(!k)return;
-  k.vekt=((k.vekt||1)%3)+1;
+  k.type=neste3Type(k.type);
   save();render();
 }
 function syklStillingKriteriumFaseRelevans(id){
@@ -2101,15 +2051,13 @@ function stillingKryssPoeng(s){
   Object.keys(st).forEach(function(kid){
     var k=stillingKriterier.find(function(x){return x.id===kid;});
     if(!k)return;
-    var typeVekt=k.type==='tiltrekkende'?1:2;
-    var egenVekt=k.vekt||1;
-    sum+=(STILLING_STATUS_POENG[st[kid]]||0)*typeVekt*egenVekt;
+    sum+=(STILLING_STATUS_POENG[st[kid]]||0)*(KRIT_TYPE_VEKT[k.type]||1);
   });
   return sum;
 }
-function stillingHarDealbreaker(s){
+function stillingUtgar(s){
   var st=s.kryssStatus||{};
-  return stillingKriterier.some(function(k){return k.dealbreaker&&st[k.id]===4;});
+  return stillingKriterier.some(function(k){return k.type==='nodvendig'&&st[k.id]===4;});
 }
 function sykleStillingKryss(stillingId,kriterieId){
   var s=stillinger.find(function(x){return x.id===stillingId;});
@@ -2135,6 +2083,7 @@ function stillingRelevansViewHTML(){
   // Tre niv\u00e5er: aktive vurderinger \u00f8verst, «Hatt denne jobben» som referanse
   // under der, «Ikke f\u00e5tt» aller nederst — det er et utfall, ikke fremgang.
   function stillingReferanseTier(s){
+    if(stillingUtgar(s))return 3;
     var st=s.stadie||0;
     if(st===2)return 2; // Ikke f\u00e5tt
     if(st===3)return 1; // Hatt denne jobben
@@ -2146,7 +2095,7 @@ function stillingRelevansViewHTML(){
     if(at!==bt)return at-bt;
     if(stillingSortering==='varighet')return(b.stadie||0)-(a.stadie||0);
     if(stillingSortering==='kryss'){
-      var aDb=stillingHarDealbreaker(a),bDb=stillingHarDealbreaker(b);
+      var aDb=stillingUtgar(a),bDb=stillingUtgar(b);
       if(aDb!==bDb)return aDb?1:-1;
       return stillingKryssPoeng(b)-stillingKryssPoeng(a);
     }
@@ -2157,11 +2106,7 @@ function stillingRelevansViewHTML(){
   var kriterierSortert=stillingKriterier.slice().sort(function(a,b){
     var fa=a.faseRelevans==='etablert'?1:0,fb=b.faseRelevans==='etablert'?1:0;
     if(fa!==fb)return fa-fb;
-    var da=a.dealbreaker?0:1,db=b.dealbreaker?0:1;
-    if(da!==db)return da-db;
-    var va=-(a.vekt||1),vb=-(b.vekt||1);
-    if(va!==vb)return va-vb;
-    return(a.type==='tiltrekkende'?1:0)-(b.type==='tiltrekkende'?1:0);
+    return KRIT_TYPER.indexOf(a.type)-KRIT_TYPER.indexOf(b.type);
   });
   var antUtvalg=kriterierSortert.filter(function(k){return k.faseRelevans!=='etablert';}).length;
 
@@ -2185,7 +2130,7 @@ function stillingRelevansViewHTML(){
       }).join('')+'</tr>'
       +visStillinger.map(function(s){
         var stadie=s.stadie||0;
-        return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1">'+(stillingHarDealbreaker(s)?'\u26a0 ':'')+esc(s.navn)+'</td>'
+        return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1">'+(stillingUtgar(s)?'\u26a0 ':'')+esc(s.navn)+'</td>'
           +STILLING_STADIER.map(function(f,i){
             // Vurderer/S\u00f8kt (0,1) er kumulativ fremgang. Ikke f\u00e5tt/Hatt denne
             // jobben (2,3) er gjensidig utelukkende utfall, ikke et steg videre.
@@ -2207,17 +2152,18 @@ function stillingRelevansViewHTML(){
       +'</table></div>';
   }
 
+  var kriterierForListe2=stillingKriterier.slice().sort(function(a,b){
+    return KRIT_TYPER.indexOf(a.type)-KRIT_TYPER.indexOf(b.type);
+  });
   h+='<div class="sec-title" style="margin-top:14px">Kriterier</div>'
     +'<div class="card" style="overflow-x:auto;padding:8px 6px">'
     +'<table style="border-collapse:collapse;font-size:11px;width:100%">'
     +'<tr><td></td>'
-    +['Type','Vekt','\u26a0','Fase','Fasthet'].map(function(t){return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted)">'+t+'</td>';}).join('')
+    +['Type','Fase','Fasthet'].map(function(t){return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted)">'+t+'</td>';}).join('')
     +'<td></td></tr>'
-    +stillingKriterier.map(function(k){
+    +kriterierForListe2.map(function(k){
       return'<tr><td style="padding:3px 6px 3px 0;font-size:12px;max-width:120px">'+esc(k.navn)+'</td>'
-        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklStillingKriteriumType(\''+q(k.id)+'\')">'+(k.type==='tiltrekkende'?'Tiltr':'N\u00f8dv')+'</button></td>'
-        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 8px" onclick="syklStillingKriteriumVekt(\''+q(k.id)+'\')">'+(k.vekt||1)+'</button></td>'
-        +'<td style="text-align:center;padding:2px"><button class="chip'+(k.dealbreaker?' on':'')+'" style="font-size:10px;padding:2px 6px" onclick="toggleStillingDealbreaker(\''+q(k.id)+'\')">\u26a0</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip'+(k.type==='nodvendig'?' on':'')+'" style="font-size:10px;padding:2px 6px" onclick="syklStillingKriteriumType(\''+q(k.id)+'\')">'+KRIT_TYPE_NAVN[k.type]+'</button></td>'
         +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklStillingKriteriumFaseRelevans(\''+q(k.id)+'\')">'+(k.faseRelevans==='etablert'?'Arb.forh':'Jobbs\u00f8k')+'</button></td>'
         +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklStillingKriteriumFasthet(\''+q(k.id)+'\')">'+(k.fasthet==='situasjonsbetinget'?'Situa':'Fast')+'</button></td>'
         +'<td style="text-align:center;padding:2px"><button class="icon-btn" style="font-size:10px;padding:1px 6px" onclick="fjernStillingKriterium(\''+q(k.id)+'\')">Fjern</button></td>'
@@ -3508,6 +3454,25 @@ function load(){
       }
     });
     try{localStorage.setItem(SK+'_datingkryssfarge1','1');}catch(e){}
+    save();
+  }
+
+  // Kriterier g\u00e5r fra type+vekt+dealbreaker til \u00e9n tredelt type. Dealbreaker blir
+  // n\u00f8dvendig (siden n\u00f8dvendig n\u00e5 alltid fungerer som dealbreaker). Gammelt
+  // «n\u00f8dvendig» uten dealbreaker nedgraderes til viktig, for \u00e5 ikke plutselig
+  // gj\u00f8re noe til en automatisk dealbreaker som ikke var ment slik f\u00f8r.
+  var tretype1=false;try{tretype1=!!localStorage.getItem(SK+'_kriterietretype1');}catch(e){}
+  if(!tretype1){
+    var konverter=function(k){
+      if(k.dealbreaker)k.type='nodvendig';
+      else if(k.type==='nodvendig')k.type='viktig';
+      else k.type=(k.vekt||1)>=2?'viktig':'onskelig';
+      delete k.vekt;
+      delete k.dealbreaker;
+    };
+    datingKriterier.forEach(konverter);
+    stillingKriterier.forEach(konverter);
+    try{localStorage.setItem(SK+'_kriterietretype1','1');}catch(e){}
     save();
   }
 
@@ -5489,6 +5454,21 @@ function prosjektFaseHTML(iv){
     +(i>0?'<button class="icon-btn" style="font-size:11px" onclick="kanbanFlytt(\''+q(iv.id)+'\',-1)">\u2039 forrige</button>':'')
     +(i<3?'<button class="icon-btn" style="font-size:11px" onclick="kanbanFlytt(\''+q(iv.id)+'\',1)">neste \u203a</button>':'')
     +'</div>';
+  // Anslag mot faktisk loggf\u00f8rt, samlet for hele prosjektets levetid — ikke bare
+  // gjeldende m\u00e5ned, som er det eneste stedet dette ellers dukker opp i appen.
+  var alleOppgaver=iv.oppgaver||[];
+  var anslagTotalt=alleOppgaver.reduce(function(a,o){return a+(Number(o.timer)||0);},0);
+  var loggetTotalt=timeLogs.filter(function(t){return t.kind==='proj'&&t.refId===iv.id;})
+    .reduce(function(a,t){return a+(Number(t.hours)||0);},0);
+  if(anslagTotalt||loggetTotalt){
+    var diff=loggetTotalt-anslagTotalt;
+    h+='<div class="card" style="padding:8px 12px;margin-top:8px;background:var(--bg)">'
+      +'<div style="display:flex;gap:14px">'
+      +'<div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Anslått</div><div style="font-size:15px;font-weight:700">'+(anslagTotalt?String(Math.round(anslagTotalt*10)/10).replace('.',',')+' t':'\u2013')+'</div></div>'
+      +'<div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Loggf\u00f8rt</div><div style="font-size:15px;font-weight:700">'+(loggetTotalt?String(Math.round(loggetTotalt*10)/10).replace('.',',')+' t':'\u2013')+'</div></div>'
+      +(anslagTotalt&&loggetTotalt?'<div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Differanse</div><div style="font-size:15px;font-weight:700;color:'+(diff<=0?'#4E7B5C':'var(--red)')+'">'+(diff>0?'+':'')+String(Math.round(diff*10)/10).replace('.',',')+' t</div></div>':'')
+      +'</div></div>';
+  }
   ['plan','arbeid'].forEach(function(fa){
     var opp=oppgaverForFase(iv,fa);
     var tIgjen=oppgaveTimerIgjen(iv,fa);
