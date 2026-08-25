@@ -1741,8 +1741,30 @@ function settDatingKriteriumFasthet(id,v){
   k.fasthet=v;
   save();render();
 }
-// Et etablert-kriterium l\u00e5ses til noen faktisk n\u00e5r «1 \u00e5r+» — det gir ikke mening
-// \u00e5 vurdere «h\u00e5ndterer konflikt i etablert hverdag» f\u00f8r dere faktisk er der.
+function syklDatingKriteriumType(id){
+  var k=datingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.type=k.type==='tiltrekkende'?'nodvendig':'tiltrekkende';
+  save();render();
+}
+function syklDatingKriteriumVekt(id){
+  var k=datingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.vekt=((k.vekt||1)%3)+1;
+  save();render();
+}
+function syklDatingKriteriumFaseRelevans(id){
+  var k=datingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.faseRelevans=k.faseRelevans==='etablert'?'utvalg':'etablert';
+  save();render();
+}
+function syklDatingKriteriumFasthet(id){
+  var k=datingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.fasthet=k.fasthet==='situasjonsbetinget'?'fast':'situasjonsbetinget';
+  save();render();
+}
 // Et etablert-kriterium l\u00e5ses til dere er forbi de tre f\u00f8rste m\u00e5nedene — ikke
 // helt til ett \u00e5r+, siden det er skillet som faktisk gir mening her.
 function datingKriteriumLast(k,p){
@@ -1839,14 +1861,21 @@ function datingKriterierViewHTML(){
     +'<div class="view-title">Kriterier</div>'
     +'<div class="view-sub">Dine egne — legg til, endre eller fjern n\u00e5r som helst.</div>';
 
+  // Avsluttede st\u00e5r alltid nederst, uansett valgt sortering — de er referanser,
+  // ikke p\u00e5g\u00e5ende vurderinger. Stabil sortering bevarer resten av rekkef\u00f8lgen.
   var visPersoner=datingPersoner.slice();
-  if(datingSortering==='varighet')visPersoner.sort(function(a,b){return(b.fase||0)-(a.fase||0);});
-  else if(datingSortering==='kryss')visPersoner.sort(function(a,b){
-    var aDb=datingHarDealbreaker(a),bDb=datingHarDealbreaker(b);
-    if(aDb!==bDb)return aDb?1:-1;
-    return datingKryssPoeng(b)-datingKryssPoeng(a);
+  visPersoner.sort(function(a,b){
+    var ar=a.avsluttet?1:0,br=b.avsluttet?1:0;
+    if(ar!==br)return ar-br;
+    if(datingSortering==='varighet')return(b.fase||0)-(a.fase||0);
+    if(datingSortering==='kryss'){
+      var aDb=datingHarDealbreaker(a),bDb=datingHarDealbreaker(b);
+      if(aDb!==bDb)return aDb?1:-1;
+      return datingKryssPoeng(b)-datingKryssPoeng(a);
+    }
+    if(datingSortering==='alfabetisk')return nbSort(a.navn,b.navn);
+    return 0;
   });
-  else if(datingSortering==='alfabetisk')visPersoner.sort(function(a,b){return nbSort(a.navn,b.navn);});
 
   // Rekkef\u00f8lge: utvalgsfase f\u00f8r etablert, dealbreakere f\u00f8rst innad i hver, s\u00e5
   // h\u00f8yest vektet, med type som siste tiebreak n\u00e5r alt annet er likt.
@@ -1899,29 +1928,23 @@ function datingKriterierViewHTML(){
       +'</table></div>';
   }
 
-  h+='<div class="sec-title" style="margin-top:14px">Kriterier</div><div class="card">'
+  h+='<div class="sec-title" style="margin-top:14px">Kriterier</div>'
+    +'<div class="card" style="overflow-x:auto;padding:8px 6px">'
+    +'<table style="border-collapse:collapse;font-size:11px;width:100%">'
+    +'<tr><td></td>'
+    +['Type','Vekt','\u26a0','Fase','Fasthet'].map(function(t){return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted)">'+t+'</td>';}).join('')
+    +'<td></td></tr>'
     +datingKriterier.map(function(k){
-      return'<div class="entry-row tett" style="align-items:flex-start"><div class="entry-body">'
-        +'<div class="entry-text">'+esc(k.navn)+'</div>'
-        +'<div class="chips" style="margin-top:3px">'
-        +'<button class="chip'+(k.type!=='tiltrekkende'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingKriteriumType(\''+q(k.id)+'\',\'nodvendig\')">N\u00f8dvendig</button>'
-        +'<button class="chip'+(k.type==='tiltrekkende'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingKriteriumType(\''+q(k.id)+'\',\'tiltrekkende\')">Tiltrekkende</button>'
-        +'</div>'
-        +'<div class="chips" style="margin-top:3px">'
-        +'<span style="font-size:10px;color:var(--muted);align-self:center;padding-right:2px">Vekt</span>'
-        +[1,2,3].map(function(v){
-          return'<button class="chip'+((k.vekt||1)===v?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingKriteriumVekt(\''+q(k.id)+'\','+v+')">'+v+'</button>';
-        }).join('')
-        +'<button class="chip'+(k.dealbreaker?' on':'')+'" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="toggleDatingDealbreaker(\''+q(k.id)+'\')">\u26a0 Dealbreaker</button>'
-        +'</div>'
-        +'<div class="chips" style="margin-top:3px">'
-        +'<button class="chip'+(k.faseRelevans!=='etablert'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingKriteriumFaseRelevans(\''+q(k.id)+'\',\'utvalg\')">Utvalgsfase</button>'
-        +'<button class="chip'+(k.faseRelevans==='etablert'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingKriteriumFaseRelevans(\''+q(k.id)+'\',\'etablert\')">Etablert</button>'
-        +'<button class="chip'+(k.fasthet!=='situasjonsbetinget'?' on':'')+'" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="settDatingKriteriumFasthet(\''+q(k.id)+'\',\'fast\')">Fast</button>'
-        +'<button class="chip'+(k.fasthet==='situasjonsbetinget'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settDatingKriteriumFasthet(\''+q(k.id)+'\',\'situasjonsbetinget\')">Situasjonsbetinget</button>'
-        +'</div></div>'
-        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernDatingKriterium(\''+q(k.id)+'\')">Fjern</button></div>';
+      return'<tr><td style="padding:3px 6px 3px 0;font-size:12px;max-width:120px">'+esc(k.navn)+'</td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklDatingKriteriumType(\''+q(k.id)+'\')">'+(k.type==='tiltrekkende'?'Tiltr':'N\u00f8dv')+'</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 8px" onclick="syklDatingKriteriumVekt(\''+q(k.id)+'\')">'+(k.vekt||1)+'</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip'+(k.dealbreaker?' on':'')+'" style="font-size:10px;padding:2px 6px" onclick="toggleDatingDealbreaker(\''+q(k.id)+'\')">\u26a0</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklDatingKriteriumFaseRelevans(\''+q(k.id)+'\')">'+(k.faseRelevans==='etablert'?'Etabl':'Utvalg')+'</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklDatingKriteriumFasthet(\''+q(k.id)+'\')">'+(k.fasthet==='situasjonsbetinget'?'Situa':'Fast')+'</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="icon-btn" style="font-size:10px;padding:1px 6px" onclick="fjernDatingKriterium(\''+q(k.id)+'\')">Fjern</button></td>'
+        +'</tr>';
     }).join('')
+    +'</table>'
     +(datingKriterier.length?'':'<div class="empty" style="padding:6px 12px">Ingen kriterier enn\u00e5.</div>')
     +'</div>'
     +'<div style="padding:6px 12px 0;display:flex;gap:6px">'
@@ -1993,29 +2016,46 @@ function settStillingKriteriumFasthet(id,v){
   k.fasthet=v;
   save();render();
 }
-// Et etablert-kriterium l\u00e5ses til du faktisk har hatt jobben — ikke bare v\u00e6rt i
-// prosess. Ulikt Dating er det ikke et stadie i s\u00f8keprosessen som avgj\u00f8r dette,
-// siden alle STILLING_STADIER-stegene fortsatt er f\u00f8r ansettelse.
+function syklStillingKriteriumType(id){
+  var k=stillingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.type=k.type==='tiltrekkende'?'nodvendig':'tiltrekkende';
+  save();render();
+}
+function syklStillingKriteriumVekt(id){
+  var k=stillingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.vekt=((k.vekt||1)%3)+1;
+  save();render();
+}
+function syklStillingKriteriumFaseRelevans(id){
+  var k=stillingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.faseRelevans=k.faseRelevans==='etablert'?'utvalg':'etablert';
+  save();render();
+}
+function syklStillingKriteriumFasthet(id){
+  var k=stillingKriterier.find(function(x){return x.id===id;});
+  if(!k)return;
+  k.fasthet=k.fasthet==='situasjonsbetinget'?'fast':'situasjonsbetinget';
+  save();render();
+}
+// Et etablert-kriterium l\u00e5ses til du faktisk n\u00e5r siste stadie — «Hatt denne
+// jobben» — ikke bare v\u00e6rt i prosess.
 function stillingKriteriumLast(k,s){
-  return k.faseRelevans==='etablert'&&!s.hattJobben;
+  return k.faseRelevans==='etablert'&&(s.stadie||0)<STILLING_STADIER.length-1;
 }
 function fjernStillingKriterium(id){
   stillingKriterier=stillingKriterier.filter(function(k){return k.id!==id;});
   stillinger.forEach(function(s){if(s.kryssStatus)delete s.kryssStatus[id];});
   save();render();
 }
-var STILLING_STADIER=['Vurderer','S\u00f8kt','F\u00e5tt/ikke f\u00e5tt'];
+var STILLING_STADIER=['Vurderer','S\u00f8kt','Ikke f\u00e5tt','Hatt denne jobben'];
 var stillingSortering='manuell';
 function settStillingSortering(v){stillingSortering=v;save();render();}
 function leggTilStilling(navn){
   navn=(navn||'').trim();if(!navn)return;
-  stillinger.push({id:'sp'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,kryssStatus:{},stadie:0,hattJobben:false});
-  save();render();
-}
-function toggleStillingHattJobben(id){
-  var s=stillinger.find(function(x){return x.id===id;});
-  if(!s)return;
-  s.hattJobben=!s.hattJobben;
+  stillinger.push({id:'sp'+Date.now()+Math.random().toString(36).slice(2,4),navn:navn,kryssStatus:{},stadie:0});
   save();render();
 }
 function flyttStillingStadie(id){
@@ -2081,14 +2121,21 @@ function stillingRelevansViewHTML(){
     +'<div class="view-title">Stillingsrelevans</div>'
     +'<div class="view-sub">Dine egne kriterier — legg til, endre eller fjern n\u00e5r som helst.</div>';
 
+  // «Hatt denne jobben» (siste stadie) st\u00e5r alltid nederst — det er en
+  // kalibreringsreferanse, ikke en p\u00e5g\u00e5ende vurdering.
   var visStillinger=stillinger.slice();
-  if(stillingSortering==='varighet')visStillinger.sort(function(a,b){return(b.stadie||0)-(a.stadie||0);});
-  else if(stillingSortering==='kryss')visStillinger.sort(function(a,b){
-    var aDb=stillingHarDealbreaker(a),bDb=stillingHarDealbreaker(b);
-    if(aDb!==bDb)return aDb?1:-1;
-    return stillingKryssPoeng(b)-stillingKryssPoeng(a);
+  visStillinger.sort(function(a,b){
+    var ar=(a.stadie||0)===STILLING_STADIER.length-1?1:0,br=(b.stadie||0)===STILLING_STADIER.length-1?1:0;
+    if(ar!==br)return ar-br;
+    if(stillingSortering==='varighet')return(b.stadie||0)-(a.stadie||0);
+    if(stillingSortering==='kryss'){
+      var aDb=stillingHarDealbreaker(a),bDb=stillingHarDealbreaker(b);
+      if(aDb!==bDb)return aDb?1:-1;
+      return stillingKryssPoeng(b)-stillingKryssPoeng(a);
+    }
+    if(stillingSortering==='alfabetisk')return nbSort(a.navn,b.navn);
+    return 0;
   });
-  else if(stillingSortering==='alfabetisk')visStillinger.sort(function(a,b){return nbSort(a.navn,b.navn);});
 
   var kriterierSortert=stillingKriterier.slice().sort(function(a,b){
     var fa=a.faseRelevans==='etablert'?1:0,fb=b.faseRelevans==='etablert'?1:0;
@@ -2121,13 +2168,11 @@ function stillingRelevansViewHTML(){
       }).join('')+'</tr>'
       +visStillinger.map(function(s){
         var stadie=s.stadie||0;
-        return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1">'+(stillingHarDealbreaker(s)?'\u26a0 ':'')+(s.hattJobben?'<span style="color:var(--muted)" title="Hatt denne jobben f\u00f8r">\u21bb </span>':'')+esc(s.navn)+'</td>'
-          +(s.hattJobben
-            ?STILLING_STADIER.map(function(){return'<td></td>';}).join('')+'<td></td>'
-            :STILLING_STADIER.map(function(f,i){
-              return'<td style="text-align:center;padding:2px"><button title="Sett til '+esc(f)+'" onclick="settStillingStadie(\''+q(s.id)+'\','+i+')" style="width:13px;height:13px;border-radius:50%;border:none;padding:0;cursor:pointer;background:'+(i<=stadie?'var(--rose)':'var(--line)')+'"></button></td>';
-            }).join('')
-            +'<td style="text-align:center;padding:2px">'+(stadie<STILLING_STADIER.length-1?'<button onclick="flyttStillingStadie(\''+q(s.id)+'\')" title="Flytt til '+esc(STILLING_STADIER[stadie+1])+'" style="font-size:12px;padding:1px 6px" class="icon-btn">\u2192</button>':'')+'</td>')
+        return'<tr><td style="padding:3px 6px 3px 0;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1">'+(stillingHarDealbreaker(s)?'\u26a0 ':'')+esc(s.navn)+'</td>'
+          +STILLING_STADIER.map(function(f,i){
+            return'<td style="text-align:center;padding:2px"><button title="Sett til '+esc(f)+'" onclick="settStillingStadie(\''+q(s.id)+'\','+i+')" style="width:13px;height:13px;border-radius:50%;border:none;padding:0;cursor:pointer;background:'+(i<=stadie?'var(--rose)':'var(--line)')+'"></button></td>';
+          }).join('')
+          +'<td style="text-align:center;padding:2px">'+(stadie<STILLING_STADIER.length-1?'<button onclick="flyttStillingStadie(\''+q(s.id)+'\')" title="Flytt til '+esc(STILLING_STADIER[stadie+1])+'" style="font-size:12px;padding:1px 6px" class="icon-btn">\u2192</button>':'')+'</td>'
           +kriterierSortert.map(function(k){
             var status=(s.kryssStatus||{})[k.id]||0;
             var farge=STILLING_KRYSS_FARGER[status];
@@ -2141,29 +2186,23 @@ function stillingRelevansViewHTML(){
       +'</table></div>';
   }
 
-  h+='<div class="sec-title" style="margin-top:14px">Kriterier</div><div class="card">'
+  h+='<div class="sec-title" style="margin-top:14px">Kriterier</div>'
+    +'<div class="card" style="overflow-x:auto;padding:8px 6px">'
+    +'<table style="border-collapse:collapse;font-size:11px;width:100%">'
+    +'<tr><td></td>'
+    +['Type','Vekt','\u26a0','Fase','Fasthet'].map(function(t){return'<td style="text-align:center;padding:2px 4px;font-size:9px;color:var(--muted)">'+t+'</td>';}).join('')
+    +'<td></td></tr>'
     +stillingKriterier.map(function(k){
-      return'<div class="entry-row tett" style="align-items:flex-start"><div class="entry-body">'
-        +'<div class="entry-text">'+esc(k.navn)+'</div>'
-        +'<div class="chips" style="margin-top:3px">'
-        +'<button class="chip'+(k.type!=='tiltrekkende'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingKriteriumType(\''+q(k.id)+'\',\'nodvendig\')">N\u00f8dvendig</button>'
-        +'<button class="chip'+(k.type==='tiltrekkende'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingKriteriumType(\''+q(k.id)+'\',\'tiltrekkende\')">Tiltrekkende</button>'
-        +'</div>'
-        +'<div class="chips" style="margin-top:3px">'
-        +'<span style="font-size:10px;color:var(--muted);align-self:center;padding-right:2px">Vekt</span>'
-        +[1,2,3].map(function(v){
-          return'<button class="chip'+((k.vekt||1)===v?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingKriteriumVekt(\''+q(k.id)+'\','+v+')">'+v+'</button>';
-        }).join('')
-        +'<button class="chip'+(k.dealbreaker?' on':'')+'" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="toggleStillingDealbreaker(\''+q(k.id)+'\')">\u26a0 Dealbreaker</button>'
-        +'</div>'
-        +'<div class="chips" style="margin-top:3px">'
-        +'<button class="chip'+(k.faseRelevans!=='etablert'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingKriteriumFaseRelevans(\''+q(k.id)+'\',\'utvalg\')">Utvalgsfase</button>'
-        +'<button class="chip'+(k.faseRelevans==='etablert'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingKriteriumFaseRelevans(\''+q(k.id)+'\',\'etablert\')">Etablert</button>'
-        +'<button class="chip'+(k.fasthet!=='situasjonsbetinget'?' on':'')+'" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="settStillingKriteriumFasthet(\''+q(k.id)+'\',\'fast\')">Fast</button>'
-        +'<button class="chip'+(k.fasthet==='situasjonsbetinget'?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingKriteriumFasthet(\''+q(k.id)+'\',\'situasjonsbetinget\')">Situasjonsbetinget</button>'
-        +'</div></div>'
-        +'<button class="icon-btn" style="font-size:11px;flex-shrink:0" onclick="fjernStillingKriterium(\''+q(k.id)+'\')">Fjern</button></div>';
+      return'<tr><td style="padding:3px 6px 3px 0;font-size:12px;max-width:120px">'+esc(k.navn)+'</td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklStillingKriteriumType(\''+q(k.id)+'\')">'+(k.type==='tiltrekkende'?'Tiltr':'N\u00f8dv')+'</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 8px" onclick="syklStillingKriteriumVekt(\''+q(k.id)+'\')">'+(k.vekt||1)+'</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip'+(k.dealbreaker?' on':'')+'" style="font-size:10px;padding:2px 6px" onclick="toggleStillingDealbreaker(\''+q(k.id)+'\')">\u26a0</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklStillingKriteriumFaseRelevans(\''+q(k.id)+'\')">'+(k.faseRelevans==='etablert'?'Etabl':'Utvalg')+'</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="chip" style="font-size:10px;padding:2px 6px" onclick="syklStillingKriteriumFasthet(\''+q(k.id)+'\')">'+(k.fasthet==='situasjonsbetinget'?'Situa':'Fast')+'</button></td>'
+        +'<td style="text-align:center;padding:2px"><button class="icon-btn" style="font-size:10px;padding:1px 6px" onclick="fjernStillingKriterium(\''+q(k.id)+'\')">Fjern</button></td>'
+        +'</tr>';
     }).join('')
+    +'</table>'
     +(stillingKriterier.length?'':'<div class="empty" style="padding:6px 12px">Ingen kriterier enn\u00e5.</div>')
     +'</div>'
     +'<div style="padding:6px 12px 0;display:flex;gap:6px">'
@@ -2177,10 +2216,9 @@ function stillingRelevansViewHTML(){
       var visPiler=stillingSortering==='manuell';
       return'<div class="entry-row" style="align-items:flex-start"><div class="entry-body">'
         +'<input class="inp" type="text" style="font-size:13px;font-weight:600;margin:0;padding:4px 6px" value="'+esc(s.navn)+'" onblur="settStillingNavn(\''+q(s.id)+'\',this.value)">'
-        +'<div class="chips" style="margin-top:3px">'+(s.hattJobben?'':STILLING_STADIER.map(function(f,i){
+        +'<div class="chips" style="margin-top:3px">'+STILLING_STADIER.map(function(f,i){
           return'<button class="chip'+(i===(s.stadie||0)?' on':'')+'" style="font-size:10px;padding:2px 8px" onclick="settStillingStadie(\''+q(s.id)+'\','+i+')">'+f+'</button>';
-        }).join(''))
-        +'<button class="chip'+(s.hattJobben?' on':'')+'" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="toggleStillingHattJobben(\''+q(s.id)+'\')">Hatt denne jobben</button>'
+        }).join('')
         +'</div>'
         +'</div>'
         +(visPiler?'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">'
