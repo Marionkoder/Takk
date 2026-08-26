@@ -443,9 +443,11 @@ function toggleKatSide(n){
   katVis[n]=!katPaa(n);
   // Står du på siden du nettopp skrudde av, sendes du tilbake til innstillingene
   if(!katPaa(n)){
-    var side=(typeof KAT_SIDER!=='undefined'?KAT_SIDER:[]).find(function(x){return x.n===n;});
     var m=sidebarKinds(n);
+    if(n==='opplevelser')m=['opplevelser'];
+    if(n==='dating')m=['dating'];
     if(m.indexOf(view.kind)>=0)view={kind:'personlig'};
+    else if(view.kind==='brukerkat'&&view.id===n)view={kind:'personlig'};
   }
   save();render();
 }
@@ -3476,6 +3478,22 @@ function load(){
     save();
   }
 
+  // Brukeropprettede hovedkategorier (som «Dyr og fugler») viste seg alltid i
+  // menyen, uten av/p\u00e5-mulighet. N\u00e5 styres de av samme bryter som resten — men
+  // f\u00f8rst m\u00e5 alle eksisterende f\u00e5 satt synlig status, s\u00e5 ingen forsvinner ved
+  // et uhell n\u00e5r fiksen tas i bruk.
+  var brukerkatSynlig1=false;try{brukerkatSynlig1=!!localStorage.getItem(SK+'_brukerkatsynlig1');}catch(e){}
+  if(!brukerkatSynlig1){
+    var kjenteNavnMigr=['folk','kreativitet','helse','mat og drikke','hjem','faglig utvikling og trivsel','natur','\u00f8konomi','beredskap','utstyr','opplevelser','dating'];
+    cats.forEach(function(c){
+      if(!c.parentId&&kjenteNavnMigr.indexOf((c.name||'').toLowerCase())<0&&katVis[c.id]===undefined){
+        katVis[c.id]=true;
+      }
+    });
+    try{localStorage.setItem(SK+'_brukerkatsynlig1','1');}catch(e){}
+    save();
+  }
+
   // «Kompetanse» endrer navn til «Faglig utvikling og trivsel» — samme kategori,
   // samme grunnverdikobling, samme prosjekter og innlegg, bare et navn som dekker
   // b\u00e5de utvikling og trivsel i jobb og hobbyer, ikke bare det \u00e5 l\u00e6re noe nytt.
@@ -4957,7 +4975,11 @@ function personligViewHTML(){
   h+='</div>'
     +'<div style="font-size:12px;color:var(--muted);padding-top:12px">'+(cur?'Valgt: '+esc((CAT_COLORS.find(function(x){return x.id===cur;})||{}).name||'')+'. Trykk den kremhvite for standard.':'Standard (kremhvit).')+'</div>'
     +'</div>';
-  // Menypunkter — én bryter per kategoriside
+  // Menypunkter — én bryter per kategoriside, inkludert de brukeren har
+  // opprettet selv — alle kategorisider skal kunne skrus av, ingen unntak.
+  var kjenteHovedkatNavn2=['folk','kreativitet','helse','mat og drikke','hjem','faglig utvikling og trivsel','natur','\u00f8konomi','beredskap','utstyr','opplevelser','dating'];
+  var brukerkatForMeny=cats.filter(function(c){return!c.parentId&&kjenteHovedkatNavn2.indexOf((c.name||'').toLowerCase())<0;})
+    .sort(function(a,b){return nbSort(a.name,b.name);});
   h+='<div class="sec-title">Menypunkter</div>'
     +'<div class="view-sub">Sl\u00e5 p\u00e5 de livsomr\u00e5dene du vil ha i menyen.</div>'
     +'<div class="card">'
@@ -4966,6 +4988,13 @@ function personligViewHTML(){
       return'<div class="entry-row tett">'
         +'<div class="entry-body"><div class="entry-text">'+esc(k.navn)+'</div></div>'
         +'<button class="chip'+(paa?' on':'')+'" style="font-size:11px;align-self:center" onclick="toggleKatSide(\''+q(k.n)+'\')">'+(paa?'P\u00e5':'Av')+'</button>'
+        +'</div>';
+    }).join('')
+    +brukerkatForMeny.map(function(c){
+      var paa=katPaa(c.id);
+      return'<div class="entry-row tett">'
+        +'<div class="entry-body"><div class="entry-text">'+esc(c.name)+'</div></div>'
+        +'<button class="chip'+(paa?' on':'')+'" style="font-size:11px;align-self:center" onclick="toggleKatSide(\''+q(c.id)+'\')">'+(paa?'P\u00e5':'Av')+'</button>'
         +'</div>';
     }).join('')
     +'</div>'
@@ -6534,6 +6563,7 @@ function saveNewCat(){
     // og M\u00e5linger f\u00f8lger automatisk med, s\u00e5 brukeren ikke trenger \u00e5 be om det.
     cats.push({id:'c_invest_'+mc.id,name:'Planlagte investeringer',parentId:mc.id});
     cats.push({id:'c_maalinger_'+mc.id,name:'M\u00e5linger',parentId:mc.id});
+    katVis[mc.id]=true; // synlig i menyen fra f\u00f8rste stund, kan skrus av som alt annet
   }
   if(mf().cats)mf().cats=[].concat(mf().cats,[mc.id]);
   if(mf().catIds)mf().catIds=[].concat(mf().catIds,[mc.id]);
@@ -8169,9 +8199,10 @@ function sidebarHTML(){
       +'<span class="s-arrow"></span>'+esc(k.navn)+'</div>';
   });
   // Hovedkategorier brukeren har opprettet selv, som ikke er en del av den faste
-  // lista over — vises alltid, ikke styrt av av/på-bryterne i Personlig
+  // lista over — styrt av samme av/på-mekanisme som resten, n\u00f8kkelen er
+  // kategoriens id i stedet for en kort forh\u00e5ndsdefinert bokstavkode.
   var kjenteHovedkatNavn=['folk','kreativitet','helse','mat og drikke','hjem','faglig utvikling og trivsel','natur','\u00f8konomi','beredskap','utstyr','opplevelser','dating'];
-  cats.filter(function(c){return!c.parentId&&kjenteHovedkatNavn.indexOf((c.name||'').toLowerCase())<0;})
+  cats.filter(function(c){return!c.parentId&&kjenteHovedkatNavn.indexOf((c.name||'').toLowerCase())<0&&katPaa(c.id);})
     .sort(function(a,b){return nbSort(a.name,b.name);})
     .forEach(function(c){
       var col2=catColor(c.id);
