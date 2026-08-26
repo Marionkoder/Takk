@@ -2275,9 +2275,9 @@ function strikkeprosjekterViewHTML(){
   h+='</div>';
   return h;
 }
-function okonomiHubHTML(){
-  rrTab='ressursbruk';
-  var h=rrTabsHTML();
+function okonomiHubHTML(innebygd){
+  var h='';
+  if(!innebygd){rrTab='ressursbruk';h=rrTabsHTML();}
   h+='<div class="view-title">Ressursbruk</div>';
   var kNaa=kvartalNaa();
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goKvartal()">'
@@ -8144,8 +8144,7 @@ function sidebarHTML(){
   };
   h+='<div class="side-month" style="'+toppStil(view.kind==='om')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
   h+='<div class="side-month" style="'+toppStil(view.kind==='innstillinger'||view.kind==='administrer')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
-  h+='<div class="side-month" style="'+toppStil(view.kind==='planlegging')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
-  h+='<div class="side-month" style="'+toppStil(view.kind==='rapportsamlet'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goRapporterRessurs()"><span class="s-arrow"></span>Rapporter og ressursbruk</div>';
+  h+='<div class="side-month" style="'+toppStil(view.kind==='planlegging'||view.kind==='rapportsamlet'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
   // Kategorisidene: alfabetisk, hver med sin egen kategorifarge — som stripene ellers
   [{n:'folk',navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
    {n:'kreativitet',navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
@@ -9178,8 +9177,10 @@ function rapportNavHTML(){
     +'<button class="chip'+(k==='oppnadd'?' on':'')+'" onclick="goOppnadd()">Oppn\u00e5dd</button>'
     +'</div>';
 }
-function rapportSamletViewHTML(){
-  var h=rapportNavHTML();
+function rapportSamletViewHTML(innebygd){
+  if(view.month==null)view.month=curMonth;
+  if(view.year==null)view.year=curYear;
+  var h=innebygd?'':rapportNavHTML();
   h+='<div class="chips" style="justify-content:center;padding:8px 12px 0">'
     +'<button class="chip'+(rapportPeriode==='maaned'?' on':'')+'" onclick="goRapport(view.month||curMonth,view.year||curYear)">M\u00e5ned</button>'
     +'<button class="chip'+(rapportPeriode==='aar'?' on':'')+'" onclick="goArsrapport(view.year||curYear)">\u00c5r</button>'
@@ -9190,8 +9191,8 @@ function rapportSamletViewHTML(){
   else h+=rapportViewHTML();
   return h;
 }
-function oppnaddViewHTML(){
-  var h=rapportNavHTML();
+function oppnaddViewHTML(innebygd){
+  var h=innebygd?'':rapportNavHTML();
   h+='<div class="view-title">Oppn\u00e5dd</div>'
     +'<div class="view-sub">Prosjekter du har oppn\u00e5dd, prosjekter du har fullf\u00f8rt og rutiner du har holdt lenge.</div>';
   var list=achievements.slice().sort(function(a,b){return (b.ts||0)-(a.ts||0);});
@@ -10639,7 +10640,7 @@ function budsjettViewHTML(){
 function planleggingViewHTML(){
   var h='<div class="view-title">Oversikt</div>'
     +'<div class="view-sub">Grunnverdier er slik du vil leve («Jeg tar vare på helsa»). Prosjekter er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['tavle','Tavle'],['tidslinje','Tidslinje'],['sammenheng','Sammenhenger'],['verdier','Grunnverdier'],['prosjekter','Prosjekter'],['rutiner','Rutiner'],['hendelser','Hendelser']];
+  var ptabs=[['tavle','Tavle'],['tidslinje','Tidslinje'],['sammenheng','Sammenhenger'],['verdier','Grunnverdier'],['prosjekter','Prosjekter'],['rutiner','Rutiner'],['hendelser','Hendelser'],['rapporter','Rapporter']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
@@ -10647,6 +10648,15 @@ function planleggingViewHTML(){
   if(planTab==='tavle')h+=kanbanTavleHTML();
   if(planTab==='tidslinje')h+=prosjektTidslinjeHTML();
   if(planTab==='sammenheng')h+=oversiktViewHTML();
+  if(planTab==='rapporter'){
+    h+='<div class="chips" style="padding:8px 12px 0">'
+      +[['rapporter','Rapport'],['oppnadd','Oppn\u00e5dd'],['ressursbruk','Ressursbruk']].map(function(t){
+        return'<button class="chip'+(rrTab===t[0]?' on':'')+'" onclick="rrTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
+      }).join('')+'</div>';
+    if(rrTab==='oppnadd')h+=oppnaddViewHTML(true);
+    else if(rrTab==='ressursbruk')h+=okonomiHubHTML(true);
+    else h+=rapportSamletViewHTML(true);
+  }
   if(planTab==='verdier'){
   h+='<div class="sec-title">Grunnverdier</div>';
   h+='<button class="add-btn" onclick="openGoalModal()">+ Ny grunnverdi</button>';
