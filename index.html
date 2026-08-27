@@ -3827,6 +3827,18 @@ function load(){
   }
 
   // Alle prosjekter skal ha en type — gi eksisterende uten type «Annet prosjekt»
+  // Nye felter på rutiner: anker, minsteversjon og logg over minimale dager.
+  var ank1=false;try{ank1=!!localStorage.getItem(SK+'_ankere1');}catch(e){}
+  if(!ank1){
+    routines.forEach(function(r){
+      if(!r.ankere)r.ankere=[];
+      if(r.minste===undefined)r.minste='';
+      if(!r.minsteLog)r.minsteLog=[];
+    });
+    try{localStorage.setItem(SK+'_ankere1','1');}catch(e){}
+    save();
+  }
+
   // Oppnådde resultater manglet dato. Henter den fra et koblet prosjekt der den
   // finnes; ellers settes måneden resultatet selv var satt til, som beste anslag.
   var ad1=false;try{ad1=!!localStorage.getItem(SK+'_achieveddato1');}catch(e){}
@@ -4146,18 +4158,18 @@ function toggleDrawer(){drawerOpen=!drawerOpen;render();}
 var rapportPeriode='maaned';
 function goArsrapport(y){rapportPeriode='aar';view={kind:'rapportsamlet',year:y};searchQuery='';drawerOpen=false;render();}
 function goRapport(m,y){rapportPeriode='maaned';view={kind:'rapportsamlet',month:m,year:y};searchQuery='';drawerOpen=false;render();}
-function goHjem(){recentDone={};view={kind:'hjem',month:curMonth,year:curYear};searchQuery='';drawerOpen=false;render();}
+function goHjem(){recentDone={};nesteUt={};view={kind:'hjem',month:curMonth,year:curYear};searchQuery='';drawerOpen=false;render();}
 function goDagbok(m,y){view={kind:'dagbok',month:m,year:y};searchQuery='';drawerOpen=false;render();}
 function goRutiner(m,catId,y){view={kind:'rutiner',month:m,cat:catId||null,year:y||null};drawerOpen=false;render();}
 function goKalender(y){view={kind:'kalender',year:y||curYear};drawerOpen=false;render();}
 function mondayOf(d){var x=new Date(d);var wd=(x.getDay()+6)%7;x.setDate(x.getDate()-wd);return x;}
-function goUke(iso){recentDone={};
+function goUke(iso){recentDone={};nesteUt={};
   var d=iso?new Date(iso):mondayOf(today);
   view={kind:'uke',ws:isoDate(mondayOf(d))};drawerOpen=false;render();
 }
-function goDag(iso){recentDone={};view={kind:'dag',d:iso||isoDate(today)};drawerOpen=false;render();}
-function dagShift(days){recentDone={};var d=new Date(view.d+'T00:00:00');d.setDate(d.getDate()+days);view.d=isoDate(d);render();}
-function ukeShift(days){recentDone={};
+function goDag(iso){recentDone={};nesteUt={};view={kind:'dag',d:iso||isoDate(today)};drawerOpen=false;render();}
+function dagShift(days){recentDone={};nesteUt={};var d=new Date(view.d+'T00:00:00');d.setDate(d.getDate()+days);view.d=isoDate(d);render();}
+function ukeShift(days){recentDone={};nesteUt={};
   var d=new Date(view.ws);d.setDate(d.getDate()+days);
   view.ws=isoDate(d);render();
 }
@@ -4300,11 +4312,107 @@ function skjulteInnleggViewHTML(){
 }
 
 /* ── Rutine/hendelse-handlinger ── */
-function toggleRoutine(id,ym){
+// ── Ankere ─────────────────────────────────────────────────────────────
+// Et anker er noe du allerede gjør, som utløser rutinen. Enten en annen rutine
+// (da vet appen når den skjer) eller fritekst for ting appen ikke kan vite noe
+// om — «etter at deigen er satt til heving». En rutine kan ha flere.
+// Form: {k:'r',id:'r123'} eller {k:'t',t:'etter morgenkaffen'}
+function ankerTekst(a){
+  if(!a)return'';
+  if(a.k==='r'){var r=routineById(a.id);return r?r.name:'';}
+  return a.t||'';
+}
+function routineById(id){return routines.find(function(r){return r.id===id;});}
+// Rutiner som har denne som anker — brukes til å markere «nå er det din tur».
+function rutinerAnkretTil(id){
+  return routines.filter(function(r){
+    return(r.ankere||[]).some(function(a){return a.k==='r'&&a.id===id;});
+  });
+}
+// Hindrer at A ankres til B som er ankret til A. Uten dette kan to rutiner
+// peke på hverandre, og «hva kommer først» blir uten svar.
+function ankerGirSykel(rutineId,kandidatId){
+  if(rutineId===kandidatId)return true;
+  var sett={};
+  var gaa=function(id){
+    if(id===rutineId)return true;
+    if(sett[id])return false;
+    sett[id]=1;
+    var r=routineById(id);if(!r)return false;
+    return(r.ankere||[]).some(function(a){return a.k==='r'&&gaa(a.id);});
+  };
+  return gaa(kandidatId);
+}
+function ankerListeHTML(f){
+  var ank=f.ankere||[];
+  var h=ank.map(function(a,i){
+    var t=ankerTekst(a);
+    if(!t)return'';
+    return'<button class="chip on" onclick="fjernAnker('+i+')">'
+      +(a.k==='r'?'\u21ba ':'')+esc(t)+' \u2715</button>';
+  }).join('');
+  var brukte=ank.filter(function(a){return a.k==='r';}).map(function(a){return a.id;});
+  var kand=routines.filter(function(r){
+    return brukte.indexOf(r.id)<0&&!ankerGirSykel(f.id||'',r.id);
+  }).sort(function(a,b){return nbSort(a.name,b.name);});
+  h+='<div style="display:flex;gap:8px;margin-top:6px">'
+    +'<input id="anker-inp" class="inp" type="text" style="flex:1" placeholder="F.eks. etter at deigen hever \u2026" value="'+esc(f._ankerInn||'')+'" oninput="mf()._ankerInn=this.value" onkeydown="if(event.key===\'Enter\'){event.preventDefault();leggTilAnkerTekst();}">'
+    +'<button onclick="leggTilAnkerTekst()" style="padding:10px 14px;border-radius:10px;border:none;background:var(--btn);color:var(--red);font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0">+</button>'
+    +'</div>';
+  if(kand.length){
+    h+='<div class="hint" style="margin-top:8px">\u2026 eller etter en annen rutine:</div><div class="chips">'
+      +kand.slice(0,12).map(function(r){
+        return'<button class="chip" onclick="leggTilAnkerRutine(\''+q(r.id)+'\')">\u21ba '+esc(r.name)+'</button>';
+      }).join('')+'</div>';
+  }
+  return h;
+}
+function leggTilAnkerTekst(){
+  var f=mf();var t=String(f._ankerInn||'').trim();
+  if(!t)return;
+  f.ankere=[].concat(f.ankere||[],[{k:'t',t:t}]);
+  f._ankerInn='';
+  render();
+  var ni=document.getElementById('anker-inp');if(ni)ni.focus();
+}
+function leggTilAnkerRutine(id){
+  var f=mf();
+  if(ankerGirSykel(f.id||'',id))return;
+  if((f.ankere||[]).some(function(a){return a.k==='r'&&a.id===id;}))return;
+  f.ankere=[].concat(f.ankere||[],[{k:'r',id:id}]);
+  render();
+}
+function fjernAnker(i){
+  var f=mf();
+  f.ankere=(f.ankere||[]).filter(function(_,j){return j!==i;});
+  render();
+}
+// Vises under rutinenavnet: «etter Morgentur · etter at deigen hever»
+function ankerLinjeTekst(r){
+  // Rutineankere får «etter» foran; fritekst vises som skrevet, ellers blir det
+  // «etter etter at deigen hever» for den som skriver hele setningen selv.
+  var t=(r.ankere||[]).map(function(a){
+    var n=ankerTekst(a);
+    if(!n)return'';
+    return a.k==='r'?('etter '+n):n;
+  }).filter(Boolean);
+  return t.join(' \u00b7 ');
+}
+function ankerLinjeHTML(r){
+  var t=ankerLinjeTekst(r);
+  return t?'<div style="font-size:12px;color:var(--muted)">'+esc(t)+'</div>':'';
+}
+
+function toggleRoutine(id,ym,minste){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
-  r.log=r.log||[];
+  r.log=r.log||[];r.minsteLog=r.minsteLog||[];
   var wasOn=r.log.includes(ym);
   r.log=wasOn?r.log.filter(function(l){return l!==ym;}):[].concat(r.log,[ym]);
+  // Minsteversjonen teller som gjort. Den registreres i samme logg, slik at
+  // «11 av 14» ikke får hull i en dårlig uke, men merkes så det er mulig å se
+  // forskjell på en full og en minimal dag.
+  if(wasOn)r.minsteLog=r.minsteLog.filter(function(l){return l!==ym;});
+  else if(minste)r.minsteLog=[].concat(r.minsteLog,[ym]);
   if(!wasOn&&(r.equipmentIds||[]).length)markEquipmentUsed(r.equipmentIds,r.name+' '+fmtDate(isoDate(today)));
   checkRoutineMilestone(r);
   save();render();
@@ -4408,7 +4516,15 @@ function evYearsTag(e,y,light){
     ?' <span style="opacity:.75;font-weight:400">· '+n+' år</span>'
     :' <span style="color:var(--rose);font-size:11px;font-weight:400">· '+n+' år</span>';
 }
-function deleteRoutine(id){routines=routines.filter(function(r){return r.id!==id;});save();closeModal();}
+function deleteRoutine(id){
+  routines=routines.filter(function(r){return r.id!==id;});
+  // Et anker som pekte på den slettede rutinen ville blitt stående som tom tekst
+  routines.forEach(function(r){
+    if(!(r.ankere||[]).length)return;
+    r.ankere=r.ankere.filter(function(a){return!(a.k==='r'&&a.id===id);});
+  });
+  save();closeModal();
+}
 function deleteEvent(id){events=events.filter(function(e){return e.id!==id;});save();closeModal();}
 function goalById(id){return goals.find(function(g){return g.id===id;});}
 function resultHasRoutine(id){
@@ -6306,7 +6422,7 @@ function openEditEntry(id){
   render();
 }
 function openRoutineModal(){
-  modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',tags:[],goalIds:[],resultIds:[],equipmentIds:[],freq:'',ease:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',tags:[],goalIds:[],resultIds:[],equipmentIds:[],freq:'',ease:'',ankere:[],minste:'',_ankerInn:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 // Rutine-detaljside: hvordan går det med rutinen, og alle dagbokinnlegg du har
@@ -6359,7 +6475,7 @@ function rutineDetaljViewHTML(){
 }
 function openEditRoutine(id){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
-  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),tags:[].concat(r.tags||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),equipmentIds:[].concat(r.equipmentIds||[]),freq:r.freq||'',ease:r.ease||'',minutes:r.minutes||'',trackHours:!!r.trackHours,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),tags:[].concat(r.tags||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),equipmentIds:[].concat(r.equipmentIds||[]),freq:r.freq||'',ease:r.ease||'',ankere:[].concat(r.ankere||[]),minste:r.minste||'',_ankerInn:'',minutes:r.minutes||'',trackHours:!!r.trackHours,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openBdayModal(memorial){
@@ -6628,14 +6744,14 @@ function routineValid(){var f=mf();return(f.name||'').trim().length>0;}
 function submitRoutine(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
-  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,tags:f.tags||[],months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[]});
+  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,tags:f.tags||[],months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),ankere:(f.ankere||[]),minste:(f.minste||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[],minsteLog:[]});
   save();closeModal();
 }
 function saveEditRoutine(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var r=routines.find(function(x){return x.id===f.id;});if(!r)return;
-  r.name=name;r.cats=f.cats;r.tags=f.tags||[];r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
+  r.name=name;r.cats=f.cats;r.tags=f.tags||[];r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.ankere=(f.ankere||[]);r.minste=(f.minste||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
   save();closeModal();
 }
 function submitEvent(){
@@ -8004,8 +8120,12 @@ function modalHTML(){
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="Beskriv rutinen …" oninput="mf().name=this.value;updateSaveBtn()">'
       +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt</span></label>'
       +'<div class="chips">'+linkChipSection(f)+'</div>'
+      +'<label class="field-lbl">Anker <span style="font-weight:400;text-transform:none;letter-spacing:0">– noe du allerede gjør, som setter i gang rutinen</span></label>'
+      +ankerListeHTML(f)
       +'<label class="field-lbl">Hva gjør dette lettere å huske og gjennomføre? <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
       +'<input class="inp" type="text" value="'+esc(f.ease||'')+'" placeholder="F.eks. joggeskoene står ved døra …" oninput="mf().ease=this.value">'
+      +'<label class="field-lbl">Minsteversjon <span style="font-weight:400;text-transform:none;letter-spacing:0">– den minste utgaven som fortsatt teller</span></label>'
+      +'<input class="inp" type="text" value="'+esc(f.minste||'')+'" placeholder="F.eks. én øvelse på matta …" oninput="mf().minste=this.value">'
       +'<label class="field-lbl">Frekvens</label>'
       +'<div class="chips">'
       +'<button class="chip'+(f.freq==='daily'?' on':'')+'" onclick="mf().freq=\'daily\';render()">Daglig</button>'
@@ -8403,10 +8523,16 @@ function catBoxesHTML(items){
           // Nettopp haket av — kort respons i kategoriens farge
           var nettopp=it.key&&recentDone[it.key];
           return'<button class="cb-item'+(nettopp?' rutine-ok':'')+'" style="opacity:.5'+(nettopp&&col?';--ok-farge:'+col:'')+'" onclick="'+it.click+'"><span style="color:var(--red)">\u2713</span> <span style="text-decoration:line-through">'+esc(it.label)+'</span>'
-            +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')+'</button>';
+            +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')
+            +(it.minsteGjort?' <span style="color:var(--muted);font-size:10px">(minsteversjon)</span>':'')+'</button>';
         }
-        return'<button class="cb-item" onclick="'+it.click+'"><span class="o">\u25cb</span> '+esc(it.label)
-          +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')+'</button>';
+        // Ankret rutine hvis anker nettopp ble haket av: «nå er det din tur»
+        var klar=it.nesteUt?' style="box-shadow:inset 0 0 0 1.5px var(--red)"':'';
+        return'<button class="cb-item"'+klar+' onclick="'+it.click+'"><span class="o">\u25cb</span> '+esc(it.label)
+          +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')
+          +(it.anker?'<span style="display:block;color:var(--muted);font-size:10px">'+esc(it.anker)+'</span>':'')
+          +'</button>'
+          +(it.minste?'<button class="cb-item" style="padding-left:20px;font-size:11px;color:var(--muted)" onclick="'+it.minsteClick+'"><span class="o">\u25cb</span> bare '+esc(it.minste)+'</button>':'');
       }).join('')
       +'</div>';
   }).join('')+'</div>';
@@ -8419,7 +8545,10 @@ function periodTodoItems(scope){
     var done=(r.log||[]).includes(key);
     var rk='r_'+r.id+'_'+key;
     if(done&&!recentDone[rk])return;
-    out.push({label:r.name,sub:sub,done:done,key:rk,cat:mainCatOf(r.cats),click:"boxToggleRoutine('"+q(r.id)+"','"+q(key)+"')",routineId:r.id,trackHours:!!r.trackHours});
+    out.push({label:r.name,sub:sub,done:done,key:rk,cat:mainCatOf(r.cats),click:"boxToggleRoutine('"+q(r.id)+"','"+q(key)+"')",routineId:r.id,trackHours:!!r.trackHours,
+      minste:(r.minste||''),minsteClick:"boxToggleRoutine('"+q(r.id)+"','"+q(key)+"',1)",
+      minsteGjort:(r.minsteLog||[]).indexOf(key)>=0,
+      anker:ankerLinjeTekst(r),nesteUt:!!nesteUt['r_'+r.id]});
   };
   routines.forEach(function(r){
     var months=r.months||[];
@@ -8485,11 +8614,21 @@ function periodTodoItems(scope){
 /* ── Visninger ── */
 var quickForm={text:'',cats:[],tags:'',routineIds:[],step:1};
 var recentDone={};
-function boxToggleRoutine(rid,key){
+var nesteUt={};
+function boxToggleRoutine(rid,key,minste){
   var k='r_'+rid+'_'+key;
   if(recentDone[k])delete recentDone[k];else recentDone[k]=1;
-  toggleRoutine(rid,key);
+  // Rutiner som er ankret til denne får en kort markering: nå er det deres tur.
+  if(!minsteEllerVanligGjort(rid,key)){
+    rutinerAnkretTil(rid).forEach(function(nx){nesteUt['r_'+nx.id]=1;});
+  }
+  toggleRoutine(rid,key,minste);
 }
+function minsteEllerVanligGjort(rid,key){
+  var r=routineById(rid);
+  return!!r&&(r.log||[]).indexOf(key)>=0;
+}
+
 function boxToggleEvent(id,occYear){
   var k='e_'+id+'_'+occYear;
   if(recentDone[k])delete recentDone[k];else recentDone[k]=1;
@@ -11071,7 +11210,9 @@ function planleggingViewHTML(){
       var gLine=gNames.length
         ?'<div class="entry-date" style="color:var(--red)">\u2192 '+esc(gNames.join(' · '))+'</div>'
         :'<div class="entry-date" style="color:var(--amber)">\u26a0\ufe0e mangler kobling</div>';
+      gLine+=ankerLinjeHTML(r);
       if(r.ease)gLine+='<div style="font-size:12px;font-style:italic;color:var(--muted)">'+esc(r.ease)+'</div>';
+      if(r.minste)gLine+='<div style="font-size:12px;color:var(--muted)">minst: '+esc(r.minste)+'</div>';
 
       return'<div class="entry-row" style="cursor:pointer" onclick="goRutineDetalj(\''+q(r.id)+'\')"><div class="entry-body">'
         +'<div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
