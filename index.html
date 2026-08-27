@@ -9356,6 +9356,173 @@ function goalGroupSort(rows){
   });
 }
 
+// ── Figurer i rapportene ────────────────────────────────────────────────
+// Alle er SVG uten tegnforklaring, laget for ~350 px bred skjerm.
+
+function dagerIMnd(m,y){return new Date(y,m,0).getDate();}
+
+// 1) Dagsrutenett: én prikk per dag, fylt der det finnes innlegg. Viser rytmen
+// og hullene, som tallet «23 innlegg» skjuler.
+function dagsprikkerSVG(m,y,alleInnlegg){
+  var ym=y+'-'+pad(m);
+  var antall={};
+  (alleInnlegg||[]).forEach(function(e){
+    if(e.date.slice(0,7)!==ym)return;
+    var d=Number(e.date.slice(8,10));
+    antall[d]=(antall[d]||0)+1;
+  });
+  var n=dagerIMnd(m,y);
+  var maks=1;for(var k in antall)if(antall[k]>maks)maks=antall[k];
+  var kol=7,r=6.2,steg=r*2+5.4;
+  var forste=(new Date(y,m-1,1).getDay()+6)%7;
+  var rader=Math.ceil((n+forste)/kol);
+  var W=kol*steg,H=rader*steg+13;
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+(W*1.5)+'px;height:auto;display:block;margin:0 auto">';
+  ['M','T','O','T','F','L','S'].forEach(function(d,i){
+    svg+='<text x="'+(i*steg+steg/2)+'" y="9" text-anchor="middle" style="font-size:7px;fill:var(--muted)">'+d+'</text>';
+  });
+  for(var i=1;i<=n;i++){
+    var pos=forste+i-1;
+    var cx=(pos%kol)*steg+steg/2, cy=Math.floor(pos/kol)*steg+steg/2+13;
+    var c=antall[i]||0;
+    if(c){
+      // Fyllgraden viser hvor mange innlegg dagen fikk, ikke bare at den fikk noe.
+      var op=0.35+0.65*(c/maks);
+      svg+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" style="fill:var(--red);fill-opacity:'+op.toFixed(2)+'"/>';
+    } else {
+      svg+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" style="fill:none;stroke:var(--line);stroke-width:1"/>';
+    }
+  }
+  return svg+'</svg>';
+}
+
+// 2) Endring fra forrige måned. Et tall uten sammenligning sier lite.
+function deltaHTML(na,forr){
+  var d=na-forr;
+  if(!forr&&!na)return'';
+  if(d===0)return'<div style="font-size:10px;color:var(--muted)">som i forrige</div>';
+  var opp=d>0;
+  return'<div style="font-size:10px;color:'+(opp?'var(--red)':'var(--muted)')+'">'
+    +(opp?'\u2191 +':'\u2193 \u2212')+Math.abs(d)+' fra forrige</div>';
+}
+
+// 3) Fordeling på grunnverdier: én stolpe delt etter hvor innleggene falt.
+// Svarer på spørsmålet appen egentlig stiller — lever jeg som jeg sa var viktig?
+function grunnverdiStripeHTML(innlegg){
+  var per={},ukjent=0,sum=0;
+  (innlegg||[]).forEach(function(e){
+    var mc=mainCatOf(e.cats);
+    if(mc){per[mc.id]=(per[mc.id]||0)+1;}else{ukjent++;}
+    sum++;
+  });
+  if(!sum)return'';
+  var deler=Object.keys(per).map(function(id){
+    var c=catById(id);
+    return{navn:c?c.name:'Ukjent',n:per[id],farge:catColor(id)||'var(--rose)'};
+  }).sort(function(a,b){return b.n-a.n||nbSort(a.navn,b.navn);});
+  if(ukjent)deler.push({navn:'Uten kategori',n:ukjent,farge:'var(--line)'});
+  var h='<div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin:2px 0 8px">';
+  deler.forEach(function(d){
+    h+='<div title="'+esc(d.navn)+'" style="width:'+(d.n/sum*100)+'%;background:'+d.farge+'"></div>';
+  });
+  h+='</div>';
+  deler.forEach(function(d){
+    h+='<div style="display:flex;align-items:center;gap:7px;font-size:12px;padding:2px 0">'
+      +'<span style="width:9px;height:9px;border-radius:3px;background:'+d.farge+';flex-shrink:0"></span>'
+      +'<span style="flex:1">'+esc(d.navn)+'</span>'
+      +'<span style="color:var(--muted)">'+d.n+' \u00b7 '+Math.round(d.n/sum*100)+'%</span></div>';
+  });
+  return h;
+}
+
+// 4) Rutinemengde som småstolper — hele lista på ett blikk i stedet for tall etter tall.
+// Regner for den viste måneden, ikke bakover fra i dag, så gamle rapporter stemmer.
+function rutineMengdeIMnd(r,m,y){
+  var n=dagerIMnd(m,y);
+  var iDag=isoDate(today);
+  var rd=r.days||[];
+  var log=r.log||[];
+  var gjort=0,mulige=0;
+  for(var i=1;i<=n;i++){
+    var iso=y+'-'+pad(m)+'-'+pad(i);
+    if(iso>iDag)break; // en måned som ikke er omme teller bare dagene som har vært
+    var d=new Date(y,m-1,i);
+    if(rd.length&&rd.indexOf(dow(d))<0)continue;
+    mulige++;
+    if(log.indexOf('d'+iso)>=0)gjort++;
+  }
+  return{gjort:gjort,mulige:mulige};
+}
+function rutineStolperHTML(m,y){
+  var rader=routines.filter(function(r){
+    var mo=r.months||[];return!mo.length||mo.indexOf(m)>=0;
+  }).map(function(r){
+    var andel=0,tekst='\u2013';
+    if(r.freq==='daily'){
+      var mg=rutineMengdeIMnd(r,m,y);
+      andel=mg.mulige?mg.gjort/mg.mulige:0;
+      tekst=mg.gjort+'/'+mg.mulige;
+    } else if(isWeekly(r)){
+      var uker=routineWeeksIn(m,y,r.freq);
+      var dn=uker.filter(function(w){return(r.log||[]).indexOf(w.key)>=0;}).length;
+      andel=uker.length?dn/uker.length:0;
+      tekst=dn+'/'+uker.length;
+    } else {
+      var gj=(r.log||[]).indexOf(y+'-'+pad(m))>=0;
+      andel=gj?1:0;
+      tekst=gj?'gjort':'\u2013';
+    }
+    return{navn:r.name,andel:andel,tekst:tekst,farge:itemColor(r.cats)||'var(--red)'};
+  });
+  if(!rader.length)return'';
+  var h='';
+  rader.sort(function(a,b){return b.andel-a.andel||nbSort(a.navn,b.navn);}).forEach(function(x){
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px">'
+      +'<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.navn)+'</span>'
+      +'<span style="width:78px;height:7px;border-radius:4px;background:var(--line);flex-shrink:0;overflow:hidden">'
+      +'<span style="display:block;height:100%;width:'+Math.round(x.andel*100)+'%;background:'+x.farge+'"></span></span>'
+      +'<span style="width:42px;text-align:right;color:var(--muted);flex-shrink:0">'+x.tekst+'</span></div>';
+  });
+  return h;
+}
+
+// 5) Tolvmånedersstriper til årsrapporten — én rad per måned, samme prikker.
+// Her ser du sesong: at november alltid er tynn, at sommeren er tett.
+function aarsStriperHTML(y,fraM){
+  fraM=fraM||1;
+  var maks=1,per={};
+  for(var m=fraM;m<=12;m++){
+    var ym=y+'-'+pad(m);
+    var dager={};
+    entries.forEach(function(e){
+      if(e.date.slice(0,7)!==ym)return;
+      var d=Number(e.date.slice(8,10));
+      dager[d]=(dager[d]||0)+1;
+      if(dager[d]>maks)maks=dager[d];
+    });
+    per[m]=dager;
+  }
+  var h='';
+  for(var mm=fraM;mm<=12;mm++){
+    var n=dagerIMnd(mm,y),dg=per[mm];
+    var W=31*4.6,H=8;
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:9px;display:block">';
+    for(var i=1;i<=n;i++){
+      var c=dg[i]||0;
+      var x=(i-1)*4.6;
+      if(c)svg+='<rect x="'+x+'" y="0" width="3.6" height="8" rx="1.2" style="fill:var(--red);fill-opacity:'+(0.35+0.65*(c/maks)).toFixed(2)+'"/>';
+      else svg+='<rect x="'+x+'" y="3" width="3.6" height="2" rx="1" style="fill:var(--line)"/>';
+    }
+    svg+='</svg>';
+    var sum=Object.keys(dg).reduce(function(a,k){return a+dg[k];},0);
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'
+      +'<button class="icon-btn" style="width:34px;font-size:10px;padding:1px 4px;flex-shrink:0" onclick="goRapport('+mm+','+y+')">'+MND_FULL[mm-1].slice(0,3)+'</button>'
+      +'<span style="flex:1;min-width:0">'+svg+'</span>'
+      +'<span style="width:26px;text-align:right;font-size:11px;color:var(--muted);flex-shrink:0">'+(sum||'')+'</span></div>';
+  }
+  return h;
+}
+
 function rapportViewHTML(){
   var m=view.month,y=view.year;
   var ym=y+'-'+pad(m);
@@ -9378,12 +9545,33 @@ function rapportViewHTML(){
   var mEvents=monthEventsFor(m,y);
   var doneE=mEvents.filter(function(e){return evDone(e,y);});
 
+  // Forrige måned, til sammenligningstallene
+  var pYm=prevY+'-'+pad(prevM);
+  var pEntries=entries.filter(function(e){return e.date.slice(0,7)===pYm;});
+  var pRoutines=routines.filter(function(r){var mo=r.months||[];return!mo.length||mo.includes(prevM);});
+  var pDoneR=pRoutines.filter(function(r){return routineMonthStatus(r,prevM,prevY).done;});
+  var pDoneE=monthEventsFor(prevM,prevY).filter(function(e){return evDone(e,prevY);});
+
   h+='<div class="sec-title">M\u00e5neden i tall</div>'
     +'<div class="card"><div style="display:flex;justify-content:space-around;text-align:center;padding:12px 10px">'
-    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+monthEntries.length+'</div><div style="font-size:11px;color:var(--muted)">innlegg</div></div>'
-    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneR.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+monthRoutines.length+'</span></div><div style="font-size:11px;color:var(--muted)">rutiner</div></div>'
-    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneE.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+mEvents.length+'</span></div><div style="font-size:11px;color:var(--muted)">hendelser</div></div>'
-    +'</div></div>';
+    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+monthEntries.length+'</div><div style="font-size:11px;color:var(--muted)">innlegg</div>'+deltaHTML(monthEntries.length,pEntries.length)+'</div>'
+    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneR.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+monthRoutines.length+'</span></div><div style="font-size:11px;color:var(--muted)">rutiner</div>'+deltaHTML(doneR.length,pDoneR.length)+'</div>'
+    +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+doneE.length+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+mEvents.length+'</span></div><div style="font-size:11px;color:var(--muted)">hendelser</div>'+deltaHTML(doneE.length,pDoneE.length)+'</div>'
+    +'</div>'
+    +'<div style="padding:2px 12px 12px">'+dagsprikkerSVG(m,y,entries)+'</div>'
+    +'</div>';
+
+  var gvStripe=grunnverdiStripeHTML(monthEntries);
+  if(gvStripe){
+    h+='<div class="sec-title">Hvor det gode kom fra</div>'
+      +'<div class="card"><div style="padding:12px 14px">'+gvStripe+'</div></div>';
+  }
+
+  var rStolper=rutineStolperHTML(m,y);
+  if(rStolper){
+    h+='<div class="sec-title">Rutiner denne m\u00e5neden</div>'
+      +'<div class="card"><div style="padding:10px 14px">'+rStolper+'</div></div>';
+  }
   if(monthEntries.length){
     h+='<div style="padding:8px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="goDagbok('+m+','+y+')">Se innleggene i Dagbok \u2192</button></div>';
   }
@@ -9554,6 +9742,17 @@ function arsrapportViewHTML(){
     +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+logCount+'</div><div style="font-size:11px;color:var(--muted)">rutiner gjort</div></div>'
     +'<div><div style="font-size:20px;font-weight:700;color:var(--red)">'+yDoneE+'<span style="font-size:13px;font-weight:400;color:var(--rose)">/'+yEvents.length+'</span></div><div style="font-size:11px;color:var(--muted)">hendelser</div></div>'
     +'</div></div>';
+
+  if(yearEntries.length){
+    h+='<div class="sec-title">\u00c5ret dag for dag</div>'
+      +'<div class="card"><div style="padding:10px 12px">'+aarsStriperHTML(y,fromM)+'</div>'
+      +'<div style="padding:0 14px 10px;font-size:10px;color:var(--muted)">M\u00f8rkere strek = flere innlegg den dagen. Trykk p\u00e5 m\u00e5neden for full rapport.</div></div>';
+    var gvAar=grunnverdiStripeHTML(yearEntries);
+    if(gvAar){
+      h+='<div class="sec-title">Hvor det gode kom fra</div>'
+        +'<div class="card"><div style="padding:12px 14px">'+gvAar+'</div></div>';
+    }
+  }
 
   var ecoRows=budgetRows.filter(function(b){return b.year===y;});
   if(ecoRows.length){
