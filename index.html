@@ -503,6 +503,18 @@ function addAchievement(kind,key,name,goalIds,cats,detail){
 function achKindLabel(k){
   return k==='milestone'?'Milepæl':k==='result'?'Prosjekt n\u00e5dd':k==='project'?'Prosjekt fullført':k==='routine'?'Rutine':'Oppnådd';
 }
+// Et resultat lagret f\u00f8r bare at det VAR oppn\u00e5dd, ikke n\u00e5r. Uten dato kan ikke
+// rapportene skille «skjedde denne m\u00e5neden» fra «skjedde en gang».
+function settResultatOppnadd(r,verdi,dato){
+  if(!r)return;
+  if(verdi){
+    r.achieved=true;
+    if(!r.achievedDate)r.achievedDate=dato||isoDate(today);
+  } else {
+    r.achieved=false;
+    delete r.achievedDate;
+  }
+}
 function catsForResult(r){
   if(r.subCats&&r.subCats.length)return r.subCats;
   var g=goalById(r.valueId);
@@ -2232,7 +2244,7 @@ function strikkeprosjekterViewHTML(){
   });
   resProjs.forEach(function(r){
     h+='<div class="entry-row" style="cursor:pointer" onclick="openEditResult(\''+q(r.id)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(resultShortTitle(r))+(r.achieved?' <span style="font-size:10px;color:var(--red)">\u00b7 \u2713 oppn\u00e5dd</span>':'')+'</div>'
+      +'<div class="entry-body"><div class="entry-text">'+esc(resultShortTitle(r))+(r.achieved?' <span style="font-size:10px;color:var(--red)">\u00b7 \u2713 oppn\u00e5dd'+(r.achievedDate?' '+fmtDate(r.achievedDate):'')+'</span>':'')+'</div>'
       +'<div class="entry-date">frist '+MND_FULL[r.month-1]+' '+r.year+'</div></div>'
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
   });
@@ -3815,6 +3827,22 @@ function load(){
   }
 
   // Alle prosjekter skal ha en type — gi eksisterende uten type «Annet prosjekt»
+  // Oppnådde resultater manglet dato. Henter den fra et koblet prosjekt der den
+  // finnes; ellers settes måneden resultatet selv var satt til, som beste anslag.
+  var ad1=false;try{ad1=!!localStorage.getItem(SK+'_achieveddato1');}catch(e){}
+  if(!ad1){
+    results.forEach(function(r){
+      if(!r.achieved||r.achievedDate)return;
+      var pro=inventories.find(function(iv){
+        return(iv.resultIds||[]).indexOf(r.id)>=0&&iv.completedDate;
+      });
+      if(pro){r.achievedDate=pro.completedDate;return;}
+      if(r.year&&r.month)r.achievedDate=r.year+'-'+pad(r.month)+'-01';
+    });
+    try{localStorage.setItem(SK+'_achieveddato1','1');}catch(e){}
+    save();
+  }
+
   var prosjt1=false;try{prosjt1=!!localStorage.getItem(SK+'_prosjekttype1');}catch(e){}
   if(!prosjt1){
     inventories.forEach(function(iv){
@@ -4408,7 +4436,7 @@ function resultDeadlineHTML(r){
       saveTxt+=' \u00b7 '+fmtKr(r.targetAmount-sv)+' igjen p\u00e5 '+qLeft+' kvartal'+(qLeft>1?'er':'')+' = ~'+fmtKr((r.targetAmount-sv)/qLeft)+'/kvartal';
     }
   }
-  if(r.achieved)return' <span style="font-size:11px;color:var(--red);font-weight:700">\u2713 oppn\u00e5dd'+saveTxt+'</span>';
+  if(r.achieved)return' <span style="font-size:11px;color:var(--red);font-weight:700">\u2713 oppn\u00e5dd'+(r.achievedDate?' '+fmtDate(r.achievedDate):'')+saveTxt+'</span>';
   var startTxt='';
   if(r.startMonth&&r.startYear){
     var todayYM=today.getFullYear()*12+today.getMonth();
@@ -4521,6 +4549,7 @@ function submitResult(){
   var f=mf();var name=(f.name||'').trim();if(!name||!f.valueId||!f.subtype)return;
   var newId='x'+Date.now()+Math.random().toString(36).slice(2,6);
   results.push({id:newId,name:name,tags:f.tags||[],shortTitle:(f.shortTitle||'').trim(),subtype:f.subtype,valueId:f.valueId,month:Number(f.month),year:Number(f.year),startMonth:f.startMonth?Number(f.startMonth):null,startYear:f.startYear?Number(f.startYear):null,subCats:f.subCats||[],achieved:!!f.achieved,targetAmount:parseKr(f.targetAmount),amountType:f.amountType||'',hoursTotal:numVal(f.hoursTotal)||'',hoursMode:f.hoursMode==='monthly'?'monthly':'total',trackHours:f.trackHours!==false,equipmentIds:f.equipmentIds||[],milestones:f.milestones||[],forutsetninger:(f.forutsetninger||'').trim(),risikoer:(f.risikoer||'').trim()});
+  if(f.achieved)settResultatOppnadd(resultById(newId),true);
   if(f.achieved&&(f.equipmentIds||[]).length)markEquipmentUsed(f.equipmentIds,name+' '+MND_FULL[Number(f.month)-1]+' '+f.year);
   syncResultRoutines(newId,f.routineIds);syncResultEvents(newId,f.eventIds);
   syncResultInvs(newId,f.invIds);
@@ -4535,7 +4564,7 @@ function saveEditResult(){
   var wasAchieved=!!r.achieved;
   r.name=name;r.tags=f.tags||[];r.shortTitle=(f.shortTitle||'').trim();r.subtype=f.subtype;r.valueId=f.valueId;r.month=Number(f.month);r.year=Number(f.year);
   r.startMonth=f.startMonth?Number(f.startMonth):null;r.startYear=f.startYear?Number(f.startYear):null;
-  r.subCats=f.subCats||[];r.achieved=!!f.achieved;r.targetAmount=parseKr(f.targetAmount);
+  r.subCats=f.subCats||[];settResultatOppnadd(r,!!f.achieved);r.targetAmount=parseKr(f.targetAmount);
   r.amountType=f.amountType||'';
   r.hoursTotal=numVal(f.hoursTotal)||'';
   r.hoursMode=f.hoursMode==='monthly'?'monthly':'total';
@@ -5279,7 +5308,7 @@ function kanbanFlytt(invId,retning){
   var ny=KANBAN_FASER[Math.max(0,Math.min(3,i+retning))];
   if(!ny||ny[0]===naa)return;
   if(ny[0]==='ferdig'){toggleProjectDone(invId);return;} // gir feiring og setter dato
-  if(naa==='ferdig'){delete iv.completedDate;(iv.resultIds||[]).forEach(function(rid){var rr=resultById(rid);if(rr)rr.achieved=false;});}
+  if(naa==='ferdig'){delete iv.completedDate;(iv.resultIds||[]).forEach(function(rid){settResultatOppnadd(resultById(rid),false);});}
   iv.fase=ny[0];
   save();render();
 }
@@ -5640,9 +5669,9 @@ function mensSyklusGraferHTML(kompakt){
 }
 function toggleProjectDone(invId){
   var inv=invById(invId);if(!inv)return;
-  if(inv.completedDate){delete inv.completedDate;(inv.resultIds||[]).forEach(function(rid){var rr=resultById(rid);if(rr)rr.achieved=false;});save();render();return;}
+  if(inv.completedDate){delete inv.completedDate;(inv.resultIds||[]).forEach(function(rid){settResultatOppnadd(resultById(rid),false);});save();render();return;}
   inv.completedDate=isoDate(today);
-  (inv.resultIds||[]).forEach(function(rid){var rr=resultById(rid);if(rr)rr.achieved=true;});
+  (inv.resultIds||[]).forEach(function(rid){settResultatOppnadd(resultById(rid),true,inv.completedDate);});
   addAchievement('project','proj:'+inv.id,inv.name,inv.goalIds||[],inv.catId?[inv.catId]:[],'');
   playFanfare();
   var ut=findFixedList('utstyr');
@@ -9359,6 +9388,28 @@ function rapportViewHTML(){
     h+='<div style="padding:8px 12px 0"><button class="icon-btn" style="font-size:11px" onclick="goDagbok('+m+','+y+')">Se innleggene i Dagbok \u2192</button></div>';
   }
 
+  // Fullførte prosjekter står ellers bare under Oppnådd og på tidslinja. Her tas de
+  // med uavhengig av om de er koblet til en grunnverdi, ellers ville et frittstående
+  // prosjekt aldri dukket opp i noen rapport.
+  var ferdigeIMnd=inventories.filter(function(iv){
+    return(iv.type||'inventar')==='prosjekt'&&iv.completedDate&&iv.completedDate.slice(0,7)===ym;
+  }).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
+  if(ferdigeIMnd.length){
+    h+='<div class="sec-title">Fullf\u00f8rt denne m\u00e5neden</div><div class="card">';
+    ferdigeIMnd.forEach(function(iv){
+      var opp=iv.oppgaver||[];
+      var pCat=iv.catId?catById(iv.catId):null;
+      h+='<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'
+        +'<div class="entry-body"><div class="entry-text"><span style="color:var(--red);font-weight:700">\u2713</span> '+esc(dispName(iv))+'</div>'
+        +'<div class="entry-date">'+(pCat?esc(pCat.name)+' \u00b7 ':'')
+        +esc(prosjekttypeName(iv.subtype).toLowerCase())
+        +(opp.length?' \u00b7 '+opp.filter(function(o){return o.ferdig;}).length+' av '+opp.length+' oppgaver':'')
+        +' \u00b7 ferdigstilt '+fmtDate(iv.completedDate)+'</div></div>'
+        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+    });
+    h+='</div>';
+  }
+
   if(!goals.length){
     h+='<div class="card"><div class="empty">Ingen grunnverdier enn\u00e5. Legg til under Oversikt, s\u00e5 bygges rapporten rundt dem.</div></div>';
     return h;
@@ -9394,11 +9445,12 @@ function rapportViewHTML(){
       var xr=row.gr.filter(function(r){return(r.resultIds||[]).includes(x.id);});
       var xe=row.ge.filter(function(e){return(e.resultIds||[]).includes(x.id);});
       var xEnt=(x.subCats||[]).length?monthEntries.filter(function(e){return resultCatMatch(x,e.cats);}).length:null;
-      if(!xr.length&&!xe.length&&xEnt===null&&x.achieved)return;
+      // Et nådd resultat ble tidligere hoppet over her, slik at prosjektet forsvant
+      // fra rapporten i samme øyeblikk som det ble fullført. Nå blir det stående.
       h+=secLbl(esc(x.name)+resultDeadlineHTML(x));
       inventories.filter(function(iv){return(iv.resultIds||[]).includes(x.id);}).forEach(function(iv){
         var ic=invCounts(iv);
-        h+='<div style="padding:0 14px 4px;font-size:12px;color:var(--muted)">'+esc(iv.name)+': '+ic.have+'/'+ic.total+(ic.missing?' \u00b7 mangler '+ic.missing:' \u00b7 komplett')+'</div>';
+        h+='<div style="padding:0 14px 4px;font-size:12px;color:var(--muted)">'+esc(iv.name)+': '+ic.have+'/'+ic.total+(ic.missing?' \u00b7 mangler '+ic.missing:' \u00b7 komplett')+(iv.completedDate?' \u00b7 <span style="color:var(--red)">\u2713 ferdigstilt '+fmtDate(iv.completedDate)+'</span>':'')+'</div>';
       });
       if(xr.length||xe.length){
         h+='<div style="padding:2px 14px 6px">';
@@ -9569,7 +9621,7 @@ function arsrapportViewHTML(){
         h+=secLbl(esc(x.name)+resultDeadlineHTML(x));
       inventories.filter(function(iv){return(iv.resultIds||[]).includes(x.id);}).forEach(function(iv){
         var ic=invCounts(iv);
-        h+='<div style="padding:0 14px 4px;font-size:12px;color:var(--muted)">'+esc(iv.name)+': '+ic.have+'/'+ic.total+(ic.missing?' \u00b7 mangler '+ic.missing:' \u00b7 komplett')+'</div>';
+        h+='<div style="padding:0 14px 4px;font-size:12px;color:var(--muted)">'+esc(iv.name)+': '+ic.have+'/'+ic.total+(ic.missing?' \u00b7 mangler '+ic.missing:' \u00b7 komplett')+(iv.completedDate?' \u00b7 <span style="color:var(--red)">\u2713 ferdigstilt '+fmtDate(iv.completedDate)+'</span>':'')+'</div>';
       });
         if(xr.length||xe.length){
           h+='<div style="padding:2px 14px 6px">';
