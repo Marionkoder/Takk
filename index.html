@@ -6716,24 +6716,26 @@ function catChipSection(f,withMains){
 
 // Det brukeren holder p\u00e5 \u00e5 skrive akkurat n\u00e5 \u2014 alt etter siste komma,
 // slik at forslagene f\u00f8lger stikkordet under fingeren og ikke hele feltet.
-function tagFragment(f){
-  var raw=(f._tagIn||'');
-  var i=raw.lastIndexOf(',');
-  return (i<0?raw:raw.slice(i+1)).trim().toLowerCase();
+function tagFragmentAv(raw){
+  var t=String(raw||'');
+  var i=t.lastIndexOf(',');
+  return (i<0?t:t.slice(i+1)).trim().toLowerCase();
 }
 // Forslag mens du skriver: treff i starten av ordet f\u00f8rst, deretter treff inni det.
-function tagSuggestions(f){
-  var frag=tagFragment(f);
+// Delt mellom hurtiginnlegget p\u00e5 forsida og stikkordfeltet i skjemaene.
+function tagForslag(frag,valgt){
   if(!frag)return[];
-  var valgt=(f.tags||[]);
+  valgt=valgt||[];
   var start=[],inni=[];
   Object.keys(allTagsPool()).sort(nbSort).forEach(function(t){
-    if(valgt.includes(t)||t===frag)return;
+    if(valgt.indexOf(t)>=0||t===frag)return;
     if(t.indexOf(frag)===0)start.push(t);
     else if(t.indexOf(frag)>0)inni.push(t);
   });
   return start.concat(inni).slice(0,8);
 }
+function tagFragment(f){return tagFragmentAv(f._tagIn);}
+function tagSuggestions(f){return tagForslag(tagFragment(f),f.tags||[]);}
 function tagInput(v){mf()._tagIn=v;render();}
 // Velger et forslag: bytter ut fragmentet som ble skrevet, og lar det som
 // eventuelt sto foran siste komma st\u00e5 urørt.
@@ -8481,6 +8483,23 @@ function toggleQuickRoutine(id){
   quickForm.routineIds=a.includes(id)?a.filter(function(x){return x!==id;}):a.concat([id]);
   render();
 }
+// Stikkordforslag i hurtiginnlegget. Her ligger stikkordene som \u00e9n tekststreng,
+// ikke som en liste, s\u00e5 fragmentet plukkes ut og settes tilbake i strengen.
+function quickTagsValgte(){
+  return (quickForm.tags||'').split(',').map(function(v){return v.trim().toLowerCase();}).filter(Boolean);
+}
+function quickTagForslag(){
+  return tagForslag(tagFragmentAv(quickForm.tags),quickTagsValgte());
+}
+function quickTagInput(v){quickForm.tags=v;render();}
+function pickQuickTag(t){
+  var raw=(quickForm.tags||'');
+  var i=raw.lastIndexOf(',');
+  quickForm.tags=(i<0?'':raw.slice(0,i+1)+' ')+t+', ';
+  render();
+  var ni=document.getElementById('quick-tags');
+  if(ni){ni.focus();ni.setSelectionRange(ni.value.length,ni.value.length);}
+}
 function submitQuick(){
   var text=(quickForm.text||'').trim();
   if(!text||!quickForm.cats.length)return;
@@ -8510,7 +8529,14 @@ function quickLogHTML(){
       +'</div>'
       +'<div style="font-size:13px;font-weight:700;margin:10px 0 6px">Hvilken kategori h\u00f8rer dette hjemme i? <span style="font-weight:400">Du kan velge mer enn \u00e9n.</span></div>'
       +'<div class="chips">'+chips+'</div>'
-      +'<input id="quick-tags" class="inp" type="text" style="margin-top:8px;font-size:13px" placeholder="Stikkord, adskilt med komma (valgfritt)" value="'+esc(quickForm.tags||'')+'" oninput="quickForm.tags=this.value">'
+      +'<input id="quick-tags" class="inp" type="text" style="margin-top:8px;font-size:13px" placeholder="Stikkord, adskilt med komma (valgfritt)" value="'+esc(quickForm.tags||'')+'" oninput="quickTagInput(this.value)">'
+      +(function(){
+        var fs=quickTagForslag();
+        if(!fs.length)return'';
+        return'<div class="chips" style="margin-top:6px">'+fs.map(function(t){
+          return'<button class="chip" onclick="pickQuickTag(\''+q(t)+'\')">'+esc(t)+'</button>';
+        }).join('')+'</div>';
+      })()
       +(function(){
         var ar=activeRoutinesNow();
         if(!ar.length)return'';
@@ -10881,8 +10907,8 @@ function render(){
   if(pinLocked){renderPinScreen();return;}
   if(view&&view.kind==='celebration'){document.getElementById('app').innerHTML=celebrationViewHTML();return;}
   var wasSearch=false,wasQuick=false;
-  var wasQTags=false;
-  try{wasSearch=document.activeElement&&document.activeElement.id==='search-inp';wasQuick=document.activeElement&&document.activeElement.id==='quick-inp';wasQTags=document.activeElement&&document.activeElement.id==='quick-tags';}catch(e){}
+  var wasQTags=false,qTagsPos=null;
+  try{wasSearch=document.activeElement&&document.activeElement.id==='search-inp';wasQuick=document.activeElement&&document.activeElement.id==='quick-inp';wasQTags=document.activeElement&&document.activeElement.id==='quick-tags';if(wasQTags)qTagsPos=document.activeElement.selectionStart;}catch(e){}
   var wasModalSok=false,modalSokPos=0;
   try{
     if(document.activeElement&&document.activeElement.id==='modal-sok-inp'){wasModalSok=true;modalSokPos=document.activeElement.selectionStart||0;}
@@ -11036,7 +11062,7 @@ function render(){
   var qi=document.getElementById('quick-inp');
   if(qi&&wasQuick){qi.focus();qi.setSelectionRange(qi.value.length,qi.value.length);}
   var qt=document.getElementById('quick-tags');
-  if(qt&&wasQTags){qt.focus();qt.setSelectionRange(qt.value.length,qt.value.length);}
+  if(qt&&wasQTags){var qp=(qTagsPos===null?qt.value.length:Math.min(qTagsPos,qt.value.length));qt.focus();qt.setSelectionRange(qp,qp);}
   var msi=document.getElementById('modal-sok-inp');
   if(msi&&wasModalSok){msi.focus();msi.setSelectionRange(modalSokPos,modalSokPos);}
   var thsi=document.getElementById('taghash-sok-inp');
