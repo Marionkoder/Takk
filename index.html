@@ -162,6 +162,8 @@ body.spesialdag-bg-17mai{--bg:#5B6E85}
 .mm-dots{display:flex;gap:1px;justify-content:center;height:3px}
 .mm-dots i{width:3px;height:3px;border-radius:50%;display:inline-block}
 .tag-pill{font-size:10px;color:var(--amber);background:#F5E8D8;padding:2px 7px;border-radius:99px}
+button.tag-pill{border:none;font-family:inherit;line-height:inherit;cursor:pointer}
+button.tag-pill:hover{filter:brightness(.94)}
 .del-btn{font-size:12px;color:var(--red);background:none;border:none;cursor:pointer;padding:2px 4px;align-self:center;flex-shrink:0}
 .empty{padding:18px;font-size:14px;color:var(--muted);line-height:1.7}
 .hint-box{margin:12px 12px 0;padding:9px 14px;background:var(--red-soft);border-radius:10px;font-size:12px;color:var(--red)}
@@ -4186,9 +4188,13 @@ function goTagAlle(tag){view={kind:'tagalle',tag:tag};drawerOpen=false;render();
 // innleggene delt på andel blant ALLE innlegg. 1 = helt vanlig. Over 1 = henger
 // sammen oftere enn tilfeldig. Under 1 = sjeldnere enn ellers.
 function tagMonsterHTML(tag){
-  var alle=entries;
+  // Regnes over DELER, ikke innlegg. Skriver du «tur med Jenny» og «operaen med
+  // Knut» i samme innlegg, hørte Jenny aldri til operaen — og med innlegget som
+  // enhet ville analysen påstått at de gjorde det.
+  var alle=[];
+  entries.forEach(function(e){bolkerFra(e).forEach(function(b){alle.push(b);});});
   var totalN=alle.length;
-  var tagget=alle.filter(function(e){return(e.tags||[]).includes(tag);});
+  var tagget=alle.filter(function(b){return(b.tags||[]).includes(tag);});
   var taggetN=tagget.length;
   if(taggetN<3||totalN<8)return''; // for lite data til at et mønster sier noe
 
@@ -6413,12 +6419,13 @@ function exportTekst(){
 
 /* ── Modal ── */
 function openEntryModal(){
-  modal={step:'entry',form:{text:'',cats:[],tags:[],routineIds:[],_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'entry',form:{text:'',cats:[],tags:[],bolker:[{cats:[],tags:[]}],_bolk:0,routineIds:[],_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openEditEntry(id){
   var e=entries.find(function(x){return x.id===id;});if(!e)return;
-  modal={step:'entry_edit',form:{id:id,text:e.text,cats:[].concat(e.cats),tags:[].concat(e.tags||[]),routineIds:[].concat(e.routineIds||[]),date:e.date,_newSub:'',_newSubParent:'',_newMain:''}};
+  var bk=bolkerFra(e);
+  modal={step:'entry_edit',form:{id:id,text:e.text,cats:[].concat(bk[0].cats),tags:[].concat(bk[0].tags),bolker:bk,_bolk:0,routineIds:[].concat(e.routineIds||[]),date:e.date,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openRoutineModal(){
@@ -6545,11 +6552,24 @@ function allTagsPool(){
   });
   return counts;
 }
+// Én stikkordbrikke. Som knapp går den til stikkordets egen side, slik at
+// stikkordene er inngangen til sammenhengene og ikke bare pynt på innlegget.
+// Brikkene ligger noen steder inne i en rad som selv er klikkbar (rutinelista
+// går til rutinedetaljene), så klikket må stoppes før det bobler videre.
+function tagKlikk(ev,t){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  goTagAlle(t);
+}
+function tagPillHTML(t,klikkbar){
+  var tc=tagColor(t);
+  var st=tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'';
+  if(klikkbar===false)return'<span class="tag-pill"'+st+'>#'+esc(t)+'</span>';
+  return'<button class="tag-pill" type="button"'+st+' onclick="tagKlikk(event,\''+q(t)+'\')">#'+esc(t)+'</button>';
+}
 function tagPillsHTML(tags){
   if(!tags||!tags.length)return'';
   return'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">'+tags.map(function(t){
-    var tc=tagColor(t);
-    return'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>';
+    return tagPillHTML(t);
   }).join('')+'</div>';
 }
 function tagCountsFor(list){
@@ -6723,12 +6743,91 @@ function toggleFormRoutine(id){
   mf().routineIds=a.includes(id)?a.filter(function(x){return x!==id;}):a.concat([id]);
   render();
 }
-function entryValid(){var f=mf();return(f.text||'').trim().length>0&&f.cats.length>0;}
+// ── Deler i et innlegg ─────────────────────────────────────────────────
+// Ett innlegg kan romme flere episoder: «tur med Jenny» og «operaen med Knut».
+// Uten deler fester alle stikkord seg til hele innlegget, og analysen tror at
+// Jenny hørte til operaen. Delene holder naboskapet riktig.
+//
+// e.cats og e.tags beholdes som unionen av alle delene, slik at ordskyer,
+// rapporter og filtre virker nøyaktig som før. Delene ligger ved siden av.
+//
+// I skjemaet speiler f.cats/f.tags den delen som er åpen, slik at
+// catChipSection, tagSectionHTML og toggle-funksjonene kan brukes uendret.
+function bolkerFra(e){
+  if(e&&e.bolker&&e.bolker.length)return e.bolker.map(function(b){
+    return{cats:[].concat(b.cats||[]),tags:[].concat(b.tags||[])};
+  });
+  return[{cats:[].concat((e&&e.cats)||[]),tags:[].concat((e&&e.tags)||[])}];
+}
+function lagreAktivBolk(f){
+  if(!f.bolker||!f.bolker.length)return;
+  var i=f._bolk||0;
+  if(!f.bolker[i])f.bolker[i]={cats:[],tags:[]};
+  f.bolker[i].cats=[].concat(f.cats||[]);
+  f.bolker[i].tags=[].concat(f.tags||[]);
+}
+function byttBolk(i){
+  var f=mf();
+  lagreAktivBolk(f);
+  f._bolk=i;
+  var b=f.bolker[i]||{cats:[],tags:[]};
+  f.cats=[].concat(b.cats);f.tags=[].concat(b.tags);
+  f._tagIn='';
+  render();updateSaveBtn();
+}
+function leggTilBolk(){
+  var f=mf();
+  lagreAktivBolk(f);
+  f.bolker=[].concat(f.bolker||[],[{cats:[],tags:[]}]);
+  byttBolk(f.bolker.length-1);
+}
+function fjernBolk(i){
+  var f=mf();
+  lagreAktivBolk(f);
+  if((f.bolker||[]).length<2)return;
+  f.bolker=f.bolker.filter(function(_,j){return j!==i;});
+  byttBolk(Math.max(0,Math.min(f._bolk||0,f.bolker.length-1)));
+}
+// Deler uten innhold kastes; unionen er det innlegget merkes med.
+function bolkerUt(f){
+  lagreAktivBolk(f);
+  var b=(f.bolker||[]).filter(function(x){return(x.cats||[]).length||(x.tags||[]).length;});
+  return b.length?b:[{cats:[].concat(f.cats||[]),tags:[].concat(f.tags||[])}];
+}
+function unionAv(bolker,felt){
+  var ut=[];
+  bolker.forEach(function(b){(b[felt]||[]).forEach(function(v){if(ut.indexOf(v)<0)ut.push(v);});});
+  return ut;
+}
+function bolkFaneHTML(f){
+  var b=f.bolker||[];
+  var h='<div class="chips" style="margin-bottom:2px">';
+  b.forEach(function(_,i){
+    h+='<button class="chip'+((f._bolk||0)===i?' on':'')+'" onclick="byttBolk('+i+')">Del '+(i+1)+'</button>';
+  });
+  h+='<button class="chip" onclick="leggTilBolk()">+ ny del</button>';
+  if(b.length>1)h+='<button class="chip" onclick="fjernBolk('+(f._bolk||0)+')">\u2715 fjern Del '+((f._bolk||0)+1)+'</button>';
+  h+='</div>';
+  if(b.length>1){
+    h+='<div class="hint" style="margin-bottom:4px">Kategorier og stikkord under h\u00f8rer bare til Del '+((f._bolk||0)+1)+'. Teksten er felles.</div>';
+  }
+  return h;
+}
+
+function entryValid(){
+  var f=mf();
+  if(!(f.text||'').trim().length)return false;
+  if((f.cats||[]).length)return true;
+  // En annen del kan ha kategorien, selv om den åpne delen er tom
+  var i=f._bolk||0;
+  return(f.bolker||[]).some(function(b,j){return j!==i&&(b.cats||[]).length;});
+}
 function submitEntry(){
   var f=mf();flushTags(f);
   var text=(f.text||'').trim();if(!text)return;
   if(!f.cats.length)return;
-  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:f.cats,tags:f.tags||[],routineIds:f.routineIds||[],date:isoDate(today)});
+  var bk=bolkerUt(f);
+  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:unionAv(bk,'cats'),tags:unionAv(bk,'tags'),bolker:bk,routineIds:f.routineIds||[],date:isoDate(today)});
   save();closeModal();
 }
 function saveEditEntry(){
@@ -6736,7 +6835,8 @@ function saveEditEntry(){
   var text=(f.text||'').trim();if(!text)return;
   if(!f.cats.length)return;
   var e=entries.find(function(x){return x.id===f.id;});if(!e)return;
-  e.text=text;e.cats=f.cats;e.tags=f.tags;e.routineIds=f.routineIds||[];
+  var bk=bolkerUt(f);
+  e.text=text;e.bolker=bk;e.cats=unionAv(bk,'cats');e.tags=unionAv(bk,'tags');e.routineIds=f.routineIds||[];
   if(f.date)e.date=f.date;
   save();closeModal();
 }
@@ -8232,6 +8332,8 @@ function modalHTML(){
       +'<textarea class="inp" placeholder="Skriv her …" oninput="mf().text=this.value;updateSaveBtn()">'+esc(f.text||'')+'</textarea>'
       +(isEdit?'<label class="field-lbl">Dato</label>'
         +'<input class="inp" type="date" value="'+esc(f.date||'')+'" style="width:auto" oninput="mf().date=this.value">':'')
+      +'<label class="field-lbl">Deler <span style="font-weight:400;text-transform:none;letter-spacing:0">– del innlegget hvis det rommer flere hendelser</span></label>'
+      +bolkFaneHTML(f)
       +'<label class="field-lbl">Kategori(er)'+(f.cats.length===0?' <span style="color:#B86E2A;font-size:11px;font-weight:400;text-transform:none;letter-spacing:0">– velg minst én</span>':'')+'</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +'<label class="field-lbl">Stikkord (valgfritt)</label>'
@@ -8255,15 +8357,49 @@ function modalHTML(){
     +'<div class="modal"><button class="close-btn" onclick="closeModal()">×</button>'+body+'</div></div>';
 }
 
+function bolkPillerHTML(cats,tags){
+  return(cats||[]).map(function(cid){
+    var c=catById(cid);if(!c)return'';
+    var m=c.parentId?catById(c.parentId):null;
+    var col=catColor(cid);
+    return'<span class="entry-cat"'+(col?' style="background:'+col+';color:'+textOn(col)+'"':'')+'>'+esc((m?m.name+' / ':'')+c.name)+'</span>';
+  }).join('')+(tags||[]).map(function(t){return tagPillHTML(t);}).join('');
+}
+function entryRowDeltHTML(e){
+  var deler=(e.bolker||[]).map(function(b,i){
+    var p=bolkPillerHTML(b.cats,b.tags);
+    if(!p)return'';
+    return'<div style="display:flex;gap:6px;align-items:flex-start;margin-top:4px">'
+      +'<span style="font-size:9px;color:var(--muted);flex-shrink:0;padding-top:3px">'+(i+1)+'</span>'
+      +'<div class="entry-cats" style="margin:0">'+p+'</div></div>';
+  }).join('');
+  var rIds=(e.routineIds||[]).map(function(rid){
+    var r=routines.find(function(x){return x.id===rid;});if(!r)return'';
+    return'<span class="tag-pill">\ud83d\udd01 '+esc(r.name)+'</span>';
+  }).join('');
+  return'<div class="entry-row">'
+    +'<div class="entry-dot"></div>'
+    +'<div class="entry-body">'
+    +'<div class="entry-text">'+esc(e.text)+'</div>'
+    +'<div class="entry-date">'+fmtDate(e.date)+'</div>'
+    +deler
+    +(rIds?'<div class="entry-cats">'+rIds+'</div>':'')
+    +'</div>'
+    +(editMode?'<button class="icon-btn" style="font-size:11px;padding:2px 7px;align-self:center;flex-shrink:0" onclick="openEditEntry(\''+q(e.id)+'\')">\u270e</button>'
+       +'<button class="del-btn" onclick="deleteEntry(\''+q(e.id)+'\')">\u2715</button>':'')
+    +'</div>';
+}
 function entryRowHTML(e){
+  // Delt innlegg: vis én brikkerad per del, så det er synlig hvilke stikkord og
+  // kategorier som faktisk hørte sammen.
+  if((e.bolker||[]).length>1)return entryRowDeltHTML(e);
   var pillItems=e.cats.map(function(cid){
     var c=catById(cid);if(!c)return'';
     var m=c.parentId?catById(c.parentId):null;
     var col=catColor(cid);
     return'<span class="entry-cat"'+(col?' style="background:'+col+';color:'+textOn(col)+'"':'')+'>'+esc((m?m.name+' / ':'')+c.name)+'</span>';
   }).join('')+(e.tags||[]).map(function(t){
-    var tc=tagColor(t);
-    return'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>';
+    return tagPillHTML(t);
   }).join('')+(e.routineIds||[]).map(function(rid){
     var r=routines.find(function(x){return x.id===rid;});if(!r)return'';
     return'<span class="tag-pill">\ud83d\udd01 '+esc(r.name)+'</span>';
@@ -10743,10 +10879,9 @@ function hashtagsViewHTML(){
   var sorter=tagSort==='alfa'?function(a,b){return nbSort(a,b);}:function(a,b){return counts[b]-counts[a]||nbSort(a,b);};
 
   var tagRow=function(t){
-    var tc=tagColor(t);
     return'<div style="padding:8px 14px;border-bottom:1px solid var(--line)">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-      +'<span class="tag-pill"'+(tc?' style="background:'+tc+';border-color:'+tc+';color:var(--ink)"':'')+'>#'+esc(t)+'</span>'
+      +tagPillHTML(t)
       +'<span style="font-size:11px;color:var(--muted)">'+counts[t]+' innlegg</span>'
       +'<span style="flex:1"></span>'
       +'<button class="icon-btn" style="font-size:10px;padding:1px 6px" onclick="openTagRename(\''+q(t)+'\')">Endre navn</button>'
