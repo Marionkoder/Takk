@@ -1159,9 +1159,8 @@ function katUnderBokserHTML(cat,alleEvs,naereIds){
     var tomtVanlig='<div class="empty">Ingenting merket med '+esc(uc.name)+' enn\u00e5. Velg den som underkategori n\u00e5r du lager et prosjekt eller en plan.</div>';
 
     if(erVitale){
-      // Har sin egen fullstendige visning, inkludert overskrift — ingen generisk
-      // «ingenting merket her»-boks skal vises i tillegg
-      h+=mensSyklusGraferHTML(true);
+      // Trackeren bor i sin egen app nå. Her står bare syklusdagen.
+      h+=syklusKortHTML();
     } else if(erMaalinger){
       // Eneste sted måleserier kan opprettes — derfor ingen generisk boks her heller
       h+='<div class="sec-title">'+esc(uc.name)+'</div>';
@@ -2421,18 +2420,6 @@ function listOversiktViewHTML(){
 function goVenteliste(){view={kind:'venteliste'};drawerOpen=false;render();}
 // ── Menstruasjonstracker ──
 // Datamodell: {id, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|'', note:'', intensity:1-4|null}
-var MENS_NIVAA=[[1,'Litt'],[2,'Moderat'],[3,'Kraftig'],[4,'Uvanlig kraftig']];
-var MENS_SMERTE=[[1,'Ingen'],[2,'Til \u00e5 leve med'],[3,'Plagsomme'],[4,'Ille']];
-var MENS_HODEPINE=[[1,'Ingen hodepine','Ingen'],[2,'Litt hodepine','Litt'],[3,'En del hodepine','En del'],[4,'Kraftig hodepine','Kraftig']];
-var MENS_HUD=[[1,'Ingen uren hud','Ingen'],[2,'Litt uren hud','Litt'],[3,'En del uren hud','En del'],[4,'Kraftig uren hud','Kraftig']];
-var MENS_OPPBLAAST=[[1,'Ingen oppbl\u00e5sthet','Ingen'],[2,'Litt oppbl\u00e5sthet','Litt'],[3,'En del oppbl\u00e5sthet','En del'],[4,'Kraftig oppbl\u00e5sthet','Kraftig']];
-var MENS_KVALME=[[1,'Ingen kvalme','Ingen'],[2,'Litt kvalme','Litt'],[3,'En del kvalme','En del'],[4,'Kraftig kvalme','Kraftig']];
-var MENS_KORSRYGG=[[1,'Ingen korsryggsmerter','Ingen'],[2,'Litt korsryggsmerter','Litt'],[3,'En del korsryggsmerter','En del'],[4,'Kraftige korsryggsmerter','Kraftige']];
-var MENS_NAKKE=[[1,'Ingen skulder-/nakkesmerter','Ingen'],[2,'Litt skulder-/nakkesmerter','Litt'],[3,'En del skulder-/nakkesmerter','En del'],[4,'Kraftige skulder-/nakkesmerter','Kraftige']];
-var MENS_ENERGI=[[1,'Veldig slapp','Veldig slapp'],[2,'Litt slapp','Litt slapp'],[3,'Normal energi','Normal'],[4,'Energioverskudd','Overskudd']];
-var MENS_KONSENTRASJON=[[1,'Store konsentrasjonsproblemer','Store problemer'],[2,'Litt ukonsentrert','Litt ukonsentrert'],[3,'Normal konsentrasjon','Normal'],[4,'Skjerpet fokus','Skjerpet']];
-function mensLyn(n){return Array(Math.max(0,(Number(n)||0)-1)).fill('\u26a1').join('');}
-function mensDraaper(n){return Array(Number(n)||0).fill('\ud83e\ude78').join('');}
 function mensSorted(){return mens.slice().sort(function(a,b){return a.start<b.start?1:-1;});} // nyeste først
 function mensSiste(){var s=mensSorted();return s.length?s[0]:null;}
 function mensSykluslengder(){
@@ -2477,10 +2464,42 @@ function mensDagerTilNeste(){
   var neste=mensNesteDato();if(!neste)return null;
   return Math.round((new Date(neste)-new Date(isoDate(today)))/86400000);
 }
-function goMens(){view={kind:'mens'};drawerOpen=false;render();}
 // Dagsmerker for en vilkårlig dato — brukt både på mens-siden (for i dag) og
 // som «tvilling» på Dag-siden i Loggføring, så begge alltid viser samme greie.
 // Perioden som dekker en gitt dato — en pågående periode regnes som løpende til i dag
+// ── Syklus ────────────────────────────────────────────────────────────
+// Selve trackeren er en egen app (syklus.html). Her leses bare registrerte
+// perioder, så appen vet hvilken syklusdag det er — og kalenderen kan farge
+// dagene. Ingenting registreres herfra.
+function syklusAppLenke(){
+  return'<a class="icon-btn" style="display:inline-block;text-decoration:none" href="syklus.html">\u00c5pne Syklus \u2192</a>';
+}
+function toggleSyklusVisning(){
+  showMens=!showMens;
+  if(!showMens&&view.kind==='mens')view={kind:'personlig'};
+  try{localStorage.setItem(SK+'_mensmeny',showMens?'1':'0');}catch(e){}
+  render();
+}
+function syklusKortHTML(){
+  if(!showMens)return'<div class="card"><div class="empty">Syklusvisningen er sl\u00e5tt av. Skru den p\u00e5 igjen under Innstillinger \u2192 Personlig.</div></div>';
+  var dag=mensDagIDag(),igjen=mensDagerTilNeste(),snitt=mensSnittSyklus();
+  var h='<div class="card"><div style="padding:14px">';
+  if(dag){
+    h+='<div style="font-size:20px;font-weight:700;color:var(--red)">Syklusdag '+dag+'</div>';
+    if(igjen!==null&&igjen!==undefined){
+      h+='<div style="font-size:13px;color:var(--muted);margin-top:2px">'
+        +(igjen>0?('ventet neste om '+igjen+' dag'+(igjen===1?'':'er')):(igjen===0?'ventet i dag':(-igjen)+' dag'+(igjen===-1?'':'er')+' p\u00e5 overtid'))
+        +(snitt?' \u00b7 snitt '+snitt+' dager':'')+'</div>';
+    }
+  } else {
+    h+='<div style="font-size:13px;color:var(--muted)">Ingen registrerte perioder enn\u00e5.</div>';
+  }
+  h+='<div style="margin-top:12px">'+syklusAppLenke()+'</div>'
+    +'<div class="hint" style="margin-top:8px">Registrering, dagsdetaljer og grafer ligger i Syklus. Appene deler lagring, s\u00e5 tallene her oppdaterer seg av seg selv.</div>'
+    +'</div></div>';
+  return h;
+}
+function mensDagFor(dato){return mensDag.find(function(x){return x.date===dato;})||null;}
 function mensPeriodeFor(dato){
   var iToday3=isoDate(today);
   return mens.filter(function(m){
@@ -2493,264 +2512,17 @@ function mensPeriodeFor(dato){
 // da regnes perioden som pågående på nytt.
 // Eggl\u00f8sningsslim — enkel av/p\u00e5-markering, ingen skala. Det som betyr noe er om du
 // la merke til det, ikke hvor mye.
-function mensSettSlim(dato){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',slim:false};mensDag.push(rad);}
-  rad.slim=!rad.slim;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim)mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettSlutt(dato){
-  var per=mensPeriodeFor(dato);if(!per)return;
-  per.end=(per.end===dato)?'':dato;
-  save();render();
-}
 // Starter en ny menstruasjon på denne datoen
-function mensStartNy(dato){
-  mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:dato,end:'',note:''});
-  save();render();
-}
 // Én rad: liten overskrift over knappene, med bare gradueringsordet i hver knapp
 // i stedet for at symptomnavnet gjentas ti ganger på siden
 // Kompakt tabell: symptomtype som rad, gradering 1\u20134 som kolonne. Erstatter det
 // som f\u00f8r var ti separate overskrift+knapperad-blokker — samme data, en br\u00f8kdel
 // av plassen. Cellene er sirkler, ikke tekstknapper, siden radnavnet allerede
 // sier hva graderingen gjelder.
-function mensGradTabellHTML(dato,rad,per){
-  var rader=[];
-  if(per)rader.push(['Bl\u00f8dning',MENS_NIVAA,rad.intensity,'mensSettDagIntensity']);
-  rader.push(['Menssmerter',MENS_SMERTE,rad.smerte,'mensSettDagSmerte']);
-  rader.push(['Energi',MENS_ENERGI,rad.energi,'mensSettDagEnergi']);
-  rader.push(['Konsentrasjon',MENS_KONSENTRASJON,rad.fokus,'mensSettDagKonsentrasjon']);
-  rader.push(['Hodepine',MENS_HODEPINE,rad.hodepine,'mensSettDagHodepine']);
-  rader.push(['Korsryggsmerter',MENS_KORSRYGG,rad.korsrygg,'mensSettDagKorsrygg']);
-  rader.push(['Skulder-/nakkesmerter',MENS_NAKKE,rad.nakke,'mensSettDagNakke']);
-  rader.push(['Kvalme',MENS_KVALME,rad.kvalme,'mensSettDagKvalme']);
-  rader.push(['Uren hud',MENS_HUD,rad.hud,'mensSettDagHud']);
-  rader.push(['Oppbl\u00e5sthet',MENS_OPPBLAAST,rad.oppblaast,'mensSettDagOppblaast']);
-
-  var h='<table style="width:100%;border-collapse:collapse;font-size:11.5px">'
-    +'<tr><td></td>'+[1,2,3,4].map(function(n){return'<td style="text-align:center;color:var(--muted);font-size:10px;padding:0 0 3px">'+n+'</td>';}).join('')+'</tr>';
-  rader.forEach(function(r){
-    var navn=r[0],skala=r[1],verdi=r[2],fn=r[3];
-    h+='<tr><td style="padding:3px 6px 3px 0;white-space:nowrap">'+esc(navn)+'</td>'
-      +skala.map(function(n){
-        var valgt=Number(verdi)===n[0];
-        var tittel=n[2]||n[1];
-        return'<td style="text-align:center;padding:2px 0"><button title="'+esc(tittel)+'" onclick="'+fn+'(\''+dato+'\','+n[0]+')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:'+(valgt?'var(--rose)':'transparent')+';padding:0;cursor:pointer"></button></td>';
-      }).join('')
-      +'</tr>';
-  });
-  h+='</table>'
-    +'<div class="hint" style="margin-top:2px">1 = ingen/lavest \u2192 4 = kraftig/h\u00f8yest</div>';
-  return h;
-}
-function mensDagMerkerHTML(dato,tittel){
-  var rad=mensDagFor(dato)||{energi:'',fokus:'',intensity:'',smerte:'',slim:false,hodepine:'',humorMerker:[],hud:'',oppblaast:'',kvalme:''};
-  var per=mensPeriodeFor(dato);
-  var erSluttdag=per&&per.end===dato;
-  var syklusdag=mensSyklusdagForDato(dato);
-  // Sluttknappen først fra dag 3, startknappen først fra dag 20 — så de ikke ligger
-  // i veien de dagene det uansett ikke er aktuelt
-  var visSlutt=per&&(erSluttdag||(syklusdag&&syklusdag>=3));
-  var visStart=!per&&(!syklusdag||syklusdag>=20);
-  var h='<div class="sec-title">'+esc(tittel)+'</div><div class="card" style="padding:10px 14px">';
-  h+=mensGradTabellHTML(dato,rad,per);
-  h+=(function(){
-      var valgt=rad.humorMerker||[];
-      return'<div class="cb-hd" style="padding:8px 0 3px">Hum\u00f8r</div>'
-        +'<div class="chips" style="margin-bottom:2px">'+MENS_HUMORORD.map(function(ord){
-          return'<button class="chip'+(valgt.indexOf(ord)>=0?' on':'')+'" onclick="mensToggleHumorMerke(\''+dato+'\',\''+ord+'\')">'+ord+'</button>';
-        }).join('')+'</div>';
-    })()
-    +'<div class="cb-hd" style="padding:6px 0 3px">Eggl\u00f8sning</div>'
-    +'<div class="chips"'+((visSlutt||visStart)?'':' style="margin-bottom:2px"')+'><button class="chip'+(rad.slim?' on':'')+'" onclick="mensSettSlim(\''+dato+'\')">'+(rad.slim?'\u2713 ':'')+'Eggl\u00f8sningsslim</button></div>';
-  if(visSlutt){
-    h+='<div class="chips"><button class="chip'+(erSluttdag?' on':'')+'" onclick="mensSettSlutt(\''+dato+'\')">'+(erSluttdag?'\u2713 Menstruasjon over':'Menstruasjon over')+'</button></div>';
-  }
-  if(visStart){
-    h+='<div class="chips"><button class="chip" onclick="mensStartNy(\''+dato+'\')">Menstruasjonen startet</button></div>';
-  }
-  return h+'</div>';
-}
-function mensViewHTML(){
-  var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
-    +'<div class="view-title">Menstruasjon</div>';
-  var dag=mensDagIDag(),dager=mensDagerTilNeste(),snittS=mensSnittSyklus(),snittL=mensSnittLengde();
-  var beregnetSyklus=(function(){var l=mensSykluslengder();return l.length?Math.round(l.slice(-6).reduce(function(a,b){return a+b;},0)/l.slice(-6).length):null;})();
-  var beregnetVarighet=(function(){
-    var l=mens.filter(function(m){return m.start&&m.end&&m.end>=m.start;}).map(function(m){return Math.round((new Date(m.end)-new Date(m.start))/86400000)+1;}).filter(function(d){return d>0&&d<20;});
-    return l.length?Math.round(l.slice(-6).reduce(function(a,b){return a+b;},0)/l.slice(-6).length*10)/10:null;
-  })();
-  var antSykluser=mensSykluslengder().length;
-  h+='<div class="card" style="padding:12px 14px">';
-  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">';
-  h+='<span>I dag: <b>'+(dag?'dag '+dag:'\u2013')+'</b></span>';
-  h+='<span>Neste ventet: <b>'+(mensNesteDato()?fmtDate(mensNesteDato())+(dager!=null?' ('+(dager<0?'forsinket '+Math.abs(dager):'om '+dager)+' dag'+(Math.abs(dager)===1?'':'er')+')':''):'\u2013')+'</b></span>';
-  h+='</div>';
-  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px;align-items:center">';
-  h+='<span>Kjent snitt syklus \u2013 <input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(mensManuellSyklus||'')+'" placeholder="'+(beregnetSyklus||'?')+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="mensManuellSyklus=Number(this.value)||null;save();render()"> dager</span>';
-  h+='<span>Kjent varighet \u2013 <input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px" value="'+esc(mensManuellVarighet||'')+'" placeholder="'+(beregnetVarighet||'?')+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="mensManuellVarighet=Number(this.value)||null;save();render()"> dager</span>';
-  h+='</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-top:4px">Disse to styrer \u00abneste ventet\u00bb og kalenderen. Skriv inn det du selv vet fra f\u00f8r \u2014 det overstyres aldri automatisk av det appen logger.</div>';
-  if(antSykluser>0&&(mensManuellSyklus||mensManuellVarighet)){
-    h+='<div style="font-size:11px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)">'
-      +'Appens egen utregning s\u00e5 langt: '+(beregnetSyklus?beregnetSyklus+' dagers syklus':'')+(beregnetSyklus&&beregnetVarighet?', ':'')+(beregnetVarighet?beregnetVarighet+' dagers varighet':'')+' (basert p\u00e5 '+antSykluser+' logget'+(antSykluser===1?'':'e')+' syklus'+(antSykluser===1?'':'er')+')'
-      +' <button class="icon-btn" style="font-size:10px;padding:0 6px" onclick="mensManuellSyklus=null;mensManuellVarighet=null;save();render()">Bruk appens tall i stedet</button>'
-      +'</div>';
-  }
-  h+='</div>';
-
-  h+=mensDagMerkerHTML(isoDate(today),'I dag');
-
-  // Siste merkede dager, med syklusdag — trykk for å rette en dag i etterkant
-  var sisteDager=mensDag.slice().sort(function(a,b){return a.date<b.date?1:-1;}).slice(0,14);
-  if(sisteDager.length){
-    h+='<div class="sec-title">Siste merkede dager <span style="font-weight:400;color:var(--rose)">\u00b7 trykk for \u00e5 rette</span></div><div class="card">'+sisteDager.map(function(r){
-      var sd=mensSyklusdagForDato(r.date);
-      var merker=[r.intensity?mensDraaper(r.intensity):'',
-                  r.smerte?(mensLyn(r.smerte)?mensLyn(r.smerte)+' ':'')+MENS_SMERTE[r.smerte-1][1]:'',
-                  r.hodepine?MENS_HODEPINE[r.hodepine-1][1]:'',
-                  (r.humorMerker&&r.humorMerker.length)?r.humorMerker.join(', '):'',
-                  r.kvalme?MENS_KVALME[r.kvalme-1][1]:'',
-                  r.hud?MENS_HUD[r.hud-1][1]:'',
-                  r.oppblaast?MENS_OPPBLAAST[r.oppblaast-1][1]:'',
-                  r.korsrygg?MENS_KORSRYGG[r.korsrygg-1][1]:'',
-                  r.nakke?MENS_NAKKE[r.nakke-1][1]:'',
-                  r.energi?MENS_ENERGI[r.energi-1][1]:'',
-                  r.fokus?MENS_KONSENTRASJON[r.fokus-1][1]:'',
-                  r.slim?'eggl\u00f8sningsslim':''].filter(Boolean).join(' \u00b7 ');
-      return'<div class="entry-row" style="cursor:pointer" onclick="goDag(\''+r.date+'\')"><div class="entry-body"><div class="entry-text" style="font-size:13px">'+fmtDate(r.date)+(sd?' <span style="font-size:11px;color:var(--muted)">\u00b7 syklusdag '+sd+'</span>':'')+'</div>'
-        +(merker?'<div class="entry-date">'+esc(merker)+'</div>':'')+'</div>'
-        +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-    }).join('')+'</div>';
-  }
-
-  h+=mensSyklusGraferHTML();
-  h+='<button class="add-btn" onclick="openMensModal()">+ Registrer</button>';
-  var sorted=mensSorted();
-  if(!sorted.length){
-    h+='<div class="card"><div class="empty">Ingen registreringer enn\u00e5.</div></div>';
-    return h;
-  }
-  h+='<div class="card">'+sorted.map(function(m){
-    var lengde=m.end&&m.end>=m.start?Math.round((new Date(m.end)-new Date(m.start))/86400000)+1:null;
-    return'<div class="entry-row" style="cursor:pointer" onclick="openEditMens(\''+q(m.id)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+fmtDate(m.start)+(m.end?' \u2013 '+fmtDate(m.end):'')+(lengde?' <span style="font-size:11px;color:var(--muted)">\u00b7 '+lengde+' dager</span>':'')+'</div>'
-      +(m.note?'<div class="entry-date">'+esc(m.note)+'</div>':'')+'</div>'
-      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-  }).join('')+'</div>';
-  return h;
-}
-function openMensModal(){modal={step:'mens',form:{start:isoDate(today),end:'',note:''}};render();}
-function openEditMens(id){
-  var m=mens.find(function(x){return x.id===id;});if(!m)return;
-  modal={step:'mens_edit',form:{id:id,start:m.start,end:m.end||'',note:m.note||''}};render();
-}
-function submitMens(){
-  var f=mf();if(!f.start)return;
-  mens.push({id:'ms'+Date.now()+Math.random().toString(36).slice(2,6),start:f.start,end:f.end||'',note:(f.note||'').trim()});
-  save();closeModal();
-}
-function saveEditMens(){
-  var f=mf();if(!f.start)return;
-  var m=mens.find(function(x){return x.id===f.id;});if(!m)return;
-  m.start=f.start;m.end=f.end||'';m.note=(f.note||'').trim();
-  save();closeModal();
-}
-function deleteMens(id){mens=mens.filter(function(x){return x.id!==id;});save();closeModal();}
 // Dagsmerker — energi og fokus, to gjensidig utelukkende par du kan sette med ett trykk
 // når du kjenner det, uten å måtte vurdere det hver dag.
-function mensDagFor(dato){return mensDag.find(function(x){return x.date===dato;})||null;}
-function mensSettDag(dato,felt,verdi){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
-  rad[felt]=rad[felt]===verdi?'':verdi;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagIntensity(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
-  rad.intensity=Number(rad.intensity)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagSmerte(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
-  rad.smerte=Number(rad.smerte)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagHodepine(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',hodepine:''};mensDag.push(rad);}
-  rad.hodepine=Number(rad.hodepine)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
 // Hum\u00f8r er ikke \u00e9n skala — det er flere akser som kan beveges uavhengig av
 // hverandre. Derfor egne merker du kan sl\u00e5 av og p\u00e5, ikke en gradert linje.
-var MENS_HUMORORD=['Irritabel','Avslappet','Engstelig','Rolig','Stresset','Innadvendt','Utadvendt'];
-function mensToggleHumorMerke(dato,ord){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',humorMerker:[]};mensDag.push(rad);}
-  rad.humorMerker=rad.humorMerker||[];
-  var i=rad.humorMerker.indexOf(ord);
-  if(i>=0)rad.humorMerker.splice(i,1);else rad.humorMerker.push(ord);
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&!rad.humorMerker.length)mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagHud(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',hud:''};mensDag.push(rad);}
-  rad.hud=Number(rad.hud)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagOppblaast(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',oppblaast:''};mensDag.push(rad);}
-  rad.oppblaast=Number(rad.oppblaast)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagKvalme(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',kvalme:''};mensDag.push(rad);}
-  rad.kvalme=Number(rad.kvalme)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagKorsrygg(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',korsrygg:''};mensDag.push(rad);}
-  rad.korsrygg=Number(rad.korsrygg)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagNakke(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:'',nakke:''};mensDag.push(rad);}
-  rad.nakke=Number(rad.nakke)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim&&!rad.hodepine&&!rad.hud&&!rad.oppblaast&&!rad.korsrygg&&!rad.nakke&&!rad.kvalme&&(!rad.humorMerker||!rad.humorMerker.length))mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagEnergi(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
-  rad.energi=Number(rad.energi)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim)mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
-function mensSettDagKonsentrasjon(dato,niva){
-  var rad=mensDagFor(dato);
-  if(!rad){rad={date:dato,energi:'',fokus:'',intensity:'',smerte:''};mensDag.push(rad);}
-  rad.fokus=Number(rad.fokus)===niva?'':niva;
-  if(!rad.energi&&!rad.fokus&&!rad.intensity&&!rad.smerte&&!rad.slim)mensDag=mensDag.filter(function(x){return x!==rad;});
-  save();render();
-}
 // Syklusdag for en vilk\u00e5rlig dato, ikke bare i dag — brukes til \u00e5 se merkene i sammenheng med syklusen
 function mensSyklusdagForDato(dato){
   var forrige=mens.filter(function(m){return m.start&&m.start<=dato;}).sort(function(a,b){return a.start<b.start?1:-1;})[0];
@@ -4105,6 +3877,9 @@ function load(){
   if(lagtTil)save();
 }
 function save(){
+  // Syklusdataene (_mens, _mensdag, _menssyklus …) eies av Syklus-appen og
+  // skrives ikke herfra. Skrev begge appene, ville den som lagret sist ha
+  // overskrevet den andre med en foreldet kopi.
   try{localStorage.setItem(SK+'_entries',JSON.stringify(entries));}catch(e){}
   try{localStorage.setItem(SK+'_cats',JSON.stringify(cats));}catch(e){}
   try{localStorage.setItem(SK+'_routines',JSON.stringify(routines));}catch(e){}
@@ -4116,11 +3891,8 @@ function save(){
   try{localStorage.setItem(SK+'_budget',JSON.stringify(budgetRows));}catch(e){}
   try{localStorage.setItem(SK+'_deposits',JSON.stringify(deposits));}catch(e){}
   try{localStorage.setItem(SK+'_timelogs',JSON.stringify(timeLogs));}catch(e){}
-  try{localStorage.setItem(SK+'_mens',JSON.stringify(mens));}catch(e){}
-  try{localStorage.setItem(SK+'_mensdag',JSON.stringify(mensDag));}catch(e){}
   try{localStorage.setItem(SK+'_maalinger',JSON.stringify(maalinger));}catch(e){}
   try{localStorage.setItem(SK+'_kvartal',JSON.stringify(kvartalNotat));}catch(e){}
-  try{localStorage.setItem(SK+'_menssyklusnotat',JSON.stringify(mensSyklusNotat));}catch(e){}
   try{localStorage.setItem(SK+'_investeringer',JSON.stringify(investeringer));}catch(e){}
   try{localStorage.setItem(SK+'_datingkriterier',JSON.stringify(datingKriterier));}catch(e){}
   try{localStorage.setItem(SK+'_datingpersoner',JSON.stringify(datingPersoner));}catch(e){}
@@ -4128,7 +3900,6 @@ function save(){
   try{localStorage.setItem(SK+'_stillinger',JSON.stringify(stillinger));}catch(e){}
   try{localStorage.setItem(SK+'_datingsortering',datingSortering);}catch(e){}
   try{localStorage.setItem(SK+'_skjulteentries',JSON.stringify(skjulteEntries));}catch(e){}
-  try{localStorage.setItem(SK+'_mensgrafsynlig',JSON.stringify(mensGrafSynlig));}catch(e){}
   try{localStorage.setItem(SK+'_investglobalrekk',JSON.stringify(investGlobalOrder));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
@@ -4142,8 +3913,6 @@ function save(){
   try{localStorage.setItem(SK+'_takarbeid',String(kanbanTakArbeid));}catch(e){}
   try{localStorage.setItem(SK+'_katvis',JSON.stringify(katVis));}catch(e){}
   try{localStorage.setItem(SK+'_mensmeny',showMens?'1':'0');}catch(e){}
-  try{localStorage.setItem(SK+'_menssyklus',String(mensManuellSyklus||''));}catch(e){}
-  try{localStorage.setItem(SK+'_mensvarighet',String(mensManuellVarighet||''));}catch(e){}
   try{localStorage.setItem(SK+'_places',JSON.stringify(places));}catch(e){}
   try{localStorage.setItem(SK+'_ach',JSON.stringify(achievements));}catch(e){}
   try{localStorage.setItem(SK+'_achdis',JSON.stringify(achDismissed));}catch(e){}
@@ -5025,11 +4794,6 @@ function personTagsSave(){
   if(e)e.personTags=f.tags||[];
   save();closeModal();
 }
-function toggleMensMeny(){
-  showMens=!showMens;
-  if(!showMens&&view.kind==='mens')view={kind:'personlig'};
-  save();render();
-}
 function goPersonlig(){view={kind:'personlig'};drawerOpen=false;render();}
 function personligViewHTML(){
   var cur=currentBgTone();
@@ -5100,13 +4864,15 @@ function personligViewHTML(){
     }).join('')
     +'</div>'
     +'<div class="hint">Innholdet beholdes uansett \u2014 det er bare skjult fra menyen.</div>';
-  // Menstruasjonstracker h\u00f8rer til Helse, men skrus av og p\u00e5 for seg
+  // Syklus bor i sin egen app. Her styres bare om syklusdagen og kalenderfargene vises.
   h+='<div class="card" style="padding:12px 14px;margin-top:8px">'
     +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Menstruasjonstracker</div>'
-    +'<div class="entry-date">kortet p\u00e5 Helse-siden</div></div>'
-    +'<button class="chip'+(showMens?' on':'')+'" onclick="toggleMensMeny()">'+(showMens?'P\u00e5':'Av')+'</button>'
-    +'</div></div>';
+    +'<div style="flex:1"><div class="entry-text">Syklus</div>'
+    +'<div class="entry-date">syklusdag p\u00e5 Helse-siden og farger i kalenderen</div></div>'
+    +'<button class="chip'+(showMens?' on':'')+'" onclick="toggleSyklusVisning()">'+(showMens?'P\u00e5':'Av')+'</button>'
+    +'</div>'
+    +'<div class="hint" style="margin-top:8px">Registrering skjer i Syklus-appen. '+syklusAppLenke()+'</div>'
+    +'</div>';
 
   // Midlertidig: forhåndsvis feiringsbannerne før selve dagen. Fjernes når begge er sett.
   h+='<div class="card" style="padding:12px 14px;margin-top:8px;border-left:3px solid var(--rose)">'
@@ -5618,128 +5384,12 @@ function prosjektFaseHTML(iv){
 // ── Syklusgrafer: energi, konsentrasjon, blødning og smerte per menssyklus ──
 // Hver syklus er fra én mensstart til dagen før neste — eller til i dag, om det
 // er den siste, pågående syklusen.
-function mensSykluser(){
-  var starter=mens.slice().sort(function(a,b){return a.start<b.start?-1:1;}).map(function(m){return m.start;});
-  var ut=[];
-  for(var i=0;i<starter.length;i++){
-    var start=starter[i];
-    var erSiste=(i===starter.length-1);
-    var lengde=erSiste
-      ? Math.round((new Date(isoDate(today)+'T00:00:00')-new Date(start+'T00:00:00'))/86400000)+1
-      : Math.round((new Date(starter[i+1]+'T00:00:00')-new Date(start+'T00:00:00'))/86400000);
-    ut.push({start:start,lengde:Math.max(1,lengde),pagaende:erSiste});
-  }
-  return ut.reverse(); // nyeste f\u00f8rst
-}
-function mensSyklusPunkter(syklus,felt){
-  var start=new Date(syklus.start+'T00:00:00');
-  var ut=[];
-  mensDag.forEach(function(r){
-    var d=Math.round((new Date(r.date+'T00:00:00')-start)/86400000)+1;
-    if(d<1||d>syklus.lengde)return;
-    var v=null;
-    if(felt==='energi')v=r.energi?Number(r.energi):null;
-    else if(felt==='fokus')v=r.fokus?Number(r.fokus):null;
-    else if(felt==='intensity')v=r.intensity?Number(r.intensity):null;
-    else if(felt==='smerte')v=r.smerte?Number(r.smerte):null;
-    else if(felt==='hodepine')v=r.hodepine?Number(r.hodepine):null;
-    else if(felt==='hud')v=r.hud?Number(r.hud):null;
-    else if(felt==='oppblaast')v=r.oppblaast?Number(r.oppblaast):null;
-    else if(felt==='korsrygg')v=r.korsrygg?Number(r.korsrygg):null;
-    else if(felt==='nakke')v=r.nakke?Number(r.nakke):null;
-    else if(felt==='kvalme')v=r.kvalme?Number(r.kvalme):null;
-    if(v!==null)ut.push({dag:d,verdi:v});
-  });
-  return ut.sort(function(a,b){return a.dag-b.dag;});
-}
-function mensSyklusSlimDager(syklus){
-  var start=new Date(syklus.start+'T00:00:00');
-  var ut=[];
-  mensDag.forEach(function(r){
-    if(!r.slim)return;
-    var d=Math.round((new Date(r.date+'T00:00:00')-start)/86400000)+1;
-    if(d>=1&&d<=syklus.lengde)ut.push(d);
-  });
-  return ut;
-}
 // Alle fire faktorene på samme 1–4-skala nå, så de kan tegnes i samme bilde med
 // felles akse. Eggløsningsslim er fortsatt av/på, og vises som søyler i bakgrunnen
 // i stedet for en linje, siden den ikke har noe nivå å tegne en linje mellom.
-var MENS_GRAF_FARGER={
-  intensity:'#D97666',   // rød, blødning
-  energi:'#E0C15A',      // gul, energi
-  smerte:'#7A2E28',      // mørkerød, menssmerter
-  hodepine:'#1F3A63',    // mørkebl\u00e5, hodepine
-  fokus:'#6FA0BC',       // bl\u00e5, konsentrasjon
-  hud:'#CC7F33',         // terrakotta, uren hud
-  oppblaast:'#5C8A6B',   // dus gr\u00f8nn, oppbl\u00e5sthet — annen valør enn slim-s\u00f8ylene
-  korsrygg:'#9C7A52',    // varm brun, korsryggsmerter
-  nakke:'#B57A8A',        // dus rosa, skulder-/nakkesmerter
-  kvalme:'#8B7BA8'        // dus lilla-gr\u00e5, kvalme — atskilt fra hum\u00f8rets tidligere lilla
-};
-function mensSyklusKombinertGrafSVG(syk){
-  var serier=[
-    ['intensity','Bl\u00f8dning'],
-    ['energi','Energi'],
-    ['smerte','Menssmerter'],
-    ['hodepine','Hodepine'],
-    ['fokus','Konsentrasjon'],
-    ['hud','Uren hud'],
-    ['oppblaast','Oppbl\u00e5sthet'],
-    ['korsrygg','Korsryggsmerter'],
-    ['nakke','Skulder-/nakkesmerter'],
-    ['kvalme','Kvalme']
-  ].filter(function(t){return t[0]==='intensity'||mensGrafSynlig[t[0]]!==false;})
-   .map(function(t){return{felt:t[0],navn:t[1],farge:MENS_GRAF_FARGER[t[0]],punkter:mensSyklusPunkter(syk,t[0])};});
-  var slimDager=mensGrafSynlig.slim!==false?mensSyklusSlimDager(syk):[];
-  var noe=serier.some(function(s){return s.punkter.length;})||slimDager.length;
-  if(!noe)return'<div class="empty" style="font-size:11px;padding:6px 0">Ingen data denne syklusen \u2014 eller alt er skrudd av under.</div>';
-  var W=320,H=140,ML=6,MR=6,MT=16,MB=6,plotW=W-ML-MR,plotH=H-MT-MB;
-  var lengde=syk.lengde;
-  var xFor=function(d){return lengde>1?ML+plotW*((d-1)/(lengde-1)):ML+plotW/2;};
-  var yFor=function(v){return MT+plotH-(v-1)/3*plotH;}; // skala 1–4
-  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:140px;display:block">';
-  // Syklusdag over hver eneste dag, i liten skrift
-  for(var d=1;d<=lengde;d++){
-    svg+='<text x="'+xFor(d)+'" y="10" text-anchor="middle" style="font-size:6px;fill:var(--muted)">'+d+'</text>';
-  }
-  // Eggl\u00f8sningsslim som lysegr\u00f8nne s\u00f8yler bak alt annet
-  var barW=lengde>1?Math.max(2,plotW/lengde*0.7):8;
-  slimDager.forEach(function(d){
-    svg+='<rect x="'+(xFor(d)-barW/2)+'" y="'+MT+'" width="'+barW+'" height="'+plotH+'" style="fill:#C9E3B8;opacity:.65"/>';
-  });
-  // Frittst\u00e5ende s\u00f8yler per registrering, i stedet for sammenhengende linjer —
-  // en linje ville antydet en jevn bevegelse ogs\u00e5 gjennom dagene du ikke registrerte
-  // noe, og den dataen finnes ikke. Litt forskyvning per serie s\u00e5 flere symptomer
-  // registrert samme dag ikke havner helt oppå hverandre.
-  var baseline=yFor(1);
-  var barBredde=1.4;
-  var forskyvSteg=1.7;
-  serier.forEach(function(s,si){
-    var forskyv=(si-(serier.length-1)/2)*forskyvSteg;
-    s.punkter.forEach(function(p){
-      if(p.verdi<=1)return; // «Ingen» skal ikke gi noe synlig utslag
-      var x=xFor(p.dag)+forskyv;
-      var y=yFor(p.verdi);
-      svg+='<rect x="'+(x-barBredde/2)+'" y="'+y+'" width="'+barBredde+'" height="'+(baseline-y)+'" rx="0.7" style="fill:'+s.farge+'"/>';
-    });
-  });
-  svg+='</svg>';
-  var forklaring='<div style="display:flex;flex-wrap:wrap;gap:8px 12px;padding:2px 2px 0;font-size:10px;color:var(--muted)">'
-    +serier.map(function(s){
-      return'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+s.farge+';margin-right:3px;vertical-align:middle"></span>'+s.navn+'</span>';
-    }).join('')
-    +(mensGrafSynlig.slim!==false?'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C9E3B8;margin-right:3px;vertical-align:middle"></span>Eggl\u00f8sningsslim</span>':'')
-    +'</div>';
-  return svg+forklaring;
-}
 // Hvilke linjer som vises i den kombinerte grafen — bl\u00f8dning kan aldri skrus av,
 // resten kan brukeren velge bort selv, siden \u00e5tte linjer fort blir mye \u00e5 se p\u00e5 en gang.
 var mensGrafSynlig={};
-function mensGrafToggle(felt){
-  mensGrafSynlig[felt]=mensGrafSynlig[felt]===false?true:false;
-  save();render();
-}
 var mensSyklusIdx=0;
 var mensSyklusNotat={};
 var investeringer=[];
@@ -5749,46 +5399,6 @@ var stillingKriterier=[];
 var stillinger=[];
 var skjulteEntries=[];
 var investGlobalOrder=[];
-function mensSyklusSettNotat(startDato,tekst){
-  mensSyklusNotat[startDato]=tekst;
-  save();
-}
-function mensSyklusValgt(i){mensSyklusIdx=Math.max(0,i);render();}
-function mensSyklusGraferHTML(kompakt){
-  var sykluser=mensSykluser();
-  if(!sykluser.length)return'';
-  var idx=Math.min(mensSyklusIdx,sykluser.length-1);
-  var syk=sykluser[idx];
-  var h='<div class="sec-title">'+(kompakt?'Menstruasjon':'Syklusgrafer')+'</div>';
-  if(kompakt){
-    h+='<div style="padding:0 12px 6px"><button class="chip" onclick="goMens()">Logg symptomer</button></div>';
-  }
-  h+='<div style="display:flex;gap:8px;padding:0 12px 6px;align-items:center;font-size:12px">'
-    +'<button class="icon-btn" style="font-size:11px" '+(idx<sykluser.length-1?'onclick="mensSyklusValgt('+(idx+1)+')"':'disabled')+'>\u2039 eldre</button>'
-    +'<span style="flex:1;text-align:center;color:var(--muted)"><b style="color:var(--ink)">Dag '+syk.lengde+'</b>. Menstruasjonen startet '+fmtDate(syk.start)+'.</span>'
-    +'<button class="icon-btn" style="font-size:11px" '+(idx>0?'onclick="mensSyklusValgt('+(idx-1)+')"':'disabled')+'>nyere \u203a</button>'
-    +'</div>';
-  h+='<div class="card" style="padding:8px 10px">'+mensSyklusKombinertGrafSVG(syk)+'</div>';
-  if(!kompakt){
-    h+='<div class="card" style="padding:8px 10px">'
-      +'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">Vis i grafen</div>'
-      +'<div class="chips">'
-      +[['energi','Energi'],['smerte','Menssmerter'],['hodepine','Hodepine'],['fokus','Konsentrasjon'],
-        ['hud','Uren hud'],['oppblaast','Oppbl\u00e5sthet'],['korsrygg','Korsryggsmerter'],
-        ['nakke','Skulder-/nakkesmerter'],['kvalme','Kvalme'],['slim','Eggl\u00f8sningsslim']].map(function(t){
-          var paa=mensGrafSynlig[t[0]]!==false;
-          return'<button class="chip'+(paa?' on':'')+'" onclick="mensGrafToggle(\''+t[0]+'\')">'+t[1]+'</button>';
-        }).join('')
-      +'</div>'
-      +'<div class="hint">Bl\u00f8dning vises alltid.</div>'
-      +'</div>';
-    h+='<div class="card" style="padding:8px 10px">'
-      +'<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">Merknad om denne syklusen</div>'
-      +'<textarea class="inp" rows="2" style="margin:0" placeholder="F.eks. noe som p\u00e5virket denne syklusen spesielt \u2026" oninput="mensSyklusSettNotat(\''+syk.start+'\',this.value)">'+esc(mensSyklusNotat[syk.start]||'')+'</textarea>'
-      +'</div>';
-  }
-  return h;
-}
 function toggleProjectDone(invId){
   var inv=invById(invId);if(!inv)return;
   if(inv.completedDate){delete inv.completedDate;(inv.resultIds||[]).forEach(function(rid){settResultatOppnadd(resultById(rid),false);});save();render();return;}
@@ -11564,9 +11174,8 @@ function render(){
   else if(view.kind==='folk')content=folkViewHTML();
   else if(view.kind==='kreativitet')content=kreativitetViewHTML();
   else if(view.kind==='helse')content=katSideHTML('helse','Helse','kat_helse');
-  else if(view.kind==='mens')content=showMens?mensViewHTML():
-    ('<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goHelse()">\u2039</button></div>'
-    +'<div class="card"><div class="empty">Menstruasjonstrackeren er sl\u00e5tt av. Skru den p\u00e5 igjen under Innstillinger \u2192 Personlig.</div></div>');
+  else if(view.kind==='mens')content='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goHelse()">\u2039</button></div>'
+    +'<div class="view-title">Syklus</div>'+syklusKortHTML();
   else if(view.kind==='matdrikke')content=katSideHTML('mat og drikke','Mat og drikke','kat_mat');
   else if(view.kind==='hjemkat')content=katSideHTML('hjem','Hjem','kat_hjem');
   else if(view.kind==='kompetanse')content=katSideHTML('faglig utvikling og trivsel','Faglig utvikling og trivsel','kat_komp',
@@ -11758,6 +11367,13 @@ function bootPin(){
 // «today» ble til nå bare satt \u00e9n gang, ved sidelasting. Sto appen \u00e5pen over midnatt
 // \u2014 f.eks. som PWA \u2014 trodde den fortsatt at det var i g\u00e5r, og en bursdag i dag ble
 // aldri oppdaget. Sjekker derfor p\u00e5 nytt n\u00e5r appen f\u00e5r fokus igjen, og med jevne mellomrom.
+// Syklus kan ha blitt endret i den andre appen mens denne lå i bakgrunnen.
+function lesSyklusData(){
+  try{mens=JSON.parse(localStorage.getItem(SK+'_mens')||'[]');}catch(e){}
+  try{mensDag=JSON.parse(localStorage.getItem(SK+'_mensdag')||'[]');}catch(e){}
+  try{mensManuellSyklus=Number(localStorage.getItem(SK+'_menssyklus'))||null;}catch(e){}
+  try{mensManuellVarighet=Number(localStorage.getItem(SK+'_mensvarighet'))||null;}catch(e){}
+}
 function friskOppDatoen(){
   var gammelIso=isoDate(today);
   today=new Date();curYear=today.getFullYear();curMonth=today.getMonth()+1;
@@ -11766,7 +11382,7 @@ function friskOppDatoen(){
   else render();
 }
 document.addEventListener('visibilitychange',function(){
-  if(document.visibilityState==='visible')friskOppDatoen();
+  if(document.visibilityState==='visible'){lesSyklusData();friskOppDatoen();}
 });
 setInterval(friskOppDatoen,60000);
 bootPin();
