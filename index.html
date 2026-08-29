@@ -8748,7 +8748,7 @@ function periodTodoItems(scope){
 }
 
 /* ── Visninger ── */
-var quickForm={text:'',cats:[],tags:'',routineIds:[],step:1};
+var quickForm={text:'',cats:[],tags:'',bolker:[{cats:[],tags:''}],_bolk:0,routineIds:[],step:1};
 var recentDone={};
 var nesteUt={};
 function boxToggleRoutine(rid,key,minste){
@@ -8804,14 +8804,75 @@ function pickQuickTag(t){
   var ni=document.getElementById('quick-tags');
   if(ni){ni.focus();ni.setSelectionRange(ni.value.length,ni.value.length);}
 }
+// Deler i hurtiginnlegget. Samme idé som i skjemaet, men her ligger stikkordene
+// som tekststreng, så delene lagrer strengen og oversettes til lister ved lagring.
+function lagreAktivQuickBolk(){
+  var i=quickForm._bolk||0;
+  if(!quickForm.bolker)quickForm.bolker=[{cats:[],tags:''}];
+  if(!quickForm.bolker[i])quickForm.bolker[i]={cats:[],tags:''};
+  quickForm.bolker[i].cats=[].concat(quickForm.cats||[]);
+  quickForm.bolker[i].tags=quickForm.tags||'';
+}
+function byttQuickBolk(i){
+  lagreAktivQuickBolk();
+  quickForm._bolk=i;
+  var b=quickForm.bolker[i]||{cats:[],tags:''};
+  quickForm.cats=[].concat(b.cats);quickForm.tags=b.tags||'';
+  render();
+}
+function leggTilQuickBolk(){
+  lagreAktivQuickBolk();
+  quickForm.bolker=[].concat(quickForm.bolker||[],[{cats:[],tags:''}]);
+  byttQuickBolk(quickForm.bolker.length-1);
+}
+function fjernQuickBolk(i){
+  lagreAktivQuickBolk();
+  if((quickForm.bolker||[]).length<2)return;
+  quickForm.bolker=quickForm.bolker.filter(function(_,j){return j!==i;});
+  byttQuickBolk(Math.max(0,Math.min(quickForm._bolk||0,quickForm.bolker.length-1)));
+}
+function quickBolkerUt(){
+  lagreAktivQuickBolk();
+  var b=(quickForm.bolker||[]).map(function(x){
+    return{cats:[].concat(x.cats||[]),
+      tags:String(x.tags||'').split(',').map(function(v){return v.trim().toLowerCase();}).filter(Boolean)
+        .filter(function(v,i,a){return a.indexOf(v)===i;})};
+  }).filter(function(x){return x.cats.length||x.tags.length;});
+  return b.length?b:[{cats:[].concat(quickForm.cats||[]),tags:[]}];
+}
+function quickBolkFaneHTML(){
+  var b=quickForm.bolker||[];
+  if(b.length<2&&!(quickForm.cats||[]).length)return'';
+  var h='<div class="chips" style="margin-top:8px">';
+  b.forEach(function(_,i){
+    h+='<button class="chip'+((quickForm._bolk||0)===i?' on':'')+'" onclick="byttQuickBolk('+i+')">Del '+(i+1)+'</button>';
+  });
+  h+='<button class="chip" onclick="leggTilQuickBolk()">+ ny del</button>';
+  if(b.length>1)h+='<button class="chip" onclick="fjernQuickBolk('+(quickForm._bolk||0)+')">\u2715 fjern Del '+((quickForm._bolk||0)+1)+'</button>';
+  h+='</div>';
+  if(b.length>1)h+='<div class="hint" style="margin-top:4px">Valgene over h\u00f8rer bare til Del '+((quickForm._bolk||0)+1)+'. Teksten er felles.</div>';
+  return h;
+}
+function quickHarKategori(){
+  if((quickForm.cats||[]).length)return true;
+  var i=quickForm._bolk||0;
+  return(quickForm.bolker||[]).some(function(b,j){return j!==i&&(b.cats||[]).length;});
+}
+
 function submitQuick(){
   var text=(quickForm.text||'').trim();
-  if(!text||!quickForm.cats.length)return;
-  var tags=(quickForm.tags||'').split(',').map(function(v){return v.trim().toLowerCase();}).filter(Boolean)
-    .filter(function(v,i,a){return a.indexOf(v)===i;});
-  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:quickForm.cats,tags:tags,routineIds:quickForm.routineIds||[],date:isoDate(today)});
-  quickForm={text:'',cats:[],tags:'',routineIds:[],step:1};
+  if(!text||!quickHarKategori())return;
+  var bk=quickBolkerUt();
+  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:unionAv(bk,'cats'),tags:unionAv(bk,'tags'),bolker:bk,routineIds:quickForm.routineIds||[],date:isoDate(today)});
+  quickForm={text:'',cats:[],tags:'',bolker:[{cats:[],tags:''}],_bolk:0,routineIds:[],step:1};
   save();render();
+}
+// «Flere valg …» skal ikke kaste det du har skrevet i hurtigskjemaet.
+function quickTilSkjema(){
+  var bk=quickBolkerUt().map(function(b){return{cats:b.cats,tags:b.tags};});
+  modal={step:'entry',form:{text:quickForm.text||'',cats:[].concat(bk[0].cats),tags:[].concat(bk[0].tags),
+    bolker:bk,_bolk:0,routineIds:[].concat(quickForm.routineIds||[]),_newSub:'',_newSubParent:'',_newMain:''}};
+  render();
 }
 function quickLogHTML(){
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
@@ -8826,7 +8887,7 @@ function quickLogHTML(){
       var on=quickForm.cats.includes(m.id);
       var col=on?catColor(m.id):null;
       return'<button class="chip'+(on?' on':'')+'"'+(col?' style="background:'+col+';border-color:'+col+';color:'+textOn(col)+'"':'')+' onclick="toggleQuickCat(\''+q(m.id)+'\')">'+esc(m.name)+'</button>';
-    }).join('')+'<button class="chip-new" onclick="openEntryModal()">Flere valg \u2026</button>';
+    }).join('')+'<button class="chip-new" onclick="quickTilSkjema()">Flere valg \u2026</button>';
     h+='<div style="display:flex;align-items:flex-start;gap:8px">'
       +'<div style="flex:1;font-size:14px;font-style:italic;color:var(--muted);white-space:pre-wrap">\u00ab'+esc(quickForm.text||'')+'\u00bb</div>'
       +'<button class="icon-btn" style="font-size:11px;padding:2px 7px;flex-shrink:0" onclick="quickBackToText()">\u270e</button>'
@@ -8850,7 +8911,8 @@ function quickLogHTML(){
             return'<button class="chip'+(on?' on':'')+'" onclick="toggleQuickRoutine(\''+q(r.id)+'\')">'+esc(r.name)+'</button>';
           }).join('')+'</div>';
       })()
-      +'<button id="quick-btn" class="save-btn" style="margin-top:10px" onclick="submitQuick()" '+(quickForm.cats.length?'':'disabled')+'>Lagre innlegget</button>';
+      +quickBolkFaneHTML()
+      +'<button id="quick-btn" class="save-btn" style="margin-top:10px" onclick="submitQuick()" '+(quickHarKategori()?'':'disabled')+'>Lagre innlegget</button>';
   }
   h+='</div>';
   return h;
