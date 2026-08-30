@@ -66,6 +66,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15p
 .topbar-row{display:flex;align-items:center;gap:10px;margin-bottom:0;padding:14px 16px 10px;background:var(--bg)}
 .stripe-ribbon{height:7px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
 .stripe-thin{height:3.5px;border-radius:2px;margin:8px 12px 2px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
+.stripe-hair{height:2px;border-radius:1px;margin:7px 0 9px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
 .menu-btn{background:none;border:1px solid var(--line);border-radius:8px;font-size:16px;padding:4px 10px;cursor:pointer;color:var(--ink)}
 h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,var(--ink));font-family:var(--font-heading,inherit)}
 .edit-btn{font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit}
@@ -1402,9 +1403,9 @@ function bdayBolkHTML(soon){
     var round=isRoundBdayNext(e);
     return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;cursor:pointer;align-items:center" onclick="goGavePerson(\''+q(e.name)+'\')">'
       +(round?confettiHTML():'')
-      +'<span style="flex-shrink:0;display:flex;align-items:center">'+ballongSVG(34)+'</span>'
+      +'<span style="flex-shrink:0;display:flex;align-items:center">'+ballongSVG(round?46:34)+'</span>'
       +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(e.name)
-      +(nAge?' fyller '+nAge:'')+(round?' \ud83c\udf89':'')+'</div>'
+      +(nAge?' fyller '+nAge:'')+'</div>'
       +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
   }).join('');
 }
@@ -2478,23 +2479,10 @@ function mensDagerTilNeste(){
 // På bursdagen fylles lavendelfeltet med én ballong per år personen fyller.
 // Fargene hentes fra kategoripaletten, med en lysere og en mørkere variant av
 // hver, så flokken føles som appen og ikke som fremmed konfetti.
+// Nøyaktig de tjue fargene fra båndet i banneret, uten lysere eller mørkere
+// varianter — så ballongene og båndet snakker samme språk.
 function ballongPalett(){
-  var ut=[];
-  CAT_COLORS.forEach(function(c){
-    ut.push(c.hex);
-    ut.push(lysHex(c.hex,0.34));
-    ut.push(darkHex(c.hex,0.3));
-  });
-  return ut;
-}
-// lightHex gir rgb() mot bakgrunnsfargen; her trengs hex, og en blanding mot
-// hvitt heller enn mot beige, ellers blir de lyse variantene grumsete.
-function lysHex(hex,f){
-  if(!hex||hex[0]!=='#')return hex;
-  var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  var mix=function(a){return Math.round(a+(255-a)*f);};
-  var to=function(n){return('0'+n.toString(16)).slice(-2);};
-  return'#'+to(mix(r))+to(mix(g))+to(mix(b));
+  return CAT_COLORS.map(function(c){return c.hex;});
 }
 // Enkel deterministisk pseudotilfeldighet, så flokken ikke stokker om seg selv
 // ved hver render — men ser tilfeldig ut, og er ulik fra person til person.
@@ -2520,33 +2508,45 @@ function ballongFarger(antall,fro){
   }
   return ut;
 }
-function ballongFlokkHTML(antall,fro){
-  if(!antall||antall<1)return'';
-  // Over hundre ballonger gir ingen ekstra glede, bare en treg side
-  var n=Math.min(antall,120);
+// Tegner et gitt utsnitt av flokken. fraIdx holder fargerekka sammenhengende,
+// slik at over- og underdelen deler én rekke og ingen naboer blir like.
+function ballongRaderHTML(farger,fraIdx,antall,marg){
+  if(antall<1)return'';
   var hoyde=34; // samme størrelse som den enkelte ballongen i bursdagsradene
   // Deles i rader og fordeles jevnt, slik at hver rad har omtrent like mange og
   // strekker seg helt ut til begge kanter. Space-between alene ville gitt en
   // halvtom siste rad med diger luft mellom ballongene.
   var perRad=12;
-  var rader=Math.max(1,Math.ceil(n/perRad));
-  var grunn=Math.floor(n/rader),rest=n%rader;
-  var farger=ballongFarger(n,fro);
-  var h='<div style="margin:10px 0 2px">',k=0;
+  var rader=Math.max(1,Math.ceil(antall/perRad));
+  var grunn=Math.floor(antall/rader),rest=antall%rader;
+  var h='<div style="'+(marg||'margin:10px 0 2px')+'">',k=fraIdx;
   for(var r=0;r<rader;r++){
     var iRad=grunn+(r<rest?1:0);
     h+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:2px">';
     for(var j=0;j<iRad;j++,k++){
       // Litt ulik høyde og helling, så flokken ikke ser oppstilt ut
-      var vipp=(froTall(fro,k*3+1)*16-8).toFixed(1);
-      var loft=Math.round(froTall(fro,k*5+2)*7);
+      var vipp=(froTall(k*3+1,k*3+1)*16-8).toFixed(1);
+      var loft=Math.round(froTall(k*5+2,k*5+2)*7);
       h+='<span style="display:inline-block;flex-shrink:0;margin-bottom:'+loft+'px;transform:rotate('+vipp+'deg)">'
         +ballongSVG(hoyde,farger[k])+'</span>';
     }
     h+='</div>';
   }
-  h+='</div>';
-  return h;
+  return h+'</div>';
+}
+// Til og med fem år står alle ballongene over teksten. Over det deles flokken
+// likt over og under, med den ekstra ballongen øverst ved oddetall.
+function ballongDeling(antall){
+  var n=Math.min(antall||0,120);
+  if(n<1)return{over:0,under:0,n:0};
+  if(n<=5)return{over:n,under:0,n:n};
+  var over=Math.ceil(n/2);
+  return{over:over,under:n-over,n:n};
+}
+function ballongFlokkHTML(antall,fro){
+  var d=ballongDeling(antall);
+  if(!d.n)return'';
+  return ballongRaderHTML(ballongFarger(d.n,fro),0,d.n);
 }
 // Bursdagsikon: liten blå ballong. Tegnet som SVG fordi ballongemojien alltid
 // er rød og ikke lar seg farge. Formen følger emojien: dråpeformet kropp,
@@ -2929,7 +2929,7 @@ function bursdagslisteViewHTML(){
         +'<span style="flex:1"><span style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:2px" onclick="goGavePerson(\''+q(e.name)+'\')">'+esc(e.name)+'</span>'
         +(age!==null?' <span style="color:var(--muted);font-size:11px">'+age+' \u00e5r</span>':'')
         +' <span style="color:var(--rose);font-size:11px">\u00b7 '+(minne?'minnebursdag '+when:(nAge!==null?'fyller '+nAge+' ':'bursdag ')+when)+'</span>'
-        +(round?' <span style="color:var(--red);font-weight:700;font-size:11px">\ud83c\udf89</span>':'')
+        +(round?' '+ballongSVG(16):'')
         +'</span>'
         +(isToday&&!minne?'<button class="chip'+(gratd?' on':'')+'" style="font-size:11px;padding:3px 10px;flex-shrink:0" onclick="toggleEvent(\''+q(e.id)+'\','+curYear+')">'+(gratd?'\u2713 Gratulert':'Gratulert?')+'</button>':'')
         +'<button class="icon-btn" style="font-size:11px;padding:1px 7px" onclick="openEditEvent(\''+q(e.id)+'\')">\u270e</button>'
@@ -2980,6 +2980,9 @@ function toggleGreet(person,year,kind){
 }
 function goGavePerson(person){view={kind:'gaveperson',person:person,_from:(view&&(view.kind==='gaver')?'gaver':view&&view.kind==='folk'?'folk':'bursdagsliste')};drawerOpen=false;render();}
 function giftKindLabel(k){return k==='jul'?'Julegave':k==='annet'?'Annen gave':'Bursdagsgave';}
+function giftKindHTML(k){
+  return(k==='jul'||k==='annet'?'':ballongSVG(13)+' ')+giftKindLabel(k);
+}
 function normTag(t){return String(t||'').trim().toLowerCase().replace(/^#/,'').replace(/\s+/g,'');}
 // Som normTag(), men bevarer mellomrom — siden stikkord faktisk kan inneholde dem
 // («jenny berg» og «jennyberg» er to ulike, ekte stikkord, ikke det samme skrevet
@@ -4794,7 +4797,7 @@ function gavePersonViewHTML(){
     h+='<div class="sec-title">Gaveid\u00e9er til '+esc(titleName)+'</div><div class="card">';
     ideas.forEach(function(g){
       h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(g.what)+'</div>'
-        +'<div class="entry-date">'+giftKindLabel(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
+        +'<div class="entry-date">'+giftKindHTML(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
         +'<button class="chip" style="font-size:11px;padding:3px 9px;align-self:center;flex-shrink:0" onclick="giftIdeaToGiven(\''+q(g.id)+'\')">\u2192 Gitt</button>'
         +'<button class="icon-btn" style="font-size:11px;padding:1px 7px;align-self:center" onclick="openEditGift(\''+q(g.id)+'\')">\u270e</button></div>';
     });
@@ -4810,7 +4813,7 @@ function gavePersonViewHTML(){
       ['bursdag','jul','annet'].forEach(function(k){
         given.filter(function(g){return g.year===y&&g.kind===k;}).forEach(function(g){
           h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(g.what)+'</div>'
-            +'<div class="entry-date">'+giftKindLabel(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
+            +'<div class="entry-date">'+giftKindHTML(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
             +'<button class="icon-btn" style="font-size:11px;padding:1px 7px;align-self:center" onclick="openEditGift(\''+q(g.id)+'\')">\u270e</button></div>';
         });
       });
@@ -4827,7 +4830,7 @@ function gavePersonViewHTML(){
       h+='<div style="padding:8px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+y+'</div><div class="card">';
       got.filter(function(g){return g.year===y;}).forEach(function(g){
         h+='<div class="entry-row"><div class="entry-body"><div class="entry-text">'+esc(g.what)+'</div>'
-          +'<div class="entry-date">'+giftKindLabel(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
+          +'<div class="entry-date">'+giftKindHTML(g.kind)+(g.note?' \u00b7 '+esc(g.note):'')+'</div></div>'
           +'<button class="icon-btn" style="font-size:11px;padding:1px 7px;align-self:center" onclick="openEditGift(\''+q(g.id)+'\')">\u270e</button></div>';
       });
       h+='</div>';
@@ -8827,17 +8830,21 @@ function hjemViewHTML(){
     var nAge=erMinne(e)?null:bdayNextAge(e);
     var yearAgo=new Date(today);yearAgo.setFullYear(yearAgo.getFullYear()-1);
     var cnt=personEntryCountSince(e.name,isoDate(yearAgo));
-    h+='<div class="card confetti" style="position:relative;overflow:hidden;background:#EDE7F1;border-color:#C9BBD6;padding:16px 16px 14px;margin-top:10px">'
+    var del=ballongDeling(nAge!==null?nAge:0);
+    var flokkFarger=del.n?ballongFarger(del.n,froFraTekst(e.name+'|'+curYear)):[];
+    h+='<div class="card confetti" style="position:relative;overflow:hidden;padding:16px 16px 14px;margin-top:10px">'
       +confettiHTML()
       +'<div style="position:relative">'
-      +'<div style="font-size:17px;font-weight:800;color:#5E4B6E">'+esc(e.name)+(nAge!==null?' fyller '+nAge+' i dag!':' har bursdag i dag!')+'</div>'
-      +'<div style="font-size:13px;color:#6D5A7D;margin-top:4px;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
+      +(del.over?ballongRaderHTML(flokkFarger,0,del.over,'margin:0 0 10px'):'')
+      +'<div style="font-size:17px;font-weight:800;color:var(--title,var(--ink))">'+esc(e.name)+(nAge!==null?' fyller '+nAge+' i dag!':' har bursdag i dag!')+'</div>'
+      +'<div class="stripe-hair"></div>'
+      +'<div style="font-size:13px;color:var(--muted);cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
       +(personTagsFor(e.name).length
         ? (cnt>0?'Du har merket '+cnt+' innlegg i takknemlighetsboka med '+esc(e.name)+' i året som har gått.'
                 :'Du har ikke merket noen innlegg med '+esc(e.name)+' i året som har gått.')
         :'Knytt en hashtagg til '+esc(e.name)+' for å telle takknemlighet gjennom året.')
       +' \u203a</div>'
-      +(nAge!==null?ballongFlokkHTML(nAge,froFraTekst(e.name+'|'+curYear)):'')
+      +(del.under?ballongRaderHTML(flokkFarger,del.over,del.under,'margin:10px 0 2px'):'')
       +'</div></div>';
   });
 
@@ -8855,11 +8862,11 @@ function hjemViewHTML(){
       var round=isRoundBdayNext(e);
       h+='<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;align-items:center">'
         +(round?confettiHTML():'')
-        +'<span style="flex-shrink:0;display:flex;align-items:center">'+ballongSVG(34)+'</span>'
+        +'<span style="flex-shrink:0;display:flex;align-items:center">'+ballongSVG(round?46:34)+'</span>'
         +'<div class="entry-body"><div class="entry-text">'+esc(e.name)
         +(nAge?' fyller '+nAge:'')
         +(function(){var gi=giftsFor(e.name).filter(function(g){return g.idea&&g.kind==='bursdag';});return gi.length?' <span style="color:var(--rose);font-size:11px">\u00b7 '+gi.length+' gaveid\u00e9'+(gi.length>1?'er':'')+'</span>':'';})()
-        +(round?' \ud83c\udf89':'')+'</div>'
+        +'</div>'
         +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+' \u00b7 om '+d+' dager')+'</div></div>'
         +'</div>';
     });
@@ -9093,7 +9100,7 @@ function dayListHTML(m,y,evList,weeklyRoutines,msList){
         var eCol=itemColor(e.cats);
         var click=editMode?'openEditEvent(\''+q(e.id)+'\')':'toggleEvent(\''+q(e.id)+'\','+o.occYear+')';
         var lbl=o.isStart?esc(e.name):'→ '+esc(e.name);
-        return'<button class="dl-ev'+(dn?' done':'')+(round?' confetti':'')+'"'+(eCol&&!dn?' style="background:'+eCol+';color:'+textOn(eCol)+(o.isStart?'':';opacity:.75')+'"':(o.isStart?'':' style="opacity:.75"'))+' onclick="'+click+'">'+(round?confettiHTML():'')+(editMode?'✎ ':'')+lbl+(o.isStart?evYearsTag(e,o.occYear,true):'')+(round&&o.isStart?' 🎉':'')+'</button>';
+        return'<button class="dl-ev'+(dn?' done':'')+(round?' confetti':'')+'"'+(eCol&&!dn?' style="background:'+eCol+';color:'+textOn(eCol)+(o.isStart?'':';opacity:.75')+'"':(o.isStart?'':' style="opacity:.75"'))+' onclick="'+click+'">'+(round?confettiHTML():'')+(editMode?'✎ ':'')+(e.bday&&!erMinne(e)&&o.isStart?ballongSVG(round?15:12)+' ':'')+lbl+(o.isStart?evYearsTag(e,o.occYear,true):'')+'</button>';
       }).join('')+(dayMs.length?' '+dayMs.map(milestoneBtnHTML).join(' '):'')+'</span>'
       +'</div>';
     lastWeek=wk;
@@ -9156,7 +9163,7 @@ function dagViewHTML(){
         var round=isRoundBdayInYear(e,o.occYear);
         var click=editMode?'openEditEvent(\''+q(e.id)+'\')':'toggleEvent(\''+q(e.id)+'\','+o.occYear+')';
         var lbl=o.isStart?esc(e.name):'\u2192 '+esc(e.name);
-        return'<button class="dl-ev'+(dn?' done':'')+(round?' confetti':'')+'"'+(eCol&&!dn?' style="background:'+eCol+';color:'+textOn(eCol)+(o.isStart?'':';opacity:.75')+'"':(o.isStart?'':' style="opacity:.75"'))+' onclick="'+click+'">'+(round?confettiHTML():'')+(editMode?'\u270e ':'')+lbl+(o.isStart?evYearsTag(e,o.occYear,true):'')+(dn?' \u2713':'')+(round&&o.isStart?' \ud83c\udf89':'')+'</button>';
+        return'<button class="dl-ev'+(dn?' done':'')+(round?' confetti':'')+'"'+(eCol&&!dn?' style="background:'+eCol+';color:'+textOn(eCol)+(o.isStart?'':';opacity:.75')+'"':(o.isStart?'':' style="opacity:.75"'))+' onclick="'+click+'">'+(round?confettiHTML():'')+(editMode?'\u270e ':'')+(e.bday&&!erMinne(e)&&o.isStart?ballongSVG(round?15:12)+' ':'')+lbl+(o.isStart?evYearsTag(e,o.occYear,true):'')+(dn?' \u2713':'')+'</button>';
       }).join(' ')
       :dayMs.length?'':'<span style="font-size:12px;color:var(--line)">\u2014</span>')
     +(dayMs.length?' '+dayMs.map(milestoneBtnHTML).join(' '):'')
@@ -9230,7 +9237,7 @@ function ukeViewHTML(){
           var round=isRoundBdayInYear(e,o.occYear);
           var click=editMode?'openEditEvent(\''+q(e.id)+'\')':'toggleEvent(\''+q(e.id)+'\','+o.occYear+')';
           var lbl=o.isStart?esc(e.name):'\u2192 '+esc(e.name);
-          return'<button class="dl-ev'+(dn?' done':'')+(round?' confetti':'')+'"'+(eCol&&!dn?' style="background:'+eCol+';color:'+textOn(eCol)+(o.isStart?'':';opacity:.75')+'"':(o.isStart?'':' style="opacity:.75"'))+' onclick="'+click+'">'+(round?confettiHTML():'')+(editMode?'\u270e ':'')+lbl+(o.isStart?evYearsTag(e,o.occYear,true):'')+(dn?' \u2713':'')+(round&&o.isStart?' \ud83c\udf89':'')+'</button>';
+          return'<button class="dl-ev'+(dn?' done':'')+(round?' confetti':'')+'"'+(eCol&&!dn?' style="background:'+eCol+';color:'+textOn(eCol)+(o.isStart?'':';opacity:.75')+'"':(o.isStart?'':' style="opacity:.75"'))+' onclick="'+click+'">'+(round?confettiHTML():'')+(editMode?'\u270e ':'')+(e.bday&&!erMinne(e)&&o.isStart?ballongSVG(round?15:12)+' ':'')+lbl+(o.isStart?evYearsTag(e,o.occYear,true):'')+(dn?' \u2713':'')+'</button>';
         }).join(' ')
         :dayMs.length?'':'<span style="font-size:12px;color:var(--line)">\u2014</span>')
       +(dayMs.length?' '+dayMs.map(milestoneBtnHTML).join(' '):'')
