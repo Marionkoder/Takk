@@ -31,7 +31,7 @@
   --salmon:#F5A38B;--red-soft:#F7DACC;--rose:#B08D7C;--amber:#B86E2A;
   --muted:#8B7C6B;--line:#E6E0D2;--done:#E3D9C2;--done-line:#D6C9AA;--btn:#E2D8C0;--sel:#D2C5A2;--sel-line:#BFB088;
   --grp:#9C6B3F;--ach-bg:#F7F1DC;--ach-line:#E6D9B4;
-  --blaa:#6BA3BC;--blaa-skygge:#3E7C96;--lv1:#7A2E28;--lv2:#9C3D2E;--lv3:#BF5638;--lv4:#E07348;--lv5:#FF9466;--lv6:#C68A1E;--lv7:#4E7B8C;
+  --blaa:#6BA3BC;--blaa-skygge:#3E7C96;--ballongsnor:#B08D7C;--lv1:#7A2E28;--lv2:#9C3D2E;--lv3:#BF5638;--lv4:#E07348;--lv5:#FF9466;--lv6:#C68A1E;--lv7:#4E7B8C;
   --font:"Nunito","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;min-height:100vh}
@@ -1400,9 +1400,10 @@ function bdayBolkHTML(soon){
     var d=daysToNextBday(e);
     var nAge=bdayNextAge(e);
     var round=isRoundBdayNext(e);
-    return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
+    return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;cursor:pointer;align-items:center" onclick="goGavePerson(\''+q(e.name)+'\')">'
       +(round?confettiHTML():'')
-      +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+ballongSVG(17)+' '+esc(e.name)
+      +'<span style="flex-shrink:0;display:flex;align-items:center">'+ballongSVG(34)+'</span>'
+      +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+esc(e.name)
       +(nAge?' fyller '+nAge:'')+(round?' \ud83c\udf89':'')+'</div>'
       +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
   }).join('');
@@ -2547,7 +2548,7 @@ function ballongSVG(px,farge){
     +'<path d="M13 26.6C18.5 24 22.6 18 22.6 11.9C22.6 8.6 21.3 5.7 19.2 3.8C20.3 5.5 20.9 7.6 20.9 9.9C20.9 16 16.8 22 11.3 24.6C10.6 25 10 25.3 13 26.6Z" style="fill:'+sk+';opacity:'+(farge?'.22':'.35')+'"/>'
     +'<ellipse cx="8.8" cy="8.2" rx="1.7" ry="2.9" transform="rotate(-25 8.8 8.2)" style="fill:#fff;opacity:.4"/>'
     +'<path d="M11.4 26.2L14.6 26.2L13 29Z" style="fill:'+f+'"/>'
-    +'<path d="M13 29c0 2.2 2.6 2.6 2.6 4.8 0 1.8-2.2 2.2-2.2 3.4" style="fill:none;stroke:var(--rose);stroke-width:1;stroke-linecap:round"/>'
+    +'<path d="M13 29c0 2.2 2.6 2.6 2.6 4.8 0 1.8-2.2 2.2-2.2 3.4" style="fill:none;stroke:var(--ballongsnor);stroke-width:1;stroke-linecap:round"/>'
     +'</svg>';
 }
 function syklusSti(){
@@ -8840,9 +8841,10 @@ function hjemViewHTML(){
       var d=daysToNextBday(e);
       var nAge=bdayNextAge(e);
       var round=isRoundBdayNext(e);
-      h+='<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative">'
+      h+='<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;align-items:center">'
         +(round?confettiHTML():'')
-        +'<div class="entry-body"><div class="entry-text">'+ballongSVG(18)+' '+esc(e.name)
+        +'<span style="flex-shrink:0;display:flex;align-items:center">'+ballongSVG(34)+'</span>'
+        +'<div class="entry-body"><div class="entry-text">'+esc(e.name)
         +(nAge?' fyller '+nAge:'')
         +(function(){var gi=giftsFor(e.name).filter(function(g){return g.idea&&g.kind==='bursdag';});return gi.length?' <span style="color:var(--rose);font-size:11px">\u00b7 '+gi.length+' gaveid\u00e9'+(gi.length>1?'er':'')+'</span>':'';})()
         +(round?' \ud83c\udf89':'')+'</div>'
