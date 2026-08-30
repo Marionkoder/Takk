@@ -31,7 +31,7 @@
   --salmon:#F5A38B;--red-soft:#F7DACC;--rose:#B08D7C;--amber:#B86E2A;
   --muted:#8B7C6B;--line:#E6E0D2;--done:#E3D9C2;--done-line:#D6C9AA;--btn:#E2D8C0;--sel:#D2C5A2;--sel-line:#BFB088;
   --grp:#9C6B3F;--ach-bg:#F7F1DC;--ach-line:#E6D9B4;
-  --lv1:#7A2E28;--lv2:#9C3D2E;--lv3:#BF5638;--lv4:#E07348;--lv5:#FF9466;--lv6:#C68A1E;--lv7:#4E7B8C;
+  --blaa:#4E7B8C;--lv1:#7A2E28;--lv2:#9C3D2E;--lv3:#BF5638;--lv4:#E07348;--lv5:#FF9466;--lv6:#C68A1E;--lv7:#4E7B8C;
   --font:"Nunito","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;min-height:100vh}
@@ -1402,7 +1402,7 @@ function bdayBolkHTML(soon){
     var round=isRoundBdayNext(e);
     return'<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
       +(round?confettiHTML():'')
-      +'<div class="entry-body"><div class="entry-text" style="font-size:13px">\ud83c\udf82 '+esc(e.name)
+      +'<div class="entry-body"><div class="entry-text" style="font-size:13px">'+ballongSVG(14)+' '+esc(e.name)
       +(nAge?' fyller '+nAge:'')+(round?' \ud83c\udf89':'')+'</div>'
       +'<div class="entry-date">'+(d===0?'i dag!':d===1?'i morgen':'om '+d+' dager')+'</div></div></div>';
   }).join('');
@@ -2471,8 +2471,81 @@ function mensDagerTilNeste(){
 // Selve trackeren er en egen app (syklus.html). Her leses bare registrerte
 // perioder, så appen vet hvilken syklusdag det er — og kalenderen kan farge
 // dagene. Ingenting registreres herfra.
+// Stien til Syklus kan endres i Innstillinger — ligger fila et annet sted eller
+// har et annet navn, skal ikke knappen føre til en blank feilside.
+// Bursdagsikon: liten blå ballong, tegnet som SVG fordi ballongemojien alltid
+// er rød og ikke lar seg farge.
+function ballongSVG(px){
+  var h=px||15;
+  return'<svg viewBox="0 0 12 17" style="height:'+h+'px;width:auto;vertical-align:-2px;flex-shrink:0" aria-hidden="true">'
+    +'<ellipse cx="6" cy="6" rx="4.6" ry="5.6" style="fill:var(--blaa)"/>'
+    +'<ellipse cx="4.3" cy="4.2" rx="1.2" ry="1.8" style="fill:#fff;opacity:.35"/>'
+    +'<path d="M6 11.6 L4.9 13.2 L7.1 13.2 Z" style="fill:var(--blaa)"/>'
+    +'<path d="M6 13.2 q1.5 1.3 0 2.6 q-1.5 1.3 0 1.2" style="fill:none;stroke:var(--rose);stroke-width:.8;stroke-linecap:round"/>'
+    +'</svg>';
+}
+function syklusSti(){
+  try{return localStorage.getItem(SK+'_syklussti')||'syklus.html';}catch(e){return'syklus.html';}
+}
+function settSyklusSti(v){
+  try{localStorage.setItem(SK+'_syklussti',String(v||'').trim()||'syklus.html');}catch(e){}
+  syklusStatus=null;render();
+}
+var syklusStatus=null; // null = ikke sjekket, 'ok', 'mangler', 'ukjent'
+// Åpner i ny fane, slik at hovedappen blir stående. Navigerer appen bort fra
+// seg selv i frittstående PWA-modus, har brukeren ingen tilbakeknapp.
+function apneSyklus(){
+  var sti=syklusSti();
+  if(location.protocol==='file:'||typeof fetch!=='function'){
+    // fetch virker ikke mot file://, så her må vi bare prøve
+    window.open(sti,'_blank');
+    return;
+  }
+  fetch(sti,{method:'HEAD'}).then(function(r){
+    if(r.ok){syklusStatus='ok';window.open(sti,'_blank');}
+    else{syklusStatus='mangler';render();}
+  }).catch(function(){
+    syklusStatus='ukjent';
+    window.open(sti,'_blank');
+  });
+}
+// Sjekker to ting: om fila finnes, og om lagringen faktisk deles. Det siste er
+// den fella som er lettest å gå i — appene kan ligge side om side og likevel ha
+// hvert sitt lager om de åpnes fra disk.
+function sjekkSyklus(){
+  var sti=syklusSti();
+  if(location.protocol==='file:'||typeof fetch!=='function'){
+    syklusStatus='fil';render();return;
+  }
+  syklusStatus='sjekker';render();
+  fetch(sti,{method:'HEAD'}).then(function(r){
+    syklusStatus=r.ok?'ok':'mangler';render();
+  }).catch(function(){
+    syklusStatus='ukjent';render();
+  });
+}
+function syklusStatusHTML(){
+  if(!syklusStatus)return'';
+  var delt=mens.length?(mens.length+' registrerte perioder er lest herfra.'):'Ingen registrerte perioder lest enn\u00e5.';
+  var t='',f='var(--muted)';
+  if(syklusStatus==='sjekker')t='Sjekker \u2026';
+  else if(syklusStatus==='ok'){t='Fant '+syklusSti()+'. '+delt;f='var(--red)';}
+  else if(syklusStatus==='mangler')t='Fant ikke '+syklusSti()+' i samme mappe som denne fila.';
+  else if(syklusStatus==='fil')t='Appen er \u00e5pnet direkte fra disk (file://). Da kan ikke stien sjekkes, og nettleseren kan gi de to filene hvert sitt lager. Legg dem p\u00e5 samme nettadresse for at de skal dele data. '+delt;
+  else t='Kunne ikke sjekke stien. '+delt;
+  return'<div style="margin-top:8px;font-size:12px;color:'+f+'">'+esc(t)+'</div>';
+}
+function syklusManglerHTML(){
+  if(syklusStatus!=='mangler')return'';
+  return'<div class="card" style="margin-top:8px;padding:12px 14px;border-left:3px solid var(--amber)">'
+    +'<div class="entry-text">Fant ikke Syklus</div>'
+    +'<div style="font-size:13px;color:var(--muted);margin-top:4px">'
+    +'Appen leter etter <b>'+esc(syklusSti())+'</b> i samme mappe som denne fila. '
+    +'Legg <b>syklus.html</b> ved siden av <b>gode-dager.html</b>, eller endre stien under Innstillinger \u2192 Personlig.'
+    +'</div></div>';
+}
 function syklusAppLenke(){
-  return'<a class="icon-btn" style="display:inline-block;text-decoration:none" href="syklus.html">\u00c5pne Syklus \u2192</a>';
+  return'<button class="icon-btn" onclick="apneSyklus()">\u00c5pne Syklus \u2192</button>';
 }
 function toggleSyklusVisning(){
   showMens=!showMens;
@@ -2496,7 +2569,7 @@ function syklusKortHTML(){
   }
   h+='<div style="margin-top:12px">'+syklusAppLenke()+'</div>'
     +'<div class="hint" style="margin-top:8px">Registrering, dagsdetaljer og grafer ligger i Syklus. Appene deler lagring, s\u00e5 tallene her oppdaterer seg av seg selv.</div>'
-    +'</div></div>';
+    +'</div></div>'+syklusManglerHTML();
   return h;
 }
 function mensDagFor(dato){return mensDag.find(function(x){return x.date===dato;})||null;}
@@ -4872,6 +4945,10 @@ function personligViewHTML(){
     +'<button class="chip'+(showMens?' on':'')+'" onclick="toggleSyklusVisning()">'+(showMens?'P\u00e5':'Av')+'</button>'
     +'</div>'
     +'<div class="hint" style="margin-top:8px">Registrering skjer i Syklus-appen. '+syklusAppLenke()+'</div>'
+    +'<label class="field-lbl" style="margin-top:10px">Sti til Syklus</label>'
+    +'<input class="inp" type="text" value="'+esc(syklusSti())+'" placeholder="syklus.html" onchange="settSyklusSti(this.value)">'
+    +'<div style="margin-top:8px"><button class="icon-btn" onclick="sjekkSyklus()">Sjekk forbindelsen</button></div>'
+    +syklusStatusHTML()
     +'</div>';
 
   // Midlertidig: forhåndsvis feiringsbannerne før selve dagen. Fjernes når begge er sett.
@@ -8697,7 +8774,7 @@ function hjemViewHTML(){
       var round=isRoundBdayNext(e);
       h+='<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative">'
         +(round?confettiHTML():'')
-        +'<div class="entry-body"><div class="entry-text">\ud83c\udf82 '+esc(e.name)
+        +'<div class="entry-body"><div class="entry-text">'+ballongSVG(15)+' '+esc(e.name)
         +(nAge?' fyller '+nAge:'')
         +(function(){var gi=giftsFor(e.name).filter(function(g){return g.idea&&g.kind==='bursdag';});return gi.length?' <span style="color:var(--rose);font-size:11px">\u00b7 '+gi.length+' gaveid\u00e9'+(gi.length>1?'er':'')+'</span>':'';})()
         +(round?' \ud83c\udf89':'')+'</div>'
