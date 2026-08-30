@@ -5616,6 +5616,90 @@ function routineExpectedHours(r,y,m,scope){
 function routineTimeItems(){
   return routines.filter(function(r){return r.trackHours;}).sort(function(a,b){return nbSort(a.name,b.name);});
 }
+// Hvilken loggnøkkel en rutine bruker for en gitt dato. Daglige logger dagen,
+// ukentlige uka, månedlige måneden — samme nøkler som avhakingen bruker.
+function rutineLoggNokkel(r,iso){
+  if(r.freq==='daily')return'd'+iso;
+  if(isWeekly(r)){
+    // Samme nøkkelformat som routineWeeksIn bruker: w<ISO-uke-år>-<ukenummer>
+    var d=new Date(iso+'T00:00:00');
+    return'w'+weekYear(d)+'-'+pad(weekNum(d));
+  }
+  return iso.slice(0,7);
+}
+function rutineGjortPaa(r,iso){return(r.log||[]).indexOf(rutineLoggNokkel(r,iso))>=0;}
+// Forslag, ikke automatikk: skriver du «savnet turen i dag», skal turen ikke
+// registreres som gått. Du bekrefter selv.
+function avhakingsForslagHTML(valgte,iso){
+  var ikkeGjort=(valgte||[]).map(function(id){return routineById(id);})
+    .filter(function(r){return r&&!rutineGjortPaa(r,iso);});
+  if(!ikkeGjort.length)return'';
+  return'<div class="card" style="margin-top:8px;padding:10px 12px;border-left:3px solid var(--rose)">'
+    +'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Ikke haket av enn\u00e5 '+esc(fmtDate(iso))+':</div>'
+    +'<div class="chips">'+ikkeGjort.map(function(r){
+      return'<button class="chip" onclick="hakAvFraInnlegg(\''+q(r.id)+'\',\''+q(iso)+'\')">\u25cb Hak av '+esc(r.name)+'</button>';
+    }).join('')+'</div></div>';
+}
+function hakAvFraInnlegg(rid,iso){
+  var r=routineById(rid);if(!r)return;
+  var key=rutineLoggNokkel(r,iso);
+  if((r.log||[]).indexOf(key)<0){
+    r.log=[].concat(r.log||[],[key]);
+    save();
+  }
+  render();
+}
+
+// ── Forslag til rutinekobling ──────────────────────────────────────────
+// Koblingen mellom innlegg og rutine finnes allerede, men krever at du husker
+// den i det ene øyeblikket du tenker på noe annet. Her rangeres rutinene etter
+// hvor godt de passer innlegget, så du bekrefter et forslag i stedet for å lete.
+function ordFra(t){
+  return String(t||'').toLowerCase()
+    .replace(/[^\wåæøéèü\s]/g,' ').split(/\s+/)
+    .filter(function(w){return w.length>2;});
+}
+// Enkel stammeklipp: «turen» og «turer» skal treffe «tur». Endelsene er de
+// vanlige norske bøyningene; ikke perfekt, men godt nok til å rangere.
+function stam(w){
+  return String(w).replace(/(ene|enes|ene|erne|ene|ens|ers|er|en|et|a|e)$/,'');
+}
+function ordTreff(a,b){
+  if(a===b)return true;
+  var sa=stam(a),sb=stam(b);
+  return sa.length>2&&sb.length>2&&(sa===sb||sa.indexOf(sb)===0||sb.indexOf(sa)===0);
+}
+function rutineForslagScore(r,tekst,tags,cats){
+  var score=0;
+  var tOrd=ordFra(tekst);
+  ordFra(r.name).forEach(function(rw){
+    if(tOrd.some(function(tw){return ordTreff(rw,tw);}))score+=3;
+  });
+  (r.tags||[]).forEach(function(rt){
+    if((tags||[]).indexOf(rt)>=0)score+=2;
+    if(tOrd.some(function(tw){return ordTreff(rt,tw);}))score+=1;
+  });
+  (r.cats||[]).forEach(function(rc){if((cats||[]).indexOf(rc)>=0)score+=1;});
+  return score;
+}
+// Sorterer aktive rutiner: treff øverst, resten alfabetisk under.
+function rutinerRangert(tekst,tags,cats,valgte){
+  return activeRoutinesNow().map(function(r){
+    return{r:r,score:(valgte||[]).indexOf(r.id)>=0?99:rutineForslagScore(r,tekst,tags,cats)};
+  }).sort(function(a,b){
+    return b.score-a.score||nbSort(a.r.name,b.r.name);
+  });
+}
+function rutineChipsHTML(rangert,valgte,klikk){
+  return rangert.map(function(x){
+    var on=(valgte||[]).indexOf(x.r.id)>=0;
+    var treff=!on&&x.score>=3;
+    return'<button class="chip'+(on?' on':'')+'"'
+      +(treff?' style="border-color:var(--red);color:var(--red)"':'')
+      +' onclick="'+klikk+'(\''+q(x.r.id)+'\')">'+(treff?'\u2726 ':'')+esc(x.r.name)+'</button>';
+  }).join('');
+}
+
 function activeRoutinesNow(){
   return routines.filter(function(r){return!(r.months&&r.months.length)||r.months.indexOf(curMonth)>=0;})
     .sort(function(a,b){return nbSort(a.name,b.name);});
@@ -6053,7 +6137,12 @@ function rutineMilepaeler(){
   return ut;
 }
 function rutineTotalTelling(r){
-  return(r.log||[]).length+entriesForRoutine(r.id).length;
+  // Avhaking og koblet innlegg kan gjelde samme dag — særlig nå som innlegget
+  // foreslår avhakingen. Telles per dag, ikke per hendelse.
+  var sett={};
+  (r.log||[]).forEach(function(k){sett[k]=1;});
+  entriesForRoutine(r.id).forEach(function(e){sett[rutineLoggNokkel(r,e.date)]=1;});
+  return Object.keys(sett).length;
 }
 function rutineStjerneMilepael(r){
   var total=rutineTotalTelling(r);
@@ -7949,13 +8038,11 @@ function modalHTML(){
       +'<label class="field-lbl">Stikkord (valgfritt)</label>'
       +tagSectionHTML(f)
       +(function(){
-        var ar=activeRoutinesNow();
-        if(!ar.length)return'';
+        var rang=rutinerRangert(f.text,unionAv(f.bolker||[{cats:f.cats,tags:f.tags}],'tags').concat(f.tags||[]),unionAv(f.bolker||[{cats:f.cats,tags:f.tags}],'cats').concat(f.cats||[]),f.routineIds);
+        if(!rang.length)return'';
         return'<label class="field-lbl">Rutine(r) dette h\u00f8rer til <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-          +'<div class="chips">'+ar.map(function(r){
-            var on=(f.routineIds||[]).includes(r.id);
-            return'<button class="chip'+(on?' on':'')+'" onclick="toggleFormRoutine(\''+q(r.id)+'\')">'+esc(r.name)+'</button>';
-          }).join('')+'</div>';
+          +'<div class="chips">'+rutineChipsHTML(rang,f.routineIds,'toggleFormRoutine')+'</div>'
+          +avhakingsForslagHTML(f.routineIds,f.date||isoDate(today));
       })()
       +(isEdit?'<button class="del-full-btn" onclick="'+(f._confirmSlett?'deleteEntry(\''+q(f.id)+'\');closeModal()':'mf()._confirmSlett=true;render()')+'">'+(f._confirmSlett?'\u26a0 Trykk igjen for \u00e5 slette for godt':'Slett innlegg')+'</button>':'')
       +(isEdit?'<div style="height:14px"></div>':'')
@@ -8441,6 +8528,16 @@ function fjernQuickBolk(i){
   quickForm.bolker=quickForm.bolker.filter(function(_,j){return j!==i;});
   byttQuickBolk(Math.max(0,Math.min(quickForm._bolk||0,quickForm.bolker.length-1)));
 }
+// Leser delene uten å endre tilstand — brukes til å rangere rutineforslag
+// mens du skriver, der lagring ville vært feil.
+function quickBolkerLes(){
+  var i=quickForm._bolk||0;
+  return(quickForm.bolker||[]).map(function(x,j){
+    var tg=(j===i?quickForm.tags:x.tags)||'';
+    return{cats:(j===i?quickForm.cats:x.cats)||[],
+      tags:String(tg).split(',').map(function(v){return v.trim().toLowerCase();}).filter(Boolean)};
+  });
+}
 function quickBolkerUt(){
   lagreAktivQuickBolk();
   var b=(quickForm.bolker||[]).map(function(x){
@@ -8513,13 +8610,12 @@ function quickLogHTML(){
         }).join('')+'</div>';
       })()
       +(function(){
-        var ar=activeRoutinesNow();
-        if(!ar.length)return'';
+        var qb=quickBolkerLes();
+        var rang=rutinerRangert(quickForm.text,unionAv(qb,'tags'),unionAv(qb,'cats'),quickForm.routineIds);
+        if(!rang.length)return'';
         return'<label class="field-lbl" style="margin-top:8px">Rutine(r) dette h\u00f8rer til <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-          +'<div class="chips">'+ar.map(function(r){
-            var on=(quickForm.routineIds||[]).includes(r.id);
-            return'<button class="chip'+(on?' on':'')+'" onclick="toggleQuickRoutine(\''+q(r.id)+'\')">'+esc(r.name)+'</button>';
-          }).join('')+'</div>';
+          +'<div class="chips">'+rutineChipsHTML(rang,quickForm.routineIds,'toggleQuickRoutine')+'</div>'
+          +avhakingsForslagHTML(quickForm.routineIds,isoDate(today));
       })()
       +quickBolkFaneHTML()
       +'<button id="quick-btn" class="save-btn" style="margin-top:10px" onclick="submitQuick()" '+(quickHarKategori()?'':'disabled')+'>Lagre innlegget</button>';
