@@ -35,6 +35,8 @@
   --font:"Nunito","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;min-height:100vh}
+button,.chip,.icon-btn,.cb-item,.inp,select,textarea{touch-action:manipulation}
+.pin-bg{touch-action:manipulation}
 
 /* ── Layout: sidebar + main ── */
 .layout{display:flex;min-height:100vh}
@@ -66,7 +68,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15p
 .topbar-row{display:flex;align-items:center;gap:10px;margin-bottom:0;padding:14px 16px 10px;background:var(--bg)}
 .stripe-ribbon{height:7px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
 .stripe-thin{height:3.5px;border-radius:2px;margin:8px 12px 2px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
-.stripe-hair{height:2px;border-radius:1px;margin:7px 0 9px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
+.stripe-hair{height:5px;border-radius:2px;margin:8px 0 10px;background:linear-gradient(to right,#74A491 0% 5%,#4E6B5C 5% 10%,#8A8B5C 10% 15%,#4E7B8C 15% 20%,#87A7BC 20% 25%,#52657E 25% 30%,#8B7A9E 30% 35%,#6D4A68 35% 40%,#8C5A74 40% 45%,#C0868E 45% 50%,#C46E7E 50% 55%,#A34A5E 55% 60%,#DE9273 60% 65%,#A8574A 65% 70%,#CC7F33 70% 75%,#E2C878 75% 80%,#C2AC85 80% 85%,#9C6B3F 85% 90%,#6F4E37 90% 95%,#94897B 95% 100%)}
+.stripe-rund{height:9px;border-radius:3px}
 .menu-btn{background:none;border:1px solid var(--line);border-radius:8px;font-size:16px;padding:4px 10px;cursor:pointer;color:var(--ink)}
 h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,var(--ink));font-family:var(--font-heading,inherit)}
 .edit-btn{font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit}
@@ -219,7 +222,7 @@ button.tag-pill:hover{filter:brightness(.94)}
 .modal-title{font-size:18px;font-weight:700;margin-bottom:16px}
 .close-btn{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)}
 .field-lbl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;display:block;margin:16px 0 6px}
-.inp{width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);font-size:15px;background:var(--bg);color:var(--ink);font-family:inherit}
+.inp{width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);font-size:16px;background:var(--bg);color:var(--ink);font-family:inherit}
 .inp:focus{outline:none;border-color:var(--red)}
 textarea.inp{min-height:80px;resize:vertical}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
@@ -2833,7 +2836,7 @@ function goBursdagsliste(){
 }
 function bursdagsPyntHTML(fro){
   var farger=ballongFarger(3,fro||1);
-  return'<div style="display:flex;gap:10px;align-items:flex-end;padding:6px 12px 0">'
+  return'<div style="display:flex;gap:8px;align-items:flex-end;flex-shrink:0;padding:0 12px 2px">'
     +farger.map(function(f,i){
       var vipp=(froTall(fro||1,i*3+1)*14-7).toFixed(1);
       return'<span style="display:inline-block;transform:rotate('+vipp+'deg)">'+ballongSVG(38,f)+'</span>';
@@ -2846,7 +2849,8 @@ function bursdagerHubHTML(){
     +'<div class="view-title">Bursdagsbok</div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goBursdagsliste()">'
     +'<div class="entry-body"><div class="entry-text">Bursdagsliste</div>'
-    +'<div class="entry-date">'+bdays.length+' av '+BDAY_MAX+' bursdager</div></div>'
+    +'<div class="entry-date">'+bdayCount()+' av '+BDAY_MAX+' bursdager'
+    +(function(){var mm=bdays.length-bdayCount();return mm?' \u00b7 '+mm+' minnebursdag'+(mm>1?'er':''):'';})()+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goGaver()">'
     +'<div class="entry-body"><div class="entry-text">Gavelogg</div>'
@@ -2867,13 +2871,15 @@ function bursdagslisteViewHTML(){
   });
   else bdays.sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div style="display:flex;align-items:flex-end;gap:10px">'
+    +'<div class="view-title" style="flex:1;min-width:0">Bursdagsliste <span style="font-size:12px;font-weight:400;color:var(--rose)">\u00b7 '+bdayCount()+' av '+BDAY_MAX+'</span></div>'
     +bursdagsPyntHTML(view.fro)
-    +'<div class="view-title">Bursdagsliste <span style="font-size:12px;font-weight:400;color:var(--rose)">\u00b7 '+bdays.length+' av '+BDAY_MAX+'</span></div>';
+    +'</div>';
   h+='<div class="chips" style="padding:8px 12px 0">'
     +[['dato','Dato'],['navn','Alfabetisk'],['alder','Alder']].map(function(t){
       return'<button class="chip'+(bdaySort===t[0]?' on':'')+'" onclick="bdaySort=\''+t[0]+'\';render()">'+t[1]+'</button>';
     }).join('')+'</div>';
-  if(bdays.length<BDAY_MAX){
+  if(bdayCount()<BDAY_MAX){
     h+='<button class="add-btn" onclick="openBdayModal()">+ Ny bursdag</button>';
     h+='<div style="padding:0 12px 4px"><button class="icon-btn" style="font-size:11px" onclick="openMinneModal()">+ Ny minnebursdag</button></div>';
   }
@@ -2904,7 +2910,7 @@ function bursdagslisteViewHTML(){
   } else {
     h+='<div class="card"><div class="empty">Ingen bursdager ennå.</div></div>';
   }
-  if(bdays.length>=BDAY_MAX){
+  if(bdayCount()>=BDAY_MAX){
     h+='<div class="hint-box" style="color:var(--amber)">Du har n\u00e5dd '+BDAY_MAX+' bursdager \u2014 Dunbars tall for hvor mange meningsfulle relasjoner et menneske greier \u00e5 holde ved like.</div>';
   }
   return h;
@@ -7104,7 +7110,7 @@ function saveEditRoutine(){
 function submitEvent(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
-  if(f.bday&&bdayCount()>=BDAY_MAX)return;
+  if(f.bday&&!f.memorial&&bdayCount()>=BDAY_MAX)return;
   // Bursdager har ikke egen kategorivelger \u2014 de h\u00f8rer alltid til Folk
   if(f.bday){var fk=folkCat();f.cats=fk?[fk.id]:[];}
   events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,tags:f.tags||[],repeat:!!f.repeat,bday:!!f.bday,memorial:!!f.memorial,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],done:false,log:[]});
@@ -8552,7 +8558,7 @@ function modalHTML(){
         +[1,2,3,4,5,10].map(function(iv){return'<option value="'+iv+'"'+((Number(f.interval)||1)===iv?' selected':'')+'>'+(iv===1?'Hvert \u00e5r':'Hvert '+iv+'. \u00e5r')+'</option>';}).join('')
         +'</select>':'')
       +(f.repeat?'<div class="hint">'+(f.bday?'Bursdager gjentas hvert \u00e5r.':'Gjentas fra og med valgt \u00e5r med valgt hyppighet \u2014 f.eks. annethvert \u00e5r. Noe som skjer fast flere ganger i \u00e5ret, legges heller inn som rutine.')+'</div>':'<div class="hint">En engangs\u00adhendelse. Skjer det fast flere ganger i \u00e5ret, er det per definisjon en rutine \u2014 legg det inn der i stedet.</div>')
-      +(f.bday&&!isEditE&&bdayCount()>=BDAY_MAX?'<div class="hint" style="color:var(--amber)">Du har n\u00e5dd '+BDAY_MAX+' bursdager \u2014 Dunbars tall for hvor mange meningsfulle relasjoner et menneske greier \u00e5 holde ved like. Slett en f\u00f8r du legger til flere.</div>':'')
+      +(f.bday&&!f.memorial&&!isEditE&&bdayCount()>=BDAY_MAX?'<div class="hint" style="color:var(--amber)">Du har n\u00e5dd '+BDAY_MAX+' bursdager \u2014 Dunbars tall for hvor mange meningsfulle relasjoner et menneske greier \u00e5 holde ved like. Slett en f\u00f8r du legger til flere.</div>':'')
       +'<label class="field-lbl">'+(f.bday?'F\u00f8dsels\u00e5r':'Start\u00e5r')+' <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
       +'<input class="inp" type="number" style="width:110px" value="'+esc(String(f.sinceYear||''))+'" placeholder="f.eks. 1986" oninput="mf().sinceYear=this.value">'
       +(f.bday?'<label class="field-lbl">Hashtagger om denne personen <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
@@ -9221,20 +9227,26 @@ function hjemViewHTML(){
     var cnt=personEntryCountSince(e.name,isoDate(yearAgo));
     var del=ballongDeling(nAge!==null?nAge:0);
     var flokkFarger=del.n?ballongFarger(del.n,froFraTekst(e.name+'|'+curYear)):[];
-    h+='<div class="card confetti" style="position:relative;overflow:hidden;padding:16px 16px 14px;margin-top:10px">'
-      +confettiHTML()
-      +'<div style="position:relative">'
+    var rund=isRoundBdayNext(e);
+    // Konfettien hører til teksten, ikke hele kortet — ellers faller den ned
+    // over den øverste ballongraden og roter til flokken.
+    h+='<div class="card'+(rund?' round-bday':'')+'" style="padding:16px 16px 14px;margin-top:10px">'
       +(del.over?ballongRaderHTML(flokkFarger,0,del.over,'margin:0 0 10px'):'')
-      +'<div style="font-size:17px;font-weight:800;color:var(--title,var(--ink))">'+esc(e.name)+(nAge!==null?' fyller '+nAge+' i dag!':' har bursdag i dag!')+'</div>'
-      +'<div class="stripe-hair"></div>'
+      +'<div class="'+(rund?'starshower':'confetti')+'" style="padding:2px 0">'
+      +(rund?starShowerHTML():confettiHTML())
+      +'<div style="position:relative;z-index:2">'
+      +'<div style="font-size:'+(rund?'21px':'17px')+';font-weight:800;color:var(--title,var(--ink))">'+esc(e.name)+(nAge!==null?' fyller '+nAge+' i dag!':' har bursdag i dag!')+'</div>'
+      +(rund?'<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);font-weight:700;margin-top:2px">Rund dag</div>':'')
+      +'<div class="stripe-hair'+(rund?' stripe-rund':'')+'"></div>'
       +'<div style="font-size:13px;color:var(--muted);cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
       +(personTagsFor(e.name).length
         ? (cnt>0?'Du har merket '+cnt+' innlegg i takknemlighetsboka med '+esc(e.name)+' i året som har gått.'
                 :'Du har ikke merket noen innlegg med '+esc(e.name)+' i året som har gått.')
         :'Knytt en hashtagg til '+esc(e.name)+' for å telle takknemlighet gjennom året.')
       +' \u203a</div>'
+      +'</div></div>'
       +(del.under?ballongRaderHTML(flokkFarger,del.over,del.under,'margin:10px 0 2px'):'')
-      +'</div></div>';
+      +'</div>';
   });
 
   // Bursdager de neste to ukene
@@ -9395,7 +9407,9 @@ function monthEventsFor(m,y){
 
 /* ── Bursdager: Dunbars tall og runde år ── */
 var BDAY_MAX=150;
-function bdayCount(){return events.filter(function(e){return e.bday;}).length;}
+// Taket er Dunbars tall for levende relasjoner. En minnebursdag er ikke en slik
+// relasjon, og skal ikke spise av plassen.
+function bdayCount(){return events.filter(function(e){return e.bday&&!erMinne(e);}).length;}
 function bdayNextAge(e){
   var s=Number(e.sinceYear);if(!(s>0))return null;
   var passed=(e.month<curMonth)||(e.month===curMonth&&(e.day||31)<today.getDate());
@@ -11937,7 +11951,7 @@ function normAnswer(x){return String(x||'').trim().toLowerCase().replace(/\s+/g,
 function pinRender(){
   var pd=pinData();
   var st=window._pinState||(window._pinState={mode:'enter',buf:'',err:'',recovering:false,ansBuf:'',newBuf:''});
-  var box=function(inner){return'<div style="max-width:360px;width:100%;margin:0 auto;padding:118px 24px 32px;text-align:center">'+inner+'</div>';};
+  var box=function(inner){return'<div style="max-width:360px;width:100%;margin:0 auto;padding:min(118px,12vh) 24px 32px;text-align:center">'+inner+'</div>';};
   var dots=function(n){var h='';for(var i=0;i<4;i++)h+='<span style="display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 6px;border:1.5px solid var(--sel-line);background:'+(i<n?'var(--ink)':'transparent')+'"></span>';return h;};
   var pad=function(handler){
     var h='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:210px;margin:30px auto 0">';
@@ -11959,13 +11973,13 @@ function pinRender(){
     h=box('<div style="font-size:17px;font-weight:700;margin-bottom:6px">Velg ny PIN</div>'
       +'<div style="font-size:13px;color:var(--muted);margin-bottom:20px">Fire siffer</div>'
       +dots(st.newBuf.length)
-      +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
+      +'<div style="color:var(--amber);font-size:12px;margin-top:12px;height:16px">'+esc(st.err||'')+'</div>'
       +pad('pinNewDigit'));
   } else {
     h=box('<div style="font-size:21px;font-weight:800;letter-spacing:.02em;line-height:1.25;margin-bottom:8px;color:var(--title,var(--ink));text-transform:uppercase">'+esc(bannerTittel())+'</div>'
       +'<div style="font-size:13px;color:var(--muted);margin-bottom:20px">Skriv PIN-koden</div>'
       +dots(st.buf.length)
-      +(st.err?'<div style="color:var(--amber);font-size:12px;margin-top:12px">'+esc(st.err)+'</div>':'')
+      +'<div style="color:var(--amber);font-size:12px;margin-top:12px;height:16px">'+esc(st.err||'')+'</div>'
       +pad('pinDigit')
       +'<button class="icon-btn" style="margin-top:16px;color:var(--rose)" onclick="_pinState.recovering=true;_pinState.err=\'\';renderPinScreen()">Glemt PIN?</button>');
   }
@@ -11975,6 +11989,7 @@ function pinRender(){
 function renderPinScreen(){pinRender();}
 function pinDigit(k){
   var st=window._pinState;
+  if(st.sperret)return;
   if(k==='\u232b'){st.buf=st.buf.slice(0,-1);st.err='';renderPinScreen();return;}
   if(st.buf.length>=4)return;
   st.buf+=k;
@@ -11984,9 +11999,10 @@ function pinDigit(k){
     else{
       st._fails=(st._fails||0)+1;
       var delay=st._fails>=3?Math.min(4000,(st._fails-2)*1000):0;
-      st.buf='';st.err='Feil PIN'+(delay?' \u2014 vent litt \u2026':'');renderPinScreen();
-      if(delay){var btns=document.querySelectorAll('#app button');btns.forEach(function(b){b.disabled=true;});
-        setTimeout(function(){st.err='';renderPinScreen();},delay);}
+      st.buf='';st.err='Feil PIN'+(delay?' \u2014 vent litt \u2026':'');
+      if(delay)st.sperret=true;
+      renderPinScreen();
+      if(delay)setTimeout(function(){st.sperret=false;st.err='';renderPinScreen();},delay);
     }
   } else renderPinScreen();
 }
