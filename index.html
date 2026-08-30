@@ -4066,6 +4066,49 @@ function goTagAlle(tag){view={kind:'tagalle',tag:tag};drawerOpen=false;render();
 // sier noe spesielt om akkurat dette stikkordet. Styrke = andel blant de taggede
 // innleggene delt på andel blant ALLE innlegg. 1 = helt vanlig. Over 1 = henger
 // sammen oftere enn tilfeldig. Under 1 = sjeldnere enn ellers.
+// Hvilke stikkord dukker oftest opp sammen med en person? Personen kan ha flere
+// personlige hashtagger, så et treff er en del som inneholder minst én av dem.
+// Regnes over deler, ikke innlegg — ellers ville «tur med Jenny, senere operaen
+// med Knut» gjort operaen til noe Jenny var med på.
+function personMonsterHTML(person){
+  var pt=personTagsFor(person);
+  if(!pt.length)return'';
+  var alle=[];
+  entries.forEach(function(e){bolkerFra(e).forEach(function(b){alle.push(b);});});
+  var totalN=alle.length;
+  var med=alle.filter(function(b){
+    return(b.tags||[]).some(function(t){return pt.indexOf(normTag(t))>=0;});
+  });
+  if(med.length<3||totalN<8)return''; // for lite data til at et mønster sier noe
+
+  var tellingMed={},tellingAlle={};
+  alle.forEach(function(b){(b.tags||[]).forEach(function(t){tellingAlle[t]=(tellingAlle[t]||0)+1;});});
+  med.forEach(function(b){(b.tags||[]).forEach(function(t){
+    if(pt.indexOf(normTag(t))>=0)return; // personens egne hashtagger teller ikke
+    tellingMed[t]=(tellingMed[t]||0)+1;
+  });});
+
+  var rader=Object.keys(tellingMed).map(function(t){
+    var antall=tellingMed[t];
+    var andelMed=antall/med.length;
+    var andelAlle=(tellingAlle[t]||0)/totalN;
+    return{navn:t,antall:antall,styrke:andelAlle>0?andelMed/andelAlle:null};
+  }).filter(function(x){return x.antall>=2;})
+    .sort(function(a,b){return b.antall-a.antall||(b.styrke||0)-(a.styrke||0);})
+    .slice(0,8);
+  if(!rader.length)return'';
+
+  return'<div class="sec-title">Dukker ofte opp sammen med '+esc(person)+'</div><div class="card">'
+    +rader.map(function(x){
+      var farge=x.styrke===null?'var(--muted)':(x.styrke>=1.5?'var(--red)':(x.styrke<0.7?'var(--muted)':'var(--ink)'));
+      var tekst=x.styrke===null?'':(x.styrke>=1.05?'\u00d7'+x.styrke.toFixed(1)+' vanligere enn ellers':(x.styrke<=0.95?'\u00d7'+x.styrke.toFixed(1)+' \u2014 sjeldnere enn ellers':'omtrent som ellers'));
+      return'<div class="entry-row tett"><div class="entry-body">'+tagPillHTML(x.navn)+'</div>'
+        +'<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--muted)">'+x.antall+' ganger</div>'
+        +(tekst?'<div style="font-size:11px;color:'+farge+'">'+tekst+'</div>':'')+'</div></div>';
+    }).join('')
+    +'</div>'
+    +'<div class="hint" style="padding:0 12px 4px">Styrke sammenligner med hvor vanlig stikkordet er i hele dagboka, s\u00e5 noe du skriver mye om ellers ikke teller som s\u00e6rlig for '+esc(person)+'.</div>';
+}
 function tagMonsterHTML(tag){
   // Regnes over DELER, ikke innlegg. Skriver du «tur med Jenny» og «operaen med
   // Knut» i samme innlegg, hørte Jenny aldri til operaen — og med innlegget som
@@ -4868,6 +4911,8 @@ function gavePersonViewHTML(){
   } else {
     h+='<div class="card">'+pEntries.map(entryRowHTML).join('')+'</div>';
   }
+
+  h+=personMonsterHTML(pn);
 
   return h;
 }
