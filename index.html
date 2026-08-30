@@ -1440,7 +1440,6 @@ function folkViewHTML(){
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
   var sky=cloudSectionHTML(counts,true,'folk','Ti på topp',true);
   if(sky)h+=sky;
-  h+=katRutineKnapperHTML(ids);
 
   // Bursdager og planer side om side
   var soon=bdays.filter(function(e){
@@ -1524,13 +1523,22 @@ function folkViewHTML(){
 
   // Underkategorier som egne bokser — samme mønster som de andre kategorisidene
   h+=katUnderBokserHTML(cat,[],{});
+
+  // Rutiner nederst, som på de andre kategorisidene
+  var underIdsF=cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;});
+  var rtsF=routines.filter(function(r){
+    return(r.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;})
+      &&!(r.cats||[]).some(function(cid){return underIdsF.indexOf(cid)>=0;});
+  }).sort(function(a,b){return nbSort(a.name,b.name);});
+  h+=katRutineKnapperHTML(ids,rtsF);
+
   return h+katSideSlutt();
 }
 // Generisk kategoriside — grunnverdi, ordsky, og det kategorien inneholder.
 // Som Folk og Kreativitet eier den ingenting; alt vises fra der det bor.
 // Rutiner som knapper — daglige hver dag, ukentlige fra mandag, månedlige fra den 1.,
 // årlige fra 1. januar. Blir stående ut perioden så du kan ta dem igjen senere.
-function katRutineKnapperHTML(ids){
+function katRutineKnapperHTML(ids,rts){
   var mine=routines.filter(function(r){return(r.cats||[]).some(function(c){return ids.indexOf(c)>=0;});});
   if(!mine.length)return'';
   var wKey='w'+weekYear(today)+'-'+pad(weekNum(today));
@@ -1576,7 +1584,23 @@ function katRutineKnapperHTML(ids){
       }).join('')
       +'</div>';
   });
-  return h?'<div class="sec-title">Rutiner <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span></div><div class="card" style="padding:4px 0 8px">'+h+'</div>':'';
+  // Redigeringslista lå før i en egen bolk «Rediger rutiner». Den hører hjemme
+  // her, i samme kort: hak av øverst, endre nederst.
+  var red='';
+  if(rts&&rts.length){
+    red='<div style="padding:8px 12px 2px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);border-top:1px solid var(--line);margin-top:4px">Endre</div>'
+      +rts.map(function(r){
+        var m=rutineMengde(r);
+        return'<div class="entry-row tett" style="cursor:pointer;border-bottom:none" onclick="openEditRoutine(\''+q(r.id)+'\')">'
+          +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
+          +'<div class="entry-date">'+esc(freqShort(r))
+          +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
+          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+      }).join('');
+  }
+  if(!h&&!red)return'';
+  return'<div class="sec-title">Rutiner'+(h?' <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span>':'')+'</div>'
+    +'<div class="card" style="padding:4px 0 8px">'+h+red+'</div>';
 }
 function katSideHTML(navn, tittel, skyNokkel, ekstra){
   var cat=katVedNavn(navn);
@@ -1630,7 +1654,6 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
     return(rad.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;});
   });
   if(katRader.length)h+=ganttHTML(katRader,'Prosjektene i tid');
-  h+=katRutineKnapperHTML(ids);
 
   if(ekstra)h+=ekstra;
 
@@ -1669,20 +1692,6 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
     h+='</div>';
   }
 
-  var rts=routines.filter(function(r){return inCat(r.cats)&&!iUnder(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
-  if(rts.length){
-    // Selve avhakingen skjer med knappene lenger opp; her ligger redigering og mengde
-    h+='<div class="sec-title">Rediger rutiner</div><div class="card">'
-      +rts.map(function(r){
-        var m=rutineMengde(r);
-        return'<div class="entry-row tett" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
-          +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
-          +'<div class="entry-date">'+esc(freqShort(r))
-          +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
-          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-      }).join('')+'</div>';
-  }
-
   var listeInv=inventories.filter(function(iv){
     var ic=iv.catIds&&iv.catIds.length?iv.catIds:(iv.catId?[iv.catId]:[]);
     return!iv.fixed&&(iv.type||'inventar')==='inventar'&&inCat(ic)&&!iUnder(ic);
@@ -1697,6 +1706,10 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
           +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
       }).join('')+'</div>';
   }
+
+  // Rutiner nederst — avhaking og redigering samlet i ett kort
+  var rts=routines.filter(function(r){return inCat(r.cats)&&!iUnder(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
+  h+=katRutineKnapperHTML(ids,rts);
 
   return h+katSideSlutt();
 }
@@ -9236,8 +9249,7 @@ function hjemViewHTML(){
       +(rund?starShowerHTML():confettiHTML())
       +'<div style="position:relative;z-index:2">'
       +'<div style="font-size:'+(rund?'21px':'17px')+';font-weight:800;color:var(--title,var(--ink))">'+esc(e.name)+(nAge!==null?' fyller '+nAge+' i dag!':' har bursdag i dag!')+'</div>'
-      +(rund?'<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);font-weight:700;margin-top:2px">Rund dag</div>':'')
-      +'<div class="stripe-hair'+(rund?' stripe-rund':'')+'"></div>'
+      +(rund?'<div class="stripe-hair stripe-rund"></div>':'<div style="height:8px"></div>')
       +'<div style="font-size:13px;color:var(--muted);cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
       +(personTagsFor(e.name).length
         ? (cnt>0?'Du har merket '+cnt+' innlegg i takknemlighetsboka med '+esc(e.name)+' i året som har gått.'
