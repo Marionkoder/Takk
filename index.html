@@ -2524,15 +2524,27 @@ function ballongFlokkHTML(antall,fro){
   if(!antall||antall<1)return'';
   // Over hundre ballonger gir ingen ekstra glede, bare en treg side
   var n=Math.min(antall,120);
+  var hoyde=34; // samme størrelse som den enkelte ballongen i bursdagsradene
+  // Deles i rader og fordeles jevnt, slik at hver rad har omtrent like mange og
+  // strekker seg helt ut til begge kanter. Space-between alene ville gitt en
+  // halvtom siste rad med diger luft mellom ballongene.
+  var perRad=12;
+  var rader=Math.max(1,Math.ceil(n/perRad));
+  var grunn=Math.floor(n/rader),rest=n%rader;
   var farger=ballongFarger(n,fro);
-  var h='<div style="display:flex;flex-wrap:wrap;gap:2px 1px;align-items:flex-end;margin:10px 0 2px;position:relative">';
-  farger.forEach(function(f,i){
-    // Litt ulik høyde og helling, så flokken ikke ser oppstilt ut
-    var vipp=(froTall(fro,i*3+1)*16-8).toFixed(1);
-    var loft=Math.round(froTall(fro,i*5+2)*7);
-    h+='<span style="display:inline-block;margin-bottom:'+loft+'px;transform:rotate('+vipp+'deg)">'
-      +ballongSVG(22,f)+'</span>';
-  });
+  var h='<div style="margin:10px 0 2px">',k=0;
+  for(var r=0;r<rader;r++){
+    var iRad=grunn+(r<rest?1:0);
+    h+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:2px">';
+    for(var j=0;j<iRad;j++,k++){
+      // Litt ulik høyde og helling, så flokken ikke ser oppstilt ut
+      var vipp=(froTall(fro,k*3+1)*16-8).toFixed(1);
+      var loft=Math.round(froTall(fro,k*5+2)*7);
+      h+='<span style="display:inline-block;flex-shrink:0;margin-bottom:'+loft+'px;transform:rotate('+vipp+'deg)">'
+        +ballongSVG(hoyde,farger[k])+'</span>';
+    }
+    h+='</div>';
+  }
   h+='</div>';
   return h;
 }
