@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Gode dager">
-<meta name="theme-color" content="#C22B2B">
+<meta name="theme-color" content="#8E1F1D">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +18,7 @@
 <script>
 (function(){
   var m={name:"Gode dager",short_name:"Gode dager",description:"Gode dager",
-    start_url:".",display:"standalone",background_color:"#FBFAF9",theme_color:"#C22B2B",
+    start_url:".",display:"standalone",background_color:"#FCFAF4",theme_color:"#8E1F1D",
     icons:[{src:"icon-192.png",sizes:"192x192",type:"image/png",purpose:"any maskable"},{src:"icon-512.png",sizes:"512x512",type:"image/png",purpose:"any maskable"}]};
   var b=new Blob([JSON.stringify(m)],{type:"application/manifest+json"});
   document.getElementById("pwa-manifest").href=URL.createObjectURL(b);
@@ -337,6 +337,8 @@ var FJERNEDE_FARGER={aubergine:'fiolett',gammelrosa:'fersken',teglstein:'rust',v
 function colorHexById(colId){var p=CAT_COLORS.find(function(x){return x.id===colId;});return p?p.hex:null;}
 function catColor(catId){
   var c=catById(catId);if(!c)return null;
+  // En underkategori kan ha sin egen farge; har den ikke det, arves hovedkategoriens.
+  if(c.color)return colorHexById(c.color);
   var m=c.parentId?catById(c.parentId):c;
   return m&&m.color?colorHexById(m.color):null;
 }
@@ -7151,7 +7153,7 @@ function saveEditCat(){
   var c=cats.find(function(x){return x.id===f.id;});if(!c)return;
   c.name=name;
   if(c.parentId&&f.parentId)c.parentId=f.parentId;
-  if(!c.parentId){if(f.color)c.color=f.color;else delete c.color;}
+  if(f.color)c.color=f.color;else delete c.color;
   save();closeModal();
 }
 function mergeCat(fromId,toId){
@@ -7807,18 +7809,17 @@ function modalHTML(){
 
   } else if(step==='cat_edit'){
     var c=catById(f.id);var isMain=c&&!c.parentId;
-    var colorSection='';
-    if(isMain){
-      colorSection='<label class="field-lbl">Farge <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
-        +'<div class="chips" style="gap:8px">'
-        +'<button class="col-sw none'+(!f.color?' on':'')+'" title="Ingen farge" onclick="mf().color=\'\';render()">✕</button>'
-        +CAT_COLORS.map(function(cc){
-          return'<button class="col-sw'+(f.color===cc.id?' on':'')+'" style="background:'+cc.hex+'" title="'+cc.name+'" onclick="mf().color=\''+cc.id+'\';render()"></button>';
-        }).join('')
-        +'</div>'
-        +(f.color?'<div class="hint">'+esc((CAT_COLORS.find(function(x){return x.id===f.color;})||{}).name||'')+' — arves av underkategoriene og vises på innlegg, i budsjettet og i rapportene.</div>'
-          :'<div class="hint">Arves av underkategoriene og vises på innlegg, i budsjettet og i rapportene.</div>');
-    }
+    var farget=isMain?'✕':'\u2193 Arv fra hovedkategori';
+    var colorSection='<label class="field-lbl">Farge <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
+      +'<div class="chips" style="gap:8px">'
+      +'<button class="col-sw none'+(!f.color?' on':'')+'" style="'+(isMain?'':'width:auto;height:30px;border-radius:14px;padding:0 10px;white-space:nowrap;font-size:11px')+'" title="'+(isMain?'Ingen farge':'Arv hovedkategoriens farge')+'" onclick="mf().color=\'\';render()">'+farget+'</button>'
+      +CAT_COLORS.map(function(cc){
+        return'<button class="col-sw'+(f.color===cc.id?' on':'')+'" style="background:'+cc.hex+'" title="'+cc.name+'" onclick="mf().color=\''+cc.id+'\';render()"></button>';
+      }).join('')
+      +'</div>'
+      +(f.color
+        ?'<div class="hint">'+esc((CAT_COLORS.find(function(x){return x.id===f.color;})||{}).name||'')+(isMain?' — arves av underkategoriene og vises på innlegg, i budsjettet og i rapportene.':' — gjelder bare denne underkategorien, uavhengig av hovedkategoriens farge.')+'</div>'
+        :'<div class="hint">'+(isMain?'Arves av underkategoriene og vises på innlegg, i budsjettet og i rapportene.':'Følger hovedkategoriens farge helt til du velger en egen her.')+'</div>');
     var parentSection='';
     if(!isMain){
       var mains2=cats.filter(function(x){return!x.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
