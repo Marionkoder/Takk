@@ -11672,11 +11672,10 @@ function planleggingViewHTML(){
   if(planTab==='tavle')h+=kanbanTavleHTML();
   if(planTab==='rapporter'){
     h+='<div class="chips" style="padding:8px 12px 0">'
-      +[['rapporter','Rapport'],['oppnadd','Gjennomf\u00f8rt'],['ressursbruk','Ressursbruk']].map(function(t){
+      +[['rapporter','Rapport'],['oppnadd','Gjennomf\u00f8rt']].map(function(t){
         return'<button class="chip'+(rrTab===t[0]?' on':'')+'" onclick="rrTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
       }).join('')+'</div>';
     if(rrTab==='oppnadd')h+=oppnaddViewHTML(true);
-    else if(rrTab==='ressursbruk')h+=okonomiHubHTML(true);
     else h+=rapportSamletViewHTML(true);
   }
   if(planTab==='verdier'){
