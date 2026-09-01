@@ -1515,13 +1515,12 @@ function folkViewHTML(){
   // Underkategorier som egne bokser — samme mønster som de andre kategorisidene
   h+=katUnderBokserHTML(cat,[],{});
 
-  // Rutiner nederst, som på de andre kategorisidene
-  var underIdsF=cats.filter(function(c){return c.parentId===cat.id;}).map(function(c){return c.id;});
+  // Rutiner nederst, som på de andre kategorisidene — inkludert underkategorier,
+  // ellers kan en rutine bli avhakbar uten å bli redigerbar.
   var rtsF=routines.filter(function(r){
-    return(r.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;})
-      &&!(r.cats||[]).some(function(cid){return underIdsF.indexOf(cid)>=0;});
+    return(r.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;});
   }).sort(function(a,b){return nbSort(a.name,b.name);});
-  h+=katRutineKnapperHTML(ids,rtsF);
+  h+=katRutineKnapperHTML(rtsF);
 
   return h+katSideSlutt();
 }
@@ -1529,69 +1528,19 @@ function folkViewHTML(){
 // Som Folk og Kreativitet eier den ingenting; alt vises fra der det bor.
 // Rutiner som knapper — daglige hver dag, ukentlige fra mandag, månedlige fra den 1.,
 // årlige fra 1. januar. Blir stående ut perioden så du kan ta dem igjen senere.
-function katRutineKnapperHTML(ids,rts){
-  var mine=routines.filter(function(r){return(r.cats||[]).some(function(c){return ids.indexOf(c)>=0;});});
-  if(!mine.length)return'';
-  var wKey='w'+weekYear(today)+'-'+pad(weekNum(today));
-  var ymKey=curYear+'-'+pad(curMonth);
-  var grupper=[
-    {tit:'I dag',liste:[]},
-    {tit:'Denne uka',liste:[]},
-    {tit:'Denne m\u00e5neden',liste:[]},
-    {tit:'I \u00e5r',liste:[]}
-  ];
-  mine.forEach(function(r){
-    // Rutiner som bare gjelder visse m\u00e5neder, skal ikke dukke opp utenom
-    if(r.months&&r.months.length&&r.months.indexOf(curMonth)<0)return;
-    var f=r.freq||'monthly';
-    if(f==='daily'){
-      var rd=r.days||[];
-      if(rd.length&&rd.indexOf(dow(today))<0)return;
-      grupper[0].liste.push({r:r,key:'d'+isoDate(today)});
-    } else if(f==='weekly'||f==='odd'||f==='even'){
-      var wk=weekNum(today);
-      if(f==='odd'&&wk%2===0)return;
-      if(f==='even'&&wk%2===1)return;
-      grupper[1].liste.push({r:r,key:wKey});
-    } else if(f==='yearly'){
-      grupper[3].liste.push({r:r,key:'y'+curYear});
-    } else {
-      grupper[2].liste.push({r:r,key:'m'+ymKey});
-    }
-  });
-  var h='';
-  grupper.forEach(function(g){
-    if(!g.liste.length)return;
-    h+='<div style="padding:6px 12px 2px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">'+g.tit+'</div>'
-      +'<div class="chips" style="padding:0 12px 4px">'
-      +g.liste.sort(function(a,b){return nbSort(a.r.name,b.r.name);}).map(function(x){
-        var gjort=(x.r.log||[]).indexOf(x.key)>=0;
-        var nettopp=recentDone['r_'+x.r.id+'_'+x.key];
-        var col=catColor(mainCatOf(x.r.cats));
-        return'<button class="chip'+(gjort?' on':'')+(nettopp?' rutine-ok':'')+'"'
-          +(nettopp&&col?' style="--ok-farge:'+col+'"':'')
-          +' onclick="boxToggleRoutine(\''+q(x.r.id)+'\',\''+q(x.key)+'\')">'
-          +(gjort?'\u2713 ':'')+esc(x.r.name)+'</button>';
-      }).join('')
-      +'</div>';
-  });
-  // Redigeringslista lå før i en egen bolk «Rediger rutiner». Den hører hjemme
-  // her, i samme kort: hak av øverst, endre nederst.
-  var red='';
-  if(rts&&rts.length){
-    red='<div style="padding:8px 12px 2px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);border-top:1px solid var(--line);margin-top:4px">Endre</div>'
-      +rts.map(function(r){
-        var m=rutineMengde(r);
-        return'<div class="entry-row tett" style="cursor:pointer;border-bottom:none" onclick="openEditRoutine(\''+q(r.id)+'\')">'
-          +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
-          +'<div class="entry-date">'+esc(freqShort(r))
-          +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
-          +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
-      }).join('');
-  }
-  if(!h&&!red)return'';
-  return'<div class="sec-title">Rutiner'+(h?' <span style="font-weight:400;color:var(--rose)">\u00b7 trykk n\u00e5r gjort</span>':'')+'</div>'
-    +'<div class="card" style="padding:4px 0 8px">'+h+red+'</div>';
+function katRutineKnapperHTML(rts){
+  // Avhaking skjer på Loggføring nå — denne bolken er bare for å finne og
+  // redigere rutinen, ikke for å hake den av. Én jobb, ikke to.
+  if(!rts||!rts.length)return'';
+  var h=rts.map(function(r){
+    var m=rutineMengde(r);
+    return'<div class="entry-row tett" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
+      +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
+      +'<div class="entry-date">'+esc(freqShort(r))
+      +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
+      +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
+  }).join('');
+  return'<div class="sec-title">Rutiner</div><div class="card" style="padding:4px 0 8px">'+h+'</div>';
 }
 function katSideHTML(navn, tittel, skyNokkel, ekstra){
   var cat=katVedNavn(navn);
@@ -1698,9 +1647,11 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
       }).join('')+'</div>';
   }
 
-  // Rutiner nederst — avhaking og redigering samlet i ett kort
-  var rts=routines.filter(function(r){return inCat(r.cats)&&!iUnder(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
-  h+=katRutineKnapperHTML(ids,rts);
+  // Rutiner nederst — avhaking og redigering samlet i ett kort. Tar med
+  // underkategorier også, ellers blir en rutine avhakbar uten å være
+  // redigerbar — nøyaktig det som gjorde noen rutiner uredigerbare før.
+  var rts=routines.filter(function(r){return inCat(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
+  h+=katRutineKnapperHTML(rts);
 
   return h+katSideSlutt();
 }
@@ -8721,7 +8672,8 @@ function modalHTML(){
       return'<button class="chip'+((f.months||[]).includes(i+1)?' on':'')+'" onclick="toggleFormMonth('+(i+1)+')">'+m.slice(0,3)+'</button>';
     }).join('');
     body='<div class="modal-title">'+(isEditR?'Rediger rutine':'Ny rutine')+'</div>'
-      +(isEditR?'<button class="icon-btn" style="font-size:12px;margin-bottom:10px'+(routineById(f.id)&&routineById(f.id).vimpel?';color:var(--red);border-color:var(--red)':'')+'" onclick="toggleRutineVimpel(\''+q(f.id)+'\')">'+(routineById(f.id)&&routineById(f.id).vimpel?'\u2691 Trykk for \u00e5 fjerne vimpelfeiring':'\u2690 Trykk for \u00e5 feire med vimpel')+'</button>':'')
+      +(isEditR?'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Gjennomf\u00f8rt totalt: <b style="color:var(--ink)">'+rutineTotalTelling(routineById(f.id))+'</b> ganger</div>'
+        +'<button class="icon-btn" style="font-size:12px;margin-bottom:10px'+(routineById(f.id)&&routineById(f.id).vimpel?';color:var(--red);border-color:var(--red)':'')+'" onclick="toggleRutineVimpel(\''+q(f.id)+'\')">'+(routineById(f.id)&&routineById(f.id).vimpel?'\u2691 Trykk for \u00e5 fjerne vimpelfeiring':'\u2690 Trykk for \u00e5 feire med vimpel')+'</button>':'')
       +'<label class="field-lbl">Hva skal gjøres?</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="Beskriv rutinen …" oninput="mf().name=this.value;updateSaveBtn()">'
       +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt</span></label>'
@@ -9376,25 +9328,6 @@ function hjemViewHTML(){
       +'<div style="font-size:12px;color:var(--muted);margin-top:4px">Se om tiden og pengene g\u00e5r opp de neste tre m\u00e5nedene \u203a</div>'
       +'</div>';
   }
-  var freshAch=achievements.filter(function(a){return(Date.now()-(a.ts||0))<86400000;}).sort(function(a,b){return(b.ts||0)-(a.ts||0);});
-  if(freshAch.length){
-    h+='<div class="sec-title">Feiring</div>';
-    freshAch.forEach(function(a){
-      var isResult=a.kind==='result';
-      var fx=achFxClass(a.kind);
-      var edgeCol=(isResult||a.kind==='project')?(catColor((a.cats||[])[0])||'var(--rose)'):null;
-      h+='<div class="card'+(fx?' '+fx:'')+'" style="position:relative;overflow:hidden;padding:14px 16px;margin-top:8px'+(edgeCol?';border-left:4px solid '+edgeCol:'')+'">'
-        +achFxHTML(a.kind)
-        +'<div style="position:relative">'
-        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);display:flex;align-items:center;gap:5px">'
-        +(a.kind==='project'?vimpelSVG(15,edgeCol||'#B08D7C',darkHex((edgeCol&&edgeCol.charAt(0)==='#')?edgeCol:'#B08D7C',0.32),null,0,''):'')
-        +'<span>'+(isResult?'\ud83c\udfc6 Prosjekt n\u00e5dd':a.kind==='project'?'Prosjekt fullf\u00f8rt':a.kind==='routine'?'\ud83d\udd01 Rutine \u00b7 '+esc(a.detail||''):'\u2713 Milep\u00e6l haket av')+'</span>'
-        +'</div>'
-        +'<div style="font-size:15px;font-weight:800;margin-top:3px">'+esc(a.name)+'</div>'
-        +(a.detail&&a.kind!=='routine'?'<div style="font-size:12px;color:var(--muted);margin-top:5px">'+esc(a.detail)+'</div>':'')
-        +'</div></div>';
-    });
-  }
 
   // Dagens innlegg
   var todaysEntries=entries.filter(function(e){return e.date===todayIso;});
@@ -9629,8 +9562,7 @@ function starShowerHTML(){
 }
 // Hvilken feiringseffekt en anerkjennelse skal ha: milepæler skimrer, prosjekter og
 // fullførte prosjekter drysser stjerner, rutiner (byggeklosser i det daglige) får ingen effekt.
-function achFxClass(kind){return(kind==='milestone'||kind==='result')?'shimmer':kind==='project'?'starshower':'';}
-function achFxHTML(kind){return kind==='project'?starShowerHTML():'';}
+
 
 function weekNum(date){
   var d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
@@ -10090,12 +10022,16 @@ function vimpelsnorRadHTML(rad){
   s+='</svg>';
   return s;
 }
+var VIMPEL_RUTINE_TERSKEL=20;
 function vimpelsnorHTML(){
-  var fraRutiner=routines.filter(function(r){return r.vimpel;}).map(function(r){
+  // Å hake av «feire med vimpel» er et ønske, ikke en garanti — rutinen må
+  // faktisk ha nådd terskelen, og prosjektet må faktisk være ferdigstilt,
+  // før noe dukker opp her. Krysset alene henger ikke opp noe med det samme.
+  var fraRutiner=routines.filter(function(r){return r.vimpel&&rutineTotalTelling(r)>=VIMPEL_RUTINE_TERSKEL;}).map(function(r){
     var farge=itemColor(r.cats||[])||'#B08D7C';
     return{navn:r.name,farge:farge,mork:darkHex(farge,0.32),klikk:'openEditRoutine(\''+q(r.id)+'\')'};
   });
-  var fraProsjekter=alleProsjekter().filter(function(iv){return iv.vimpel;}).map(function(iv){
+  var fraProsjekter=alleProsjekter().filter(function(iv){return iv.vimpel&&iv.completedDate;}).map(function(iv){
     var farge=itemColor((iv.catIds||[]).concat(iv.catId?[iv.catId]:[]))||'#B08D7C';
     return{navn:dispName(iv),farge:farge,mork:darkHex(farge,0.32),klikk:'goInventar(\''+q(iv.id)+'\')'};
   });
