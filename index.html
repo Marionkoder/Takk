@@ -561,7 +561,6 @@ function etterslepRutineMilepaeler(){
     }
   });
 }
-function goOppnadd(){view={kind:'oppnadd'};drawerOpen=false;render();}
 var BEREDSKAP_SEKSJONER=[
   {id:'bs_betaling',name:'Betaling'},
   {id:'bs_drikke',name:'Drikke'},
@@ -8886,7 +8885,7 @@ function sidebarHTML(){
   };
   h+='<div class="side-month" style="'+toppStil(view.kind==='om')+'" onclick="goOm()"><span class="s-arrow"></span>Om appen</div>';
   h+='<div class="side-month" style="'+toppStil(view.kind==='innstillinger'||view.kind==='administrer')+'" onclick="goInnstillinger()"><span class="s-arrow"></span>Innstillinger</div>';
-  h+='<div class="side-month" style="'+toppStil(view.kind==='planlegging'||view.kind==='rapportsamlet'||view.kind==='oppnadd'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
+  h+='<div class="side-month" style="'+toppStil(view.kind==='planlegging'||view.kind==='rapportsamlet'||view.kind==='okonomi'||view.kind==='budsjett')+'" onclick="goPlanlegging()"><span class="s-arrow"></span>Oversikt</div>';
   // Kategorisidene: alfabetisk, hver med sin egen kategorifarge — som stripene ellers
   [{n:'folk',navn:'Folk',fn:'goFolk()',kat:'folk',kinds:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson']},
    {n:'kreativitet',navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
@@ -9462,6 +9461,8 @@ function hjemViewHTML(){
     h+='</div>';
   }
 
+  h+=vimpelsnorHTML();
+
   return h;
 }
 
@@ -9940,11 +9941,7 @@ function catPillsHTML(catIds){
 }
 
 function rapportNavHTML(){
-  var k=view.kind;
-  return'<div class="chips" style="justify-content:center;padding:10px 12px 0">'
-    +'<button class="chip'+(k==='rapportsamlet'?' on':'')+'" onclick="goRapport(curMonth,curYear)">Rapport</button>'
-    +'<button class="chip'+(k==='oppnadd'?' on':'')+'" onclick="goOppnadd()">Gjennomf\u00f8rt</button>'
-    +'</div>';
+  return'';
 }
 function rapportSamletViewHTML(innebygd){
   if(view.month==null)view.month=curMonth;
@@ -10043,16 +10040,6 @@ function vimpelsnorHTML(){
   return h;
 }
 
-function oppnaddViewHTML(innebygd){
-  var h=innebygd?'':rapportNavHTML();
-  h+='<div class="view-title">Gjennomf\u00f8rt</div>'
-    +'<div class="view-sub">Rutiner og prosjekter du selv har valgt \u00e5 feire med en vimpel.</div>';
-  h+=vimpelsnorHTML();
-  if(!(routines.some(function(r){return r.vimpel;})||alleProsjekter().some(function(iv){return iv.vimpel;}))){
-    h+='<div class="card"><div class="empty">Ingen vimpler enn\u00e5. \u00c5pne en rutine eller et prosjekt og trykk \u00abFeire med vimpel\u00bb.</div></div>';
-  }
-  return h;
-}
 function oppsummeringViewHTML(){
   var h='';
   var sorted=entries.slice().sort(function(a,b){return a.date<b.date?-1:1;});
@@ -11670,14 +11657,7 @@ function planleggingViewHTML(){
   }).join('')+'</div>';
 
   if(planTab==='tavle')h+=kanbanTavleHTML();
-  if(planTab==='rapporter'){
-    h+='<div class="chips" style="padding:8px 12px 0">'
-      +[['rapporter','Rapport'],['oppnadd','Gjennomf\u00f8rt']].map(function(t){
-        return'<button class="chip'+(rrTab===t[0]?' on':'')+'" onclick="rrTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
-      }).join('')+'</div>';
-    if(rrTab==='oppnadd')h+=oppnaddViewHTML(true);
-    else h+=rapportSamletViewHTML(true);
-  }
+  if(planTab==='rapporter')h+=rapportSamletViewHTML(true);
   if(planTab==='verdier'){
   h+='<div class="sec-title">Verdiplan</div>';
   h+='<button class="add-btn" onclick="openGoalModal()">+ Ny grunnverdi</button>';
@@ -11959,7 +11939,6 @@ function render(){
   else if(view.kind==='venteliste')content=ventelisteViewHTML();
   else if(view.kind==='gaver')content=gaverViewHTML();
   else if(view.kind==='gaveperson')content=gavePersonViewHTML();
-  else if(view.kind==='oppnadd')content=oppnaddViewHTML();
   else if(view.kind==='rapportsamlet')content=rapportSamletViewHTML();
   else if(view.kind==='inventar')content=inventarViewHTML();
   else if(view.kind==='skjulte')content=skjulteInnleggViewHTML();
