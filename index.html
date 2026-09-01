@@ -3799,6 +3799,22 @@ function load(){
     save();
   }
 
+  // Prosjekter kunne samle på en død kategori-id ved siden av en gyldig —
+  // trolig fra en kategori som ble fjernet eller fikk ny id underveis. Var
+  // den døde først i lista, viste kortet «ingen kategori» selv om en gyldig
+  // lå rett etter. Rydder alle prosjekter for godt, én gang.
+  var katrydd1=false;try{katrydd1=!!localStorage.getItem(SK+'_katrydd1');}catch(e){}
+  if(!katrydd1){
+    inventories.forEach(function(iv){
+      if(!iv.catIds&&!iv.catId)return;
+      var renset=(iv.catIds||[]).filter(function(cid){return!!catById(cid);});
+      iv.catIds=renset;
+      iv.catId=renset[0]||(catById(iv.catId)?iv.catId:'');
+    });
+    try{localStorage.setItem(SK+'_katrydd1','1');}catch(e){}
+    save();
+  }
+
   // Oppnådde resultater manglet dato. Henter den fra et koblet prosjekt der den
   // finnes; ellers settes måneden resultatet selv var satt til, som beste anslag.
   var ad1=false;try{ad1=!!localStorage.getItem(SK+'_achieveddato1');}catch(e){}
@@ -5441,7 +5457,9 @@ function toggleKanbanBakgrunn(fase){kanbanBakgrunnApen[fase]=!kanbanBakgrunnApen
 // prosjektene som er «ikke denne uka». Selve fasen bestemmer om kortet i det
 // hele tatt kan merkes sånn (bare Planlegging og Gjennomføring).
 function kanbanKortHTML(iv,f,fi,tett){
-  var catId=(iv.catIds&&iv.catIds[0])||iv.catId;
+  // catIds kan i sjeldne tilfeller inneholde en gammel id ved siden av en
+  // gyldig — plukk den første som faktisk finnes, ikke bare den første i lista.
+  var catId=((iv.catIds||[]).find(function(cid){return!!catById(cid);}))||(catById(iv.catId)?iv.catId:'');
   var col=catColor(catId)||'var(--line)';
   var erFerdig=f[0]==='ferdig';
   var demp=f[0]==='ide'?'#7A7166':'var(--ink)';
@@ -6504,7 +6522,7 @@ function removeInvField(fid){mf().fields=(mf().fields||[]).filter(function(x){re
 function submitInv(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
-  var catIds=(f.type==='prosjekt'||f.type==='inventar')?(f.catIds||[]):[];
+  var catIds=(f.type==='prosjekt'||f.type==='inventar')?(f.catIds||[]).filter(function(cid){return!!catById(cid);}):[];
   var inv={id:'i'+Date.now()+Math.random().toString(36).slice(2,6),name:name,tags:f.tags||[],description:(f.description||'').trim(),amountType:f.amountType||'',targetAmount:parseKr(f.targetAmount),hoursMode:f.hoursMode==='monthly'?'monthly':'total',type:f.type||'inventar',subtype:f.subtype||'',pakkeFast:f.type==='pakke'?!!f.pakkeFast:undefined,knit:f.subtype==='strikk'?f.knit:undefined,sew:f.subtype==='sy'?f.sew:undefined,maint:(f.subtype==='vedlikehold'||f.subtype==='oppussing')?f.maint:undefined,startDate:f.startDate||'',endDate:f.endDate||'',catId:(f.type==='prosjekt'||f.type==='inventar')?(catIds[0]||''):(f.catId||''),catIds:catIds,resources:f.type==='prosjekt'?(f.resources||'').trim():undefined,hoursTotal:numVal(f.hoursTotal)||'',trackHours:f.type==='prosjekt'?f.trackHours!==false:undefined,varValues:f.varValues||{},goalIds:f.goalIds||[],resultIds:f.resultIds||[],eventIds:f.eventIds||[],fields:f.fields||[],sections:f.type==='pakke'?JSON.parse(JSON.stringify(PAKKE_DEFAULT_SEKSJONER)):[],items:[]};
   
   inventories.push(inv);save();closeModal();goInventar(inv.id);
@@ -6513,7 +6531,7 @@ function saveEditInv(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!invValid(f))return;
   var inv=invById(f.id);if(!inv)return;
-  var catIds=(f.type==='prosjekt'||f.type==='inventar')?(f.catIds||[]):[];
+  var catIds=(f.type==='prosjekt'||f.type==='inventar')?(f.catIds||[]).filter(function(cid){return!!catById(cid);}):[];
   inv.name=name;inv.tags=f.tags||[];inv.description=(f.description||'').trim();inv.amountType=f.amountType||'';inv.targetAmount=parseKr(f.targetAmount);inv.hoursMode=f.hoursMode==='monthly'?'monthly':'total';inv.forutsetninger=(f.forutsetninger||'').trim();inv.risikoer=(f.risikoer||'').trim();inv.type=f.type||'inventar';inv.subtype=f.subtype||'';inv.pakkeFast=f.type==='pakke'?!!f.pakkeFast:undefined;if(f.subtype==='strikk')inv.knit=f.knit;else delete inv.knit;if(f.subtype==='sy')inv.sew=f.sew;else delete inv.sew;if(f.subtype==='vedlikehold'||f.subtype==='oppussing')inv.maint=f.maint;else delete inv.maint;inv.startDate=f.startDate||'';inv.endDate=f.endDate||'';inv.catId=(f.type==='prosjekt'||f.type==='inventar')?(catIds[0]||''):(f.catId||'');inv.catIds=catIds;if(f.type==='prosjekt')inv.resources=(f.resources||'').trim();inv.hoursTotal=numVal(f.hoursTotal)||'';if(f.type==='prosjekt')inv.trackHours=f.trackHours!==false;inv.varValues=f.varValues||{};inv.goalIds=f.goalIds||[];inv.resultIds=f.resultIds||[];inv.eventIds=f.eventIds||[];inv.fields=f.fields||[];
   save();closeModal();
 }
