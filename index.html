@@ -8865,6 +8865,21 @@ function resultStatusStyle(status){
   if(status==='queued')return'opacity:.5';
   return'';
 }
+// Innebygde hovedkategorier har hver sin faste view.kind med ekstra innhold
+// (budsjett, kriterier og lignende) som en generisk side ikke gjengir. Alt
+// annet — Kultur, Reiser, brukeropprettede kategorier — går via brukerkat.
+var KAT_VIEW_KIND={c_helse:'helse',c_natur:'natur',c_matdrikke:'matdrikke',c_hjem:'hjemkat',
+  c_kompetanse:'kompetanse',c_dating:'dating',c_okonomi:'okonomikat',c_beredskapkat:'beredskapkat',
+  c_utstyrkat:'utstyrkat',c_folk:'folk',c_kreativitet:'kreativitet',c_opplevelser:'opplevelser'};
+// Tar imot en kategori-id på hvilket som helst nivå — en underkategori sender
+// deg til hovedkategoriens side, siden det er der underkategorien vises.
+function goKategoriside(catId){
+  var c=catById(catId);if(!c)return;
+  var mainId=c.parentId||c.id;
+  var kind=KAT_VIEW_KIND[mainId];
+  if(kind)view={kind:kind};else view={kind:'brukerkat',id:mainId};
+  drawerOpen=false;render();
+}
 function mainCatOf(catIds){
   var cid=(catIds||[])[0];if(!cid)return null;
   var c=catById(cid);if(!c)return null;
@@ -11601,11 +11616,11 @@ function planleggingViewHTML(){
         }
         if(linkedE.length){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Planer og hendelser</div>';
-          linkedE.forEach(function(e){h+='<div style="font-size:13px;padding:2px 0">'+esc(e.name)+' <span style="color:var(--muted);font-size:11px">· '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert år':' '+e.year)+'</span></div>';});
+          linkedE.forEach(function(e){var mc=mainCatOf(e.cats);h+='<div style="font-size:13px;padding:2px 0;cursor:pointer" onclick="event.stopPropagation();goKategoriside(\''+q(mc?mc.id:'')+'\')">'+esc(e.name)+' <span style="color:var(--muted);font-size:11px">· '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert år':' '+e.year)+'</span></div>';});
         }
         if(linkedR.length){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Rutiner</div>';
-          linkedR.forEach(function(r){h+='<div style="font-size:13px;padding:2px 0">'+esc(r.name)+'</div>';});
+          linkedR.forEach(function(r){var mc=mainCatOf(r.cats);h+='<div style="font-size:13px;padding:2px 0;cursor:pointer" onclick="event.stopPropagation();goKategoriside(\''+q(mc?mc.id:'')+'\')">'+esc(r.name)+'</div>';});
         }
         if(vInvs.length){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Lister</div>';
@@ -11653,8 +11668,8 @@ function planleggingViewHTML(){
     if(utenE.length){
       h+='<div style="padding:10px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">Planer og hendelser</div>';
       utenE.forEach(function(e){
-        var dn=evDone(e,curYear);
-        h+='<div class="entry-row"><button class="chk'+(dn?' done':'')+'" onclick="toggleEvent(\''+q(e.id)+'\','+curYear+')">'+(dn?'\u2713':'')+'</button><div class="entry-body" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
+        var dn=evDone(e,curYear),mc=mainCatOf(e.cats);
+        h+='<div class="entry-row"><button class="chk'+(dn?' done':'')+'" onclick="toggleEvent(\''+q(e.id)+'\','+curYear+')">'+(dn?'\u2713':'')+'</button><div class="entry-body" style="cursor:pointer" onclick="goKategoriside(\''+q(mc?mc.id:'')+'\')">'
           +'<div class="entry-text">'+esc(e.name)+'</div>'
           +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' \u00b7 hvert \u00e5r':' '+e.year)+'</div></div></div>';
       });
@@ -11662,7 +11677,8 @@ function planleggingViewHTML(){
     if(utenR.length){
       h+='<div style="padding:10px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">Rutiner</div>';
       utenR.forEach(function(r){
-        h+='<div class="entry-row" style="cursor:pointer" onclick="goRutineDetalj(\''+q(r.id)+'\')"><div class="entry-body">'
+        var mc=mainCatOf(r.cats);
+        h+='<div class="entry-row" style="cursor:pointer" onclick="goKategoriside(\''+q(mc?mc.id:'')+'\')"><div class="entry-body">'
           +'<div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
           +ankerLinjeHTML(r)
           +'</div><span style="align-self:center;color:var(--rose)">\u203a</span></div>';
