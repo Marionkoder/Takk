@@ -5413,6 +5413,62 @@ var KANBAN_FASER=[['ide','Ideer'],['plan','Planlegging'],['arbeid','Gjennomf\u00
 // se hele idelista hele tiden — de tre andre starter åpne.
 var kanbanApen={ide:false,plan:true,arbeid:true,ferdig:false};
 function toggleKanbanFase(id){kanbanApen[id]=!kanbanApen[id];render();}
+// Langvarige prosjekter som ligger i Planlegging eller Gjennomføring uten å
+// være noe du faktisk jobber med denne uka. Et manuelt valg, ikke noe appen
+// gjetter seg til — og det nullstilles aldri av seg selv, du slår det av når
+// prosjektet er aktuelt igjen.
+function toggleIkkeDenneUka(id){
+  var iv=invById(id);if(!iv)return;
+  iv.ikkeDenneUka=!iv.ikkeDenneUka;save();render();
+}
+var kanbanBakgrunnApen={plan:false,arbeid:false};
+function toggleKanbanBakgrunn(fase){kanbanBakgrunnApen[fase]=!kanbanBakgrunnApen[fase];render();}
+// tett=true gir et lite, dempet kort uten oppgaveliste — for de bakgrunns-
+// prosjektene som er «ikke denne uka». Selve fasen bestemmer om kortet i det
+// hele tatt kan merkes sånn (bare Planlegging og Gjennomføring).
+function kanbanKortHTML(iv,f,fi,tett){
+  var col=catColor((iv.catIds&&iv.catIds[0])||iv.catId)||'var(--line)';
+  var erFerdig=f[0]==='ferdig';
+  var demp=f[0]==='ide'?'#7A7166':'var(--ink)';
+  var kanUke=(f[0]==='plan'||f[0]==='arbeid');
+  if(tett){
+    return'<div style="background:var(--card);border:1px solid var(--line);border-left:3px solid '+col+';border-radius:8px;padding:5px 7px;margin:0 4px 4px;opacity:.72">'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+      +'<span style="flex:1;font-size:11px;line-height:1.25;cursor:pointer" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</span>'
+      +'<button class="icon-btn" style="font-size:9.5px;padding:1px 5px;flex-shrink:0" onclick="toggleIkkeDenneUka(\''+q(iv.id)+'\')">Denne uka</button>'
+      +'</div></div>';
+  }
+  var t=kanbanTimerIgjen(iv);
+  var frist=iv.endDate?fmtDate(iv.endDate):'';
+  var forsinket=iv.endDate&&!iv.completedDate&&iv.endDate<isoDate(today);
+  return'<div style="background:var(--card);border:1px solid var(--line);border-left:3px solid '+col+';border-radius:8px;padding:6px 7px;margin:0 4px 5px'+(erFerdig?';font-style:italic':'')+'">'
+    +'<div style="font-size:11.5px;font-weight:700;line-height:1.25;cursor:pointer;color:'+(erFerdig?'var(--muted)':demp)+'" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</div>'
+    +(t!==null?'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(t).replace('.',',')+' t igjen</div>':'')
+    +(frist?'<div style="font-size:10px;margin-top:1px;color:'+(forsinket?'var(--red)':'var(--muted)')+'">'+(iv.completedDate?'\u2713 '+fmtDate(iv.completedDate):'frist '+frist)+'</div>':'')
+    +(kanUke?(function(){
+        var opp=oppgaverForFase(iv,f[0]);
+        var tIgjen=oppgaveTimerIgjen(iv,f[0]);
+        var klar=faseKlar(iv,f[0]);
+        var oh='';
+        if(opp.length){
+          oh+='<div style="margin-top:4px">'+opp.map(function(o){
+            return'<div style="display:flex;align-items:flex-start;gap:4px;font-size:10px;padding:1px 0;cursor:pointer" onclick="toggleOppgave(\''+q(iv.id)+'\',\''+q(o.id)+'\')">'
+              +'<span style="flex-shrink:0">'+(o.ferdig?'\u2611':'\u2610')+'</span>'
+              +'<span style="flex:1;'+(o.ferdig?'text-decoration:line-through;color:var(--muted)':'')+'">'+esc(o.navn)+(o.timer?' <span style="color:var(--muted)">('+String(o.timer).replace('.',',')+'t)</span>':'')+'</span>'
+              +'</div>';
+          }).join('')+'</div>';
+          if(tIgjen)oh+='<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(tIgjen).replace('.',',')+' t igjen i fasen</div>';
+          if(klar)oh+='<div style="font-size:10.5px;font-weight:700;color:#4E7B5C;margin-top:3px">\u2713 Klar for '+(f[0]==='plan'?'gjennomf\u00f8ring':'ferdigstilling')+'</div>';
+        }
+        oh+='<button class="icon-btn" style="font-size:10px;padding:1px 5px;margin-top:3px" onclick="openOppgaveModal(\''+q(iv.id)+'\',\''+f[0]+'\')">+ oppgave</button>';
+        return oh;
+      })():'')
+    +'<div style="display:flex;align-items:center;gap:3px;margin-top:4px">'
+    +(fi>0?'<button class="icon-btn" style="font-size:11px;padding:1px 6px" onclick="kanbanFlytt(\''+q(iv.id)+'\',-1)">\u2039</button>':'')
+    +(kanUke?'<button class="icon-btn" style="font-size:9.5px;padding:1px 6px;color:var(--muted)" onclick="toggleIkkeDenneUka(\''+q(iv.id)+'\')">Ikke denne uka</button>':'')
+    +(fi<3?'<button class="icon-btn" style="font-size:11px;padding:1px 6px;margin-left:auto" onclick="kanbanFlytt(\''+q(iv.id)+'\',1)">\u203a</button>':'')
+    +'</div></div>';
+}
 var kanbanTakPlan=5,kanbanTakArbeid=15;
 function kanbanFase(iv){
   if(iv.completedDate)return'ferdig';
@@ -5526,7 +5582,6 @@ function kanbanTavleHTML(){
     var iFase=alle.filter(function(iv){return kanbanFase(iv)===f[0];})
       .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
     var apen=!!kanbanApen[f[0]];
-    var erFerdig=f[0]==='ferdig';
     h+='<div style="background:'+(farger[f[0]]||'transparent')+';border-radius:10px;padding:2px;margin-bottom:6px">'
       +'<div style="display:flex;align-items:center;gap:6px;padding:8px 6px;cursor:pointer" onclick="toggleKanbanFase(\''+f[0]+'\')">'
       +'<span class="s-arrow'+(apen?' open':'')+'" style="font-size:11px">\u25b6\ufe0e</span>'
@@ -5537,42 +5592,17 @@ function kanbanTavleHTML(){
     if(!iFase.length){
       h+='<div style="font-size:11px;color:var(--muted);padding:0 10px 10px">\u2013</div>';
     }
-    // Ideer får en dempet, mørk gråbrun tekst i stedet for full svart — det er
-    // fasen der ingenting krever like mye oppmerksomhet akkurat nå. Ferdigstilt
-    // får grå, kursiv tekst — unnagjort, ikke noe å legge vekt på lenger.
-    var demp=f[0]==='ide'?'#7A7166':'var(--ink)';
-    iFase.forEach(function(iv){
-      var col=catColor((iv.catIds&&iv.catIds[0])||iv.catId)||'var(--line)';
-      var t=kanbanTimerIgjen(iv);
-      var frist=iv.endDate?fmtDate(iv.endDate):'';
-      var forsinket=iv.endDate&&!iv.completedDate&&iv.endDate<isoDate(today);
-      h+='<div style="background:var(--card);border:1px solid var(--line);border-left:3px solid '+col+';border-radius:8px;padding:6px 7px;margin:0 4px 5px'+(erFerdig?';font-style:italic':'')+'">'
-        +'<div style="font-size:11.5px;font-weight:700;line-height:1.25;cursor:pointer;color:'+(erFerdig?'var(--muted)':demp)+'" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</div>'
-        +(t!==null?'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(t).replace('.',',')+' t igjen</div>':'')
-        +(frist?'<div style="font-size:10px;margin-top:1px;color:'+(forsinket?'var(--red)':'var(--muted)')+'">'+(iv.completedDate?'\u2713 '+fmtDate(iv.completedDate):'frist '+frist)+'</div>':'')
-        +((f[0]==='plan'||f[0]==='arbeid')?(function(){
-            var opp=oppgaverForFase(iv,f[0]);
-            var tIgjen=oppgaveTimerIgjen(iv,f[0]);
-            var klar=faseKlar(iv,f[0]);
-            var oh='';
-            if(opp.length){
-              oh+='<div style="margin-top:4px">'+opp.map(function(o){
-                return'<div style="display:flex;align-items:flex-start;gap:4px;font-size:10px;padding:1px 0;cursor:pointer" onclick="toggleOppgave(\''+q(iv.id)+'\',\''+q(o.id)+'\')">'
-                  +'<span style="flex-shrink:0">'+(o.ferdig?'\u2611':'\u2610')+'</span>'
-                  +'<span style="flex:1;'+(o.ferdig?'text-decoration:line-through;color:var(--muted)':'')+'">'+esc(o.navn)+(o.timer?' <span style="color:var(--muted)">('+String(o.timer).replace('.',',')+'t)</span>':'')+'</span>'
-                  +'</div>';
-              }).join('')+'</div>';
-              if(tIgjen)oh+='<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(tIgjen).replace('.',',')+' t igjen i fasen</div>';
-              if(klar)oh+='<div style="font-size:10.5px;font-weight:700;color:#4E7B5C;margin-top:3px">\u2713 Klar for '+(f[0]==='plan'?'gjennomf\u00f8ring':'ferdigstilling')+'</div>';
-            }
-            oh+='<button class="icon-btn" style="font-size:10px;padding:1px 5px;margin-top:3px" onclick="openOppgaveModal(\''+q(iv.id)+'\',\''+f[0]+'\')">+ oppgave</button>';
-            return oh;
-          })():'')
-        +'<div style="display:flex;gap:3px;margin-top:4px">'
-        +(fi>0?'<button class="icon-btn" style="font-size:11px;padding:1px 6px" onclick="kanbanFlytt(\''+q(iv.id)+'\',-1)">\u2039</button>':'')
-        +(fi<3?'<button class="icon-btn" style="font-size:11px;padding:1px 6px;margin-left:auto" onclick="kanbanFlytt(\''+q(iv.id)+'\',1)">\u203a</button>':'')
-        +'</div></div>';
-    });
+    var kanUke=(f[0]==='plan'||f[0]==='arbeid');
+    var prioritert=kanUke?iFase.filter(function(iv){return!iv.ikkeDenneUka;}):iFase;
+    var bakgrunn=kanUke?iFase.filter(function(iv){return iv.ikkeDenneUka;}):[];
+    prioritert.forEach(function(iv){h+=kanbanKortHTML(iv,f,fi,false);});
+    if(bakgrunn.length){
+      var bApen=!!kanbanBakgrunnApen[f[0]];
+      h+='<div style="margin:2px 4px 4px;font-size:11px;color:var(--muted);cursor:pointer" onclick="toggleKanbanBakgrunn(\''+f[0]+'\')">'
+        +'<span class="s-arrow'+(bApen?' open':'')+'" style="font-size:9px">\u25b6\ufe0e</span> '
+        +bakgrunn.length+' p\u00e5g\u00e5ende, ikke denne uka</div>';
+      if(bApen)bakgrunn.forEach(function(iv){h+=kanbanKortHTML(iv,f,fi,true);});
+    }
     }
     h+='</div>';
   });
