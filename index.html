@@ -4543,7 +4543,6 @@ function resultHasRoutine(id){
 function resultById(id){return results.find(function(r){return r.id===id;});}
 // Alle prosjekter ligger nå i inventories
 function alleProsjekter(){return inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});}
-function prosjekterForGrunnverdi(gid){return alleProsjekter().filter(function(iv){return(iv.goalIds||[]).indexOf(gid)>=0;});}
 function resultsFor(goalId){return results.filter(function(r){return r.valueId===goalId;}).sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);});}
 function monthsLeft(r){return(r.year-curYear)*12+(r.month-curMonth);}
 function resultDeadlineHTML(r){
@@ -8883,97 +8882,6 @@ function resultStatusStyle(status){
   if(status==='queued')return'opacity:.5';
   return'';
 }
-function oversiktViewHTML(){
-  var h='<div class="sec-title">Tabell med sammenhenger</div>'
-    +'<div class="view-sub">Hvordan grunnverdiene henger sammen med prosjekter, rutiner og hendelser.</div>';
-  var vals=goals.slice().sort(function(a,b){return nbSort(a.name,b.name);});
-  if(!vals.length)return h+'<div class="card"><div class="empty">Ingen grunnverdier ennå. Legg inn en grunnverdi først, så vokser oversikten fram.</div></div>';
-  var rows=[];
-  vals.forEach(function(v){
-    var res=prosjekterForGrunnverdi(v.id).sort(function(a,b){
-      return((a.endDate||'9999')<(b.endDate||'9999')?-1:(a.endDate||'9999')>(b.endDate||'9999')?1:0)||nbSort(a.name,b.name);});
-    var resIds={};res.forEach(function(r){resIds[r.id]=1;});
-    var linkedToRes=function(x){return (x.resultIds||[]).some(function(rid){return resIds[rid];});};
-    var vRows=[];
-    res.forEach(function(r){
-      var rts=routines.filter(function(x){return (x.resultIds||[]).indexOf(r.id)>=0;}).sort(function(a,b){return nbSort(a.name,b.name);});
-      var evs=events.filter(function(x){return !x.bday&&(x.resultIds||[]).indexOf(r.id)>=0;}).sort(function(a,b){return nbSort(a.name,b.name);});
-      var n=Math.max(rts.length,evs.length,1);
-      for(var i=0;i<n;i++)vRows.push({res:i===0?r:null,resSpan:n,resRender:i===0,rt:rts[i]||null,ev:evs[i]||null,resCtx:r});
-    });
-    var dRts=routines.filter(function(x){return (x.goalIds||[]).indexOf(v.id)>=0&&!linkedToRes(x);}).sort(function(a,b){return nbSort(a.name,b.name);});
-    var dEvs=events.filter(function(x){return !x.bday&&(x.goalIds||[]).indexOf(v.id)>=0&&!linkedToRes(x);}).sort(function(a,b){return nbSort(a.name,b.name);});
-    var dn=Math.max(dRts.length,dEvs.length);
-    for(var j=0;j<dn;j++)vRows.push({res:null,resSpan:1,resRender:true,rt:dRts[j]||null,ev:dEvs[j]||null});
-    if(!vRows.length)vRows.push({res:null,resSpan:1,resRender:true,rt:null,ev:null});
-    vRows[0].val=v;vRows[0].valSpan=vRows.length;
-    rows=rows.concat(vRows);
-  });
-  var cellS='border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:left';
-  var headS='text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);padding:8px;border-bottom:1.5px solid var(--line);white-space:nowrap';
-  var t='<div class="card" style="padding:0;overflow-x:auto;-webkit-overflow-scrolling:touch">'
-    +'<table style="border-collapse:collapse;min-width:100%;font-size:12px">'
-    +'<tr><th style="position:sticky;left:0;z-index:2;background:var(--card);'+headS+';min-width:104px">Grunnverdi</th>'
-    +'<th style="'+headS+';min-width:120px">Prosjekt</th>'
-    +'<th style="'+headS+';min-width:120px">Rutine</th>'
-    +'<th style="'+headS+';min-width:110px">Hendelse</th></tr>';
-  rows.forEach(function(r,idx){
-    var topB=r.val&&idx>0?'border-top:1.5px solid var(--sel-line);':'';
-    t+='<tr>';
-    if(r.val){
-      var col=catColor(mainCatOf(r.val.cats));
-      t+='<td rowspan="'+r.valSpan+'" style="position:sticky;left:0;z-index:1;background:var(--card);'+cellS+';'+topB+'font-weight:700;cursor:pointer" onclick="openEditGoal(\''+q(r.val.id)+'\')">'
-        +(col?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+col+';margin-right:5px"></span>':'')
-        +esc(r.val.name)+'</td>';
-    }
-    if(r.resRender){
-      var resSt=r.res?resultStatusStyle(resultStatus(r.res)):'';
-      t+='<td rowspan="'+r.resSpan+'" style="'+cellS+';'+topB+resSt+';'+(r.res?'cursor:pointer':'')+'"'+(r.res?' onclick="openEditResult(\''+q(r.res.id)+'\')"':'')+'>'
-        +(r.res?esc(r.res.name)+'<div style="font-size:10px;color:var(--muted)">'
-          +(function(){
-            var p2=r.res;
-            var fra=p2.startDate?MND_FULL[Number(p2.startDate.slice(5,7))-1].slice(0,3)+' '+p2.startDate.slice(0,4)+' \u2013 ':'';
-            var til=p2.endDate?MND_FULL[Number(p2.endDate.slice(5,7))-1].slice(0,3)+' '+p2.endDate.slice(0,4):'ingen frist';
-            var ms=(p2.items||[]).filter(function(x){return x.date;});
-            var antDone=ms.filter(function(x){return x.have;}).length;
-            return fra+til+(ms.length?' \u00b7 '+antDone+'/'+ms.length+' milep\u00e6ler':'');
-          })()
-          +'</div>':'')
-        +'</td>';
-    }
-    var rtSt=r.rt?routineStatusStyle(r.rt):'';
-    t+='<td style="'+cellS+';'+topB+rtSt+';'+(r.rt?'cursor:pointer':'')+'"'+(r.rt?' onclick="openEditRoutine(\''+q(r.rt.id)+'\')"':'')+'>'
-      +(r.rt?esc(r.rt.name)+'<div style="font-size:10px;color:var(--muted)">'+esc(freqShort(r.rt))+'</div>':'')+'</td>';
-    t+='<td style="'+cellS+';'+topB+(r.ev?'cursor:pointer':'')+'"'+(r.ev?' onclick="openEditEvent(\''+q(r.ev.id)+'\')"':'')+'>'
-      +(r.ev?esc(r.ev.name)+'<div style="font-size:10px;color:var(--muted)">'+esc(evShort(r.ev))+'</div>':'')+'</td>';
-    t+='</tr>';
-  });
-  t+='</table></div>';
-  h+=t;
-  h+='<div style="padding:6px 12px 0;font-size:10.5px;color:var(--muted)">'
-    +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#FDF3C7;margin-right:4px;vertical-align:middle"></span>Aktiv / ikke haket av enn\u00e5'
-    +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#E1F1DE;margin-right:4px;vertical-align:middle"></span>Vedlikeholdes / haket av'
-    +' &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--line);opacity:.5;margin-right:4px;vertical-align:middle"></span>Ikke startet'
-    +'<div style="margin-top:2px">Prosjekter f\u00e5rger etter startdato og oppn\u00e5dd-status. Rutiner f\u00e5rger etter om de er haket av for gjeldende dag/uke/m\u00e5ned/\u00e5r, uavhengig av prosjektet de er koblet til.</div>'
-    +'</div>';
-  // Uten kobling
-  var freeR=routines.filter(function(x){return !(x.goalIds||[]).length&&!(x.resultIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
-  var freeE=events.filter(function(x){return !x.bday&&!(x.goalIds||[]).length&&!(x.resultIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
-  if(freeR.length||freeE.length){
-    h+='<div class="sec-title">Uten kobling</div>'
-      +'<div class="card">';
-    freeR.forEach(function(r){
-      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')"><div class="entry-body">'
-        +'<div class="entry-text">'+esc(r.name)+'</div><div class="entry-date">rutine \u00b7 '+esc(freqShort(r))+'</div></div></div>';
-    });
-    freeE.forEach(function(e){
-      h+='<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')"><div class="entry-body">'
-        +'<div class="entry-text">'+esc(e.name)+'</div><div class="entry-date">hendelse \u00b7 '+esc(evShort(e))+'</div></div></div>';
-    });
-    h+='</div><div class="hint-box">Disse er ikke knyttet til en grunnverdi eller et prosjekt. Det kan v\u00e6re helt greit \u2014 men det er ogs\u00e5 her du ser hva som lever sitt eget liv.</div>';
-  }
-  return h;
-}
 function mainCatOf(catIds){
   var cid=(catIds||[])[0];if(!cid)return null;
   var c=catById(cid);if(!c)return null;
@@ -10857,38 +10765,6 @@ function ganttHTML(rader,tittel){
   h+='</div>';
   return h;
 }
-function prosjektTidslinjeHTML(){
-  var h='<div class="sec-title">Tidslinje for prosjekter</div>';
-  h+='<button class="add-btn" onclick="openProjModal()">+ Nytt prosjekt</button>';
-  h+=ganttHTML();
-  var allProj=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});
-  var byStart=function(a,b){return(a.startDate||a.endDate||'9999')<(b.startDate||b.endDate||'9999')?-1:1;};
-  var activeProj=allProj.filter(function(iv){return!iv.completedDate;}).sort(byStart);
-  var doneProj=allProj.filter(function(iv){return iv.completedDate;}).sort(function(a,b){return(a.completedDate<b.completedDate)?1:-1;});
-  var projRow=function(inv){
-    var opp=inv.oppgaver||[];
-    var oppHave=opp.filter(function(o){return o.ferdig;}).length;
-    var pCat=inv.catId?catById(inv.catId):null;
-    return'<div class="entry-row" style="cursor:pointer" onclick="goInventar(\''+q(inv.id)+'\')">'
-      +'<div class="entry-body"><div class="entry-text"'+(inv.completedDate?' style="color:var(--muted)"':'')+'>'+(inv.completedDate?'\u2713 ':'')+esc(dispName(inv))+'</div>'
-      +'<div class="entry-date">'+(pCat?esc(pCat.name)+' \u00b7 ':'')+(opp.length?oppHave+' av '+opp.length+' oppgaver':'ingen oppgaver enn\u00e5')
-      +(inv.completedDate?' \u00b7 <span style="color:var(--red)">ferdigstilt '+fmtDate(inv.completedDate)+'</span>'
-        :(inv.endDate?' \u00b7 frist '+fmtDate(inv.endDate):''))
-      +'</div></div>'
-      +'<span style="align-self:center;color:var(--rose)">\u203a</span>'
-      +'</div>';
-  };
-  if(!allProj.length){
-    h+='<div class="card"><div class="empty">Ingen prosjekter enn\u00e5. Et prosjekt har ramme (datoer, tidsbruk, kategori), en fase p\u00e5 Kanban-tavla og oppgaver.</div></div>';
-  } else {
-    if(activeProj.length)h+='<div class="card">'+activeProj.map(projRow).join('')+'</div>';
-    if(doneProj.length){
-      h+='<div class="sec-title">Ferdigstilte prosjekter</div>'
-        +'<div class="card">'+doneProj.map(projRow).join('')+'</div>';
-    }
-  }
-  return h;
-}
 function printListHTML(inv){
   var typeTxt=(inv.type||'inventar')==='pakke'?'Pakkeliste':(inv.type||'inventar')==='prosjekt'?prosjekttypeName(inv.subtype):'Inventarliste';
   var isProjP=(inv.type||'inventar')==='prosjekt';
@@ -11673,14 +11549,12 @@ function budsjettViewHTML(){
 function planleggingViewHTML(){
   var h='<div class="view-title">Oversikt</div>'
     +'<div class="view-sub">Grunnverdier er slik du vil leve («Jeg tar vare på helsa»). Prosjekter er praktiske mål du vil oppnå ved å leve på den måten («Jeg kan løpe fem kilometer»). Rutiner («Jeg trener intervaller to ganger i uka») og hendelser («Testløpe to kilometer») er det du planlegger å gjøre for å nå disse målene.</div>';
-  var ptabs=[['tavle','Tavle'],['tidslinje','Tidslinje'],['sammenheng','Sammenhenger'],['verdier','Grunnverdier'],['prosjekter','Prosjekter'],['rutiner','Rutiner'],['hendelser','Hendelser'],['rapporter','Rapporter']];
+  var ptabs=[['tavle','Tavle'],['verdier','Grunnverdier'],['prosjekter','Prosjekter'],['rutiner','Rutiner'],['hendelser','Hendelser'],['rapporter','Rapporter']];
   h+='<div class="chips" style="padding:10px 12px 0">'+ptabs.map(function(t){
     return'<button class="chip'+(planTab===t[0]?' on':'')+'" onclick="planTab=\''+t[0]+'\';render()">'+t[1]+'</button>';
   }).join('')+'</div>';
 
   if(planTab==='tavle')h+=kanbanTavleHTML();
-  if(planTab==='tidslinje')h+=prosjektTidslinjeHTML();
-  if(planTab==='sammenheng')h+=oversiktViewHTML();
   if(planTab==='rapporter'){
     h+='<div class="chips" style="padding:8px 12px 0">'
       +[['rapporter','Rapport'],['oppnadd','Oppn\u00e5dd'],['ressursbruk','Ressursbruk']].map(function(t){
@@ -11719,30 +11593,40 @@ function planleggingViewHTML(){
           h+='<div style="font-size:12px;font-style:italic;color:var(--muted);white-space:pre-wrap;margin-bottom:8px">'+esc(g.text)+'</div>';
         }
         var vResults=resultsFor(g.id);
-        if(linkedR.length){
-          h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Rutiner</div>';
-          linkedR.forEach(function(r){h+='<div style="font-size:13px;padding:2px 0">'+esc(r.name)+'</div>';});
+        var vInvsAll=inventories.filter(function(iv){return(iv.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
+        var vInvs=vInvsAll.filter(function(iv){return(iv.type||'inventar')!=='prosjekt';});
+        var vProsj=vInvsAll.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});
+        // Prosjekter først — de er det konkrete beviset på at grunnverdien
+        // faktisk leves. Så det som er planlagt, så det som gjøres jevnlig.
+        if(vResults.length||vProsj.length){
+          h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Prosjekter</div>';
+          vResults.forEach(function(r){h+='<div style="font-size:13px;padding:2px 0"><button class="icon-btn" style="font-size:12px;padding:1px 8px" onclick="event.stopPropagation();openEditResult(\''+q(r.id)+'\')">'+esc(resultShortTitle(r))+'</button>'+resultDeadlineHTML(r)+'</div>';});
+          // Aktive først; ferdigstilte samler seg nederst i kursiv, så listen
+          // fortsatt åpner på det som pågår.
+          var vProsjAktive=vProsj.filter(function(iv){return!iv.completedDate;});
+          var vProsjFerdig=vProsj.filter(function(iv){return iv.completedDate;});
+          vProsjAktive.forEach(function(iv){
+            var ic=invCounts(iv);
+            h+='<div style="font-size:13px;padding:2px 0"><button class="icon-btn" style="font-size:12px;padding:1px 8px" onclick="event.stopPropagation();goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+' \u00b7 '+ic.have+'/'+ic.total+' \u203a</button></div>';
+          });
+          vProsjFerdig.forEach(function(iv){
+            var ic=invCounts(iv);
+            h+='<div style="font-size:13px;padding:2px 0;font-style:italic;color:var(--muted)"><button class="icon-btn" style="font-size:12px;padding:1px 8px;font-style:italic;color:inherit" onclick="event.stopPropagation();goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+' \u00b7 '+ic.have+'/'+ic.total+' \u203a</button></div>';
+          });
         }
         if(linkedE.length){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Planer og hendelser</div>';
           linkedE.forEach(function(e){h+='<div style="font-size:13px;padding:2px 0">'+esc(e.name)+' <span style="color:var(--muted);font-size:11px">· '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert år':' '+e.year)+'</span></div>';});
         }
-        var vInvsAll=inventories.filter(function(iv){return(iv.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
-        var vInvs=vInvsAll.filter(function(iv){return(iv.type||'inventar')!=='prosjekt';});
-        var vProsj=vInvsAll.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});
+        if(linkedR.length){
+          h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Rutiner</div>';
+          linkedR.forEach(function(r){h+='<div style="font-size:13px;padding:2px 0">'+esc(r.name)+'</div>';});
+        }
         if(vInvs.length){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Lister</div>';
           vInvs.forEach(function(iv){
             var ic=invCounts(iv);
             h+='<div style="font-size:13px;padding:2px 0"><button class="icon-btn" style="font-size:12px;padding:1px 8px" onclick="event.stopPropagation();goInventar(\''+q(iv.id)+'\')">'+esc(iv.name)+' \u00b7 '+ic.have+'/'+ic.total+' \u203a</button></div>';
-          });
-        }
-        if(vResults.length||vProsj.length){
-          h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Prosjekter</div>';
-          vResults.forEach(function(r){h+='<div style="font-size:13px;padding:2px 0"><button class="icon-btn" style="font-size:12px;padding:1px 8px" onclick="event.stopPropagation();openEditResult(\''+q(r.id)+'\')">'+esc(resultShortTitle(r))+'</button>'+resultDeadlineHTML(r)+'</div>';});
-          vProsj.forEach(function(iv){
-            var ic=invCounts(iv);
-            h+='<div style="font-size:13px;padding:2px 0"><button class="icon-btn" style="font-size:12px;padding:1px 8px" onclick="event.stopPropagation();goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+' \u00b7 '+ic.have+'/'+ic.total+' \u203a</button></div>';
           });
         }
         var linkedL=laters.filter(function(l){return(l.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
