@@ -5490,7 +5490,17 @@ function kanbanTimerIgjen(iv){
 function kanbanTavleHTML(){
   var alle=inventories.filter(function(iv){return(iv.type||'inventar')==='prosjekt';});
   var h='';
-  if(!alle.length)return'<div class="card"><div class="empty">Ingen prosjekter enn\u00e5.</div></div>';
+
+  // Ukenummer og datoer først — så det er tydelig hvilken uke kapasitetstallene
+  // under faktisk gjelder for, før man i det hele tatt ser på prosjektene.
+  var man=mondayOf(today),son=new Date(man);son.setDate(man.getDate()+6);
+  var kortDato=function(d){return d.getDate()+'. '+MND_FULL[d.getMonth()];};
+  h+='<div style="padding:10px 14px 2px">'
+    +'<div style="font-size:20px;font-weight:700;color:var(--red)">Uke '+weekNum(today)+'</div>'
+    +'<div style="font-size:13px;color:var(--muted)">'+kortDato(man)+' \u2013 '+kortDato(son)+'</div>'
+    +'</div>';
+
+  if(!alle.length)return h+'<div class="card"><div class="empty">Ingen prosjekter enn\u00e5.</div></div>';
 
   // Ukens timer mot taket, for de to fasene som faktisk har et tak
   var farger={ide:'#F2E9D8',plan:'',arbeid:'',ferdig:'#D9E3D6'};
@@ -9550,10 +9560,10 @@ function routineWeeksIn(m,y,freq){
 }
 function kalNavHTML(){
   return'<div class="chips" style="justify-content:center;padding:10px 12px 0">'
-    +'<button class="chip'+(view.kind==='dag'?' on':'')+'" onclick="goDag()">Dagsvisning</button>'
-    +'<button class="chip'+(view.kind==='uke'?' on':'')+'" onclick="goUke()">Ukesvisning</button>'
-    +'<button class="chip'+(view.kind==='rutiner'?' on':'')+'" onclick="goRutiner('+(view.kind==='rutiner'?view.month:curMonth)+',null'+(view.kind==='kalender'?','+view.year:'')+')">M\u00e5nedsvisning</button>'
-    +'<button class="chip'+(view.kind==='kalender'?' on':'')+'" onclick="goKalender('+(view.kind==='rutiner'&&view.year?view.year:'curYear')+')">\u00c5rsvisning</button>'
+    +'<button class="chip'+(view.kind==='dag'?' on':'')+'" onclick="goDag()">Dag</button>'
+    +'<button class="chip'+(view.kind==='uke'?' on':'')+'" onclick="goUke()">Uke</button>'
+    +'<button class="chip'+(view.kind==='rutiner'?' on':'')+'" onclick="goRutiner('+(view.kind==='rutiner'?view.month:curMonth)+',null'+(view.kind==='kalender'?','+view.year:'')+')">M\u00e5ned</button>'
+    +'<button class="chip'+(view.kind==='kalender'?' on':'')+'" onclick="goKalender('+(view.kind==='rutiner'&&view.year?view.year:'curYear')+')">\u00c5r</button>'
     +'</div>';
 }
 function dagViewHTML(){
