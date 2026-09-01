@@ -5450,7 +5450,10 @@ function kanbanKortHTML(iv,f,fi,tett){
   // med samme merke-stil som resten av appen bruker for kategori (catPillsHTML),
   // ikke som en hashtag blant prosjektets egne stikkord. Mangler kategorien,
   // sier merket det rett ut i stedet for å bare være fraværende.
-  var katRad=catId?catPillsHTML([catId]):'<div class="entry-cats"><span class="entry-cat" style="background:none;border:1px dashed var(--amber);color:var(--amber);cursor:pointer" onclick="event.stopPropagation();openEditInv(\''+q(iv.id)+'\')">Ingen kategori \u2014 velg</span></div>';
+  // Sjekker at kategorien faktisk finnes, ikke bare at det står en id der —
+  // en id som peker på en slettet kategori er like usynlig som ingen id.
+  var katFinnes=catId&&catById(catId);
+  var katRad=katFinnes?catPillsHTML([catId]):'<div class="entry-cats"><span class="entry-cat" style="background:none;border:1px dashed var(--amber);color:var(--amber);cursor:pointer" onclick="event.stopPropagation();openEditInv(\''+q(iv.id)+'\')">Ingen kategori \u2014 velg</span></div>';
   var tagRad=(iv.tags&&iv.tags.length)?tagPillsHTML(iv.tags):'';
   if(tett){
     return'<div style="background:var(--card);border:1px solid var(--line);border-left:5px solid '+col+';border-radius:8px;padding:5px 7px;margin:0 4px 4px;opacity:.72">'
