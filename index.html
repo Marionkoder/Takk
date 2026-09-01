@@ -7031,6 +7031,16 @@ function cloudScale(){
   Object.keys(g).forEach(function(k){if(g[k]>m)m=g[k];});
   return Math.max(m,8);
 }
+// Gir stikkordet en av tre nyanser av kategorifargen sin — grunnfarge, lysere
+// eller mørkere — bestemt av selve ordet, så det samme stikkordet alltid får
+// samme nyanse, uten å lagre noe ekstra for det.
+function tagNyansefarge(tag,grunn){
+  if(!grunn||grunn.charAt(0)!=='#')return grunn;
+  var sum=0;for(var i=0;i<tag.length;i++)sum+=tag.charCodeAt(i)*(i+1);
+  var t=froTall(sum,sum%7);
+  if(t<0.34)return grunn;
+  return t<0.67?lysHex(grunn,0.3):darkHex(grunn,0.22);
+}
 function cloudWordsHTML(counts,clickable,limit,kompakt){
   // Én felles motor for alle ordskyer — samme størrelser, avstand og utseende
   var words=Object.keys(counts).filter(function(w){return counts[w]>0;});
@@ -7054,8 +7064,15 @@ function cloudWordsHTML(counts,clickable,limit,kompakt){
     else if(c>=500){size+=6;}
     else if(c>=250){size+=3;}
     var cls='cloud-word lv'+lv+(c>10&&c<750?' hot':'');
-    if(clickable)return'<button class="'+cls+'" style="font-size:'+size+'px" onclick="goTagAlle(\''+q(w)+'\')">#'+esc(w)+'</button>';
-    return'<span class="'+cls+'" style="font-size:'+size+'px;cursor:default">#'+esc(w)+'</span>';
+    // Har stikkordet en kategori, tar fargen over — en nyanse av den, ikke
+    // fargen rett av, så flere stikkord i samme kategori ikke blir identiske.
+    // Frekvensen sier fortsatt sitt gjennom størrelse og vekt, uendret.
+    var katId=tagCats[w];
+    var grunnfarge=katId&&catColor(katId);
+    var stil='font-size:'+size+'px'+(clickable?'':';cursor:default');
+    if(grunnfarge)stil+=';color:'+tagNyansefarge(w,grunnfarge);
+    if(clickable)return'<button class="'+cls+'" style="'+stil+'" onclick="goTagAlle(\''+q(w)+'\')">#'+esc(w)+'</button>';
+    return'<span class="'+cls+'" style="'+stil+'">#'+esc(w)+'</span>';
   }).join('')+'</div>';
 }
 function cloudHTML(counts,clickable,limit,kompakt){
