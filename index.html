@@ -7289,7 +7289,14 @@ function saveEditEntry(){
   if(f.date)e.date=f.date;
   save();closeModal();
 }
-function routineValid(){var f=mf();return(f.name||'').trim().length>0;}
+function routineValid(){
+  var f=mf();
+  if(!(f.name||'').trim())return false;
+  // Hendelser skal ha en grunnverdi — bursdager er unntatt, de bruker aldri
+  // grunnverdi-kobling i det hele tatt.
+  if(modal&&(modal.step==='event'||modal.step==='event_edit')&&!f.bday&&!(f.goalIds||[]).length)return false;
+  return true;
+}
 function submitRoutine(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
@@ -8772,8 +8779,9 @@ function modalHTML(){
         +'<input class="inp" type="text" style="flex:1;margin:0" placeholder="F.eks. JennyA" value="'+esc(f._ptInput||'')+'" oninput="mf()._ptInput=this.value" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addPersonTag();}">'
         +'<button class="chip" onclick="addPersonTag()">+ Legg til</button></div>'
         +'<div class="hint">Innlegg i takknemlighetsboka som bruker disse stikkordene, vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og folk med samme navn holdes fra hverandre.</div>':'')
-      +(!f.bday?'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt, valgfritt</span></label>'
-      +'<div class="chips">'+linkChipSection(f)+'</div>':'')
+      +(!f.bday?'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– velg minst \u00e9n grunnverdi</span></label>'
+      +'<div class="chips">'+linkChipSection(f)+'</div>'
+      +((f.goalIds||[]).length?'':'<div class="hint" style="color:#B86E2A">Hendelsen m\u00e5 kobles til minst \u00e9n grunnverdi.</div>'):'')
       +(!f.bday?equipmentPickerHTML(f):'')
       +(!f.bday?'<label class="field-lbl">Stikkord <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'+tagSectionHTML(f):'')
       +(!f.bday?'<label class="field-lbl">Kategori(er)</label>'
@@ -11762,7 +11770,11 @@ function planleggingViewHTML(){
         }
         if(linkedE.length){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Planer og hendelser</div>';
-          linkedE.forEach(function(e){var mc=mainCatOf(e.cats);h+='<div style="font-size:13px;padding:2px 0;cursor:pointer" onclick="event.stopPropagation();goKategoriside(\''+q(mc?mc.id:'')+'\')">'+esc(e.name)+' <span style="color:var(--muted);font-size:11px">· '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert år':' '+e.year)+'</span></div>';});
+          linkedE.forEach(function(e){
+            var dn=evDone(e,curYear);
+            h+='<div class="entry-row" style="padding:2px 0"><button class="chk'+(dn?' done':'')+'" onclick="event.stopPropagation();toggleEvent(\''+q(e.id)+'\','+curYear+')">'+(dn?'\u2713':'')+'</button><div class="entry-body" style="cursor:pointer" onclick="event.stopPropagation();openEditEvent(\''+q(e.id)+'\')">'
+              +'<div class="entry-text" style="font-size:13px">'+esc(e.name)+' <span style="color:var(--muted);font-size:11px">\u00b7 '+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' hvert \u00e5r':' '+e.year)+'</span></div></div></div>';
+          });
         }
         if(linkedR.length){
           h+='<div style="font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin:6px 0 3px">Rutiner</div>';
@@ -11814,8 +11826,8 @@ function planleggingViewHTML(){
     if(utenE.length){
       h+='<div style="padding:10px 14px 2px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp)">Planer og hendelser</div>';
       utenE.forEach(function(e){
-        var dn=evDone(e,curYear),mc=mainCatOf(e.cats);
-        h+='<div class="entry-row"><button class="chk'+(dn?' done':'')+'" onclick="toggleEvent(\''+q(e.id)+'\','+curYear+')">'+(dn?'\u2713':'')+'</button><div class="entry-body" style="cursor:pointer" onclick="goKategoriside(\''+q(mc?mc.id:'')+'\')">'
+        var dn=evDone(e,curYear);
+        h+='<div class="entry-row"><button class="chk'+(dn?' done':'')+'" onclick="toggleEvent(\''+q(e.id)+'\','+curYear+')">'+(dn?'\u2713':'')+'</button><div class="entry-body" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
           +'<div class="entry-text">'+esc(e.name)+'</div>'
           +'<div class="entry-date">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1]+(e.repeat?' \u00b7 hvert \u00e5r':' '+e.year)+'</div></div></div>';
       });
