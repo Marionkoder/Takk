@@ -544,7 +544,9 @@ function catsForResult(r){
 }
 function checkRoutineMilestone(r){
   var n=(r.log||[]).length;
-  if(n>0&&n%100===0)addAchievement('routine','routine:'+r.id+':'+n,r.name,r.goalIds||[],r.cats||[],n+' ganger');
+  // MIDLERTIDIG for å teste vimpelfunksjonen: terskelen er satt til 20 i
+  // stedet for 100. Bytt tilbake til n%100===0 når testingen er ferdig.
+  if(n>0&&n%20===0)addAchievement('routine','routine:'+r.id+':'+n,r.name,r.goalIds||[],r.cats||[],n+' ganger');
 }
 function goOppnadd(){view={kind:'oppnadd'};window._achDel=null;drawerOpen=false;render();}
 function askDeleteAch(id){window._achDel=id;render();}
@@ -2625,7 +2627,7 @@ function ballonghimmelHTML(){
     })
     .sort(function(a,b){return nbSort(a.tag,b.tag);}); // fast rekkefølge, fritt blandet i størrelse
   if(!rader.length)return'';
-  var h='<div class="sec-title">Stikkord som har tatt av</div><div class="card"><div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:16px 14px 12px">';
+  var h='<div class="sec-title">Mest takknemlig for</div><div class="card"><div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:16px 14px 12px">';
   rader.forEach(function(r){
     var H=stikkordBallongStorrelse(r.n);
     var Ffinal=Math.min(16,Math.max(9,H*0.16));
@@ -2878,7 +2880,6 @@ function startCelebration(auto){window._celebSlide=0;window._celebAuto=!!auto;vi
 function celebNext(){window._celebSlide=(window._celebSlide||0)+1;render();}
 function celebPrev(){window._celebSlide=Math.max(0,(window._celebSlide||0)-1);render();}
 function closeCelebration(){if(window._celebAuto)markCelebrationSeen();window._celebSlide=0;goHjem();}
-var bdaySort='dato';
 function goBursdagsliste(){
   // Nytt frø ved hver åpning — de tre ballongene øverst skal skifte farge.
   // Frøet ligger på view, ikke i en global, så en vanlig render ikke stokker om.
@@ -2911,56 +2912,38 @@ function bursdagerHubHTML(){
 }
 function bursdagslisteViewHTML(){
   var bdays=events.filter(function(e){return e.bday;});
-  // Sortering: dato (n\u00e6rmest f\u00f8rst), alfabetisk, eller alder (eldst f\u00f8rst)
-  if(bdaySort==='navn')bdays.sort(function(a,b){return nbSort(a.name,b.name);});
-  else if(bdaySort==='alder')bdays.sort(function(a,b){
-    var aa=ageToday(a),ab=ageToday(b);
-    if(aa===null&&ab===null)return nbSort(a.name,b.name);
-    if(aa===null)return 1;
-    if(ab===null)return-1;
-    return ab-aa||nbSort(a.name,b.name);
-  });
-  else bdays.sort(function(a,b){return daysToNextBday(a)-daysToNextBday(b)||nbSort(a.name,b.name);});
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div style="display:flex;align-items:flex-end;gap:10px">'
     +'<div class="view-title" style="flex:1;min-width:0">Bursdagsliste <span style="font-size:12px;font-weight:400;color:var(--rose)">\u00b7 '+bdayCount()+' av '+BDAY_MAX+'</span></div>'
     +bursdagsPyntHTML(view.fro)
     +'</div>';
-  h+='<div class="chips" style="padding:8px 12px 0">'
-    +[['dato','Dato'],['navn','Alfabetisk'],['alder','Alder']].map(function(t){
-      return'<button class="chip'+(bdaySort===t[0]?' on':'')+'" onclick="bdaySort=\''+t[0]+'\';render()">'+t[1]+'</button>';
-    }).join('')+'</div>';
   if(bdayCount()<BDAY_MAX){
     h+='<button class="add-btn" onclick="openBdayModal()">+ Ny bursdag</button>';
     h+='<div style="padding:0 12px 4px"><button class="icon-btn" style="font-size:11px" onclick="openMinneModal()">+ Ny minnebursdag</button></div>';
   }
-  if(bdays.length){
-    h+='<div class="card" style="padding:6px 0">';
-    bdays.forEach(function(e){
+  // Månedsbolker, tre i bredden, fra og med inneværende måned og tolv måneder
+  // frem — som et lite oppslag, ikke en redigerbar liste. Rediger navn og
+  // dato gjøres fra personsida nå, ikke herfra.
+  var perMnd={};for(var m0=1;m0<=12;m0++)perMnd[m0]=[];
+  bdays.forEach(function(e){perMnd[e.month].push(e);});
+  Object.keys(perMnd).forEach(function(m0){
+    perMnd[m0].sort(function(a,b){return(a.day||0)-(b.day||0)||nbSort(a.name,b.name);});
+  });
+  var rekkefolge=[];for(var k=0;k<12;k++)rekkefolge.push(((curMonth-1+k)%12)+1);
+  h+='<div class="card" style="padding:12px 10px"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px 10px">';
+  rekkefolge.forEach(function(m0){
+    h+='<div>'
+      +'<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grp);margin-bottom:4px">'+esc(MND_FULL[m0-1].toUpperCase())+'</div>';
+    perMnd[m0].forEach(function(e){
       var minne=erMinne(e);
-      var round=!minne&&isRoundBdayNext(e);
       var nAge=minne?null:bdayNextAge(e);
-      var age=minne?null:ageToday(e);
-      var dd=daysToNextBday(e);
-      var isToday=dd===0;
-      var gratd=evDone(e,curYear);
-      var when=isToday?'i dag!':dd===1?'i morgen':'om '+dd+' dager';
-      h+='<div class="'+(round?'confetti round-bday':'')+'" style="display:flex;align-items:center;gap:8px;padding:3px 14px;font-size:13px;position:relative">'
-        +(round?confettiHTML():'')
-        +'<span style="width:64px;flex-shrink:0;color:var(--muted);font-size:12px">'+(e.day?e.day+'. ':'')+MND_FULL[e.month-1].slice(0,3)+'</span>'
-        +'<span style="flex:1"><span style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:2px" onclick="goGavePerson(\''+q(e.name)+'\')">'+esc(e.name)+'</span>'
-        +(age!==null?' <span style="color:var(--muted);font-size:11px">'+age+' \u00e5r</span>':'')
-        +' <span style="color:var(--rose);font-size:11px">\u00b7 '+(minne?'minnebursdag '+when:(nAge!==null?'fyller '+nAge+' ':'bursdag ')+when)+'</span>'
-        +(round?' '+personBallongSVG(e.name,16):'')
-        +'</span>'
-        +(isToday&&!minne?'<button class="chip'+(gratd?' on':'')+'" style="font-size:11px;padding:3px 10px;flex-shrink:0" onclick="toggleEvent(\''+q(e.id)+'\','+curYear+')">'+(gratd?'\u2713 Gratulert':'Gratulert?')+'</button>':'')
-        +'<button class="icon-btn" style="font-size:11px;padding:1px 7px" onclick="openEditEvent(\''+q(e.id)+'\')">\u270e</button>'
+      h+='<div style="font-size:12.5px;padding:2px 0;cursor:pointer;overflow-wrap:anywhere" onclick="goGavePerson(\''+q(e.name)+'\')">'
+        +(e.day?e.day+'. ':'')+esc(e.name)+(nAge!==null?' '+nAge:'')
         +'</div>';
     });
     h+='</div>';
-  } else {
-    h+='<div class="card"><div class="empty">Ingen bursdager ennå.</div></div>';
-  }
+  });
+  h+='</div></div>';
   if(bdayCount()>=BDAY_MAX){
     h+='<div class="hint-box" style="color:var(--amber)">Du har n\u00e5dd '+BDAY_MAX+' bursdager \u2014 Dunbars tall for hvor mange meningsfulle relasjoner et menneske greier \u00e5 holde ved like.</div>';
   }
@@ -9870,7 +9853,9 @@ function toggleVimpel(id){
   a.vimpel=!a.vimpel;save();render();
 }
 function vimpelKvalifisert(a){
-  return a.kind==='project'||(a.kind==='routine'&&a.detail==='100 ganger');
+  // MIDLERTIDIG: matcher den midlertidige 20-terskelen over. Bytt tilbake til
+  // '100 ganger' når testingen er ferdig.
+  return a.kind==='project'||(a.kind==='routine'&&a.detail==='20 ganger');
 }
 function vimpelSVG(px,farge,morkFarge,tekst,localFont,tekstFarge){
   // Ekte spiss, men bredere vinkel enn referansebildet — 72 bred mot 100 høy
