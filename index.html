@@ -3815,6 +3815,17 @@ function load(){
     save();
   }
 
+  // Samme opprydding for rutiner og hendelser — mainCatOf() hadde samme
+  // svakhet som kortene på tavla, og kunne gjøre en rutine helt uklikkbar
+  // i Verdiplan hvis en død id lå først i kategorilista.
+  var katrydd2=false;try{katrydd2=!!localStorage.getItem(SK+'_katrydd2');}catch(e){}
+  if(!katrydd2){
+    routines.forEach(function(r){if(r.cats)r.cats=r.cats.filter(function(cid){return!!catById(cid);});});
+    events.forEach(function(e){if(e.cats)e.cats=e.cats.filter(function(cid){return!!catById(cid);});});
+    try{localStorage.setItem(SK+'_katrydd2','1');}catch(e){}
+    save();
+  }
+
   // Oppnådde resultater manglet dato. Henter den fra et koblet prosjekt der den
   // finnes; ellers settes måneden resultatet selv var satt til, som beste anslag.
   var ad1=false;try{ad1=!!localStorage.getItem(SK+'_achieveddato1');}catch(e){}
@@ -5453,6 +5464,16 @@ function toggleIkkeDenneUka(id){
 }
 var kanbanBakgrunnApen={plan:false,arbeid:false};
 function toggleKanbanBakgrunn(fase){kanbanBakgrunnApen[fase]=!kanbanBakgrunnApen[fase];render();}
+// Hvert enkelt prosjekt starter kollapset — bare tittel og kategori på én
+// linje — siden hele poenget med tavla er å se mange prosjekter samtidig.
+var kanbanKortApen={};
+function toggleKanbanKort(id){kanbanKortApen[id]=!kanbanKortApen[id];render();}
+function kanbanSettPlanlagt(id,val){
+  var iv=invById(id);if(!iv)return;
+  var n=Number(String(val).replace(',','.'));
+  iv.planlagtTimerUke=isNaN(n)?0:Math.max(0,n);
+  save();render();
+}
 // tett=true gir et lite, dempet kort uten oppgaveliste — for de bakgrunns-
 // prosjektene som er «ikke denne uka». Selve fasen bestemmer om kortet i det
 // hele tatt kan merkes sånn (bare Planlegging og Gjennomføring).
@@ -5487,13 +5508,25 @@ function kanbanKortHTML(iv,f,fi,tett){
   // Bytt-fase-knappene bruker samme regel som pilene før dem: bare fasen rett
   // før og rett etter i rekka, aldri hopp over flere.
   var FASENAVN={ide:'Flytt til id\u00e9',plan:'Flytt til planlegging',arbeid:'Flytt til gjennomf\u00f8ring',ferdig:'Marker som ferdigstilt'};
-  return'<div style="background:var(--card);border:1px solid var(--line);border-left:5px solid '+col+';border-radius:8px;padding:6px 7px;margin:0 4px 5px'+(erFerdig?';font-style:italic':'')+'">'
-    +'<div style="display:flex;align-items:flex-start;gap:4px">'
-    +'<div style="flex:1;font-size:13.5px;font-weight:700;line-height:1.25;cursor:pointer;color:'+(erFerdig?'var(--muted)':demp)+'" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</div>'
-    +'<button class="icon-btn" style="font-size:11px;padding:1px 6px;flex-shrink:0" onclick="event.stopPropagation();openEditInv(\''+q(iv.id)+'\')">\u270e</button>'
-    +'</div>'
+  var apen=!!kanbanKortApen[iv.id];
+  // Toppraden — pil, tittel, kategori — vises alltid, kollapset eller ikke.
+  // Det er nok til å kjenne prosjektet igjen uten å måtte åpne det.
+  var topprad='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleKanbanKort(\''+q(iv.id)+'\')">'
+    +'<span class="s-arrow'+(apen?' open':'')+'" style="font-size:9px;flex-shrink:0">\u25b6\ufe0e</span>'
+    +'<span style="flex:1;font-size:13.5px;font-weight:700;line-height:1.25;'+(erFerdig?'font-style:italic;color:var(--muted)':'color:'+demp)+'" onclick="event.stopPropagation();goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</span>'
     +katRad
+    +'<button class="icon-btn" style="font-size:11px;padding:1px 6px;flex-shrink:0" onclick="event.stopPropagation();openEditInv(\''+q(iv.id)+'\')">\u270e</button>'
+    +'</div>';
+  if(!apen){
+    return'<div style="background:var(--card);border:1px solid var(--line);border-left:5px solid '+col+';border-radius:8px;padding:6px 7px;margin:0 4px 5px'+(erFerdig?';font-style:italic':'')+'">'+topprad+'</div>';
+  }
+  return'<div style="background:var(--card);border:1px solid var(--line);border-left:5px solid '+col+';border-radius:8px;padding:6px 7px;margin:0 4px 5px'+(erFerdig?';font-style:italic':'')+'">'
+    +topprad
     +tagRad
+    +(kanUke?'<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:5px">'
+        +'<span style="flex:1">Planlagt denne uka</span>'
+        +'<input class="inp" type="text" inputmode="decimal" style="width:44px;padding:2px 4px;text-align:right;margin:0" value="'+esc(iv.planlagtTimerUke?String(iv.planlagtTimerUke).replace('.',','):'')+'" placeholder="0" onclick="event.stopPropagation()" onchange="kanbanSettPlanlagt(\''+q(iv.id)+'\',this.value)"> t'
+        +'</div>':'')
     +(t!==null?'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(t).replace('.',',')+' t igjen</div>':'')
     +(frist?'<div style="font-size:10px;margin-top:1px;color:'+(forsinket?'var(--red)':'var(--muted)')+'">'+(iv.completedDate?'\u2713 '+fmtDate(iv.completedDate):'frist '+frist)+'</div>':'')
     +(kanUke?(function(){
@@ -5617,11 +5650,17 @@ function kanbanTavleHTML(){
   [['plan','Planlegging',kanbanTakPlan],['arbeid','Gjennomf\u00f8ring',kanbanTakArbeid]].forEach(function(t){
     var brukt=kanbanUkeTimer(t[0]);
     var tak=t[0]==='plan'?kanbanTakPlan:kanbanTakArbeid;
+    // Summen av det du selv har lagt inn per prosjekt — «ikke denne uka»-
+    // prosjekter teller ikke med, siden de eksplisitt er holdt utenfor uka.
+    var planlagt=alle.filter(function(iv){return kanbanFase(iv)===t[0]&&!iv.ikkeDenneUka;})
+      .reduce(function(s,iv){return s+(Number(iv.planlagtTimerUke)||0);},0);
     h+='<div class="card" style="padding:8px 14px;margin-bottom:4px">'
       +'<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">'
       +'<span style="flex:1">'+t[1]+' denne uka \u2013 h\u00f8yst <input class="inp" type="text" inputmode="numeric" style="width:40px;display:inline-block;margin:0 4px;padding:2px 4px;text-align:right" value="'+esc(String(tak))+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')" onchange="kanbanSettTak(\''+t[0]+'\',this.value)"> t/uke</span>'
       +'<b style="color:'+(brukt>tak?'var(--red)':'var(--ink)')+'">'+String(brukt).replace('.',',')+' / '+tak+' t</b>'
-      +'</div></div>';
+      +'</div>'
+      +(planlagt>0?'<div style="font-size:11px;color:var(--muted);margin-top:2px">Planlagt denne uka: <b style="color:'+(planlagt>tak?'var(--red)':'var(--ink)')+'">'+String(planlagt).replace('.',',')+' t</b></div>':'')
+      +'</div>';
   });
 
   // Fargeflate bak fasene: bare Ideer beholder sin lyse bakgrunn. Ferdigstilt
@@ -7300,14 +7339,14 @@ function routineValid(){var f=mf();return(f.name||'').trim().length>0;}
 function submitRoutine(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
-  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,tags:f.tags||[],months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),ankere:(f.ankere||[]),minste:(f.minste||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[],minsteLog:[]});
+  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:(f.cats||[]).filter(function(cid){return!!catById(cid);}),tags:f.tags||[],months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),ankere:(f.ankere||[]),minste:(f.minste||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[],minsteLog:[]});
   save();closeModal();
 }
 function saveEditRoutine(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var r=routines.find(function(x){return x.id===f.id;});if(!r)return;
-  r.name=name;r.cats=f.cats;r.tags=f.tags||[];r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.ankere=(f.ankere||[]);r.minste=(f.minste||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
+  r.name=name;r.cats=(f.cats||[]).filter(function(cid){return!!catById(cid);});r.tags=f.tags||[];r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.ankere=(f.ankere||[]);r.minste=(f.minste||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
   save();closeModal();
 }
 function submitEvent(){
@@ -7316,7 +7355,7 @@ function submitEvent(){
   if(f.bday&&!f.memorial&&bdayCount()>=BDAY_MAX)return;
   // Bursdager har ikke egen kategorivelger \u2014 de h\u00f8rer alltid til Folk
   if(f.bday){var fk=folkCat();f.cats=fk?[fk.id]:[];}
-  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:f.cats,month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,tags:f.tags||[],repeat:!!f.repeat,bday:!!f.bday,memorial:!!f.memorial,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],done:false,log:[]});
+  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:(f.cats||[]).filter(function(cid){return!!catById(cid);}),month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,tags:f.tags||[],repeat:!!f.repeat,bday:!!f.bday,memorial:!!f.memorial,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],done:false,log:[]});
   if(f._fromLater)laters=laters.filter(function(l){return l.id!==f._fromLater;});
   save();closeModal();
 }
@@ -7325,7 +7364,7 @@ function saveEditEvent(){
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var e=events.find(function(x){return x.id===f.id;});if(!e)return;
   if(f.bday){var fk=folkCat();f.cats=fk?[fk.id]:[];}
-  e.name=name;e.cats=f.cats;e.month=Number(f.month);e.year=Number(f.year);
+  e.name=name;e.cats=(f.cats||[]).filter(function(cid){return!!catById(cid);});e.month=Number(f.month);e.year=Number(f.year);
   e.day=f.day?Number(f.day):null;e.toMonth=(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null;e.toDay=(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null;e.tags=f.tags||[];e.repeat=!!f.repeat;e.bday=!!f.bday;e.memorial=!!f.memorial;e.interval=Number(f.interval)||1;
   e.sinceYear=f.sinceYear?Number(f.sinceYear):null;
   e.goalIds=f.bday?[]:(f.goalIds||[]);e.resultIds=f.bday?[]:(f.resultIds||[]);e.equipmentIds=f.bday?[]:(f.equipmentIds||[]);e.ease=(f.ease||'').trim();
@@ -8994,8 +9033,12 @@ function goKategoriside(catId){
   drawerOpen=false;render();
 }
 function mainCatOf(catIds){
-  var cid=(catIds||[])[0];if(!cid)return null;
-  var c=catById(cid);if(!c)return null;
+  // Samme rettelse som på tavla: en død id først i lista skal ikke skjule en
+  // gyldig som kommer etter. Rettet her, ikke bare lokalt, siden dette brukes
+  // av rapporter, klikk-navigasjon og fargelegging over hele appen.
+  var cid=(catIds||[]).find(function(x){return!!catById(x);});
+  if(!cid)return null;
+  var c=catById(cid);
   return c.parentId?(catById(c.parentId)||null):c;
 }
 function routineTimeLogRowsHTML(items){
