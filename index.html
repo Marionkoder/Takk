@@ -5409,6 +5409,10 @@ function markEquipmentUsed(ids,label){
 // alltid er enige om hva som er ferdig. Ideer har ingen timebegrensning — det er
 // før noe i det hele tatt er bestemt.
 var KANBAN_FASER=[['ide','Ideer'],['plan','Planlegging'],['arbeid','Gjennomf\u00f8ring'],['ferdig','Ferdigstilt']];
+// Hvilke faser som er slått ut. Ideer starter kollapset — det er greit å ikke
+// se hele idelista hele tiden — de tre andre starter åpne.
+var kanbanApen={ide:false,plan:true,arbeid:true,ferdig:false};
+function toggleKanbanFase(id){kanbanApen[id]=!kanbanApen[id];render();}
 var kanbanTakPlan=5,kanbanTakArbeid=15;
 function kanbanFase(iv){
   if(iv.completedDate)return'ferdig';
@@ -5503,7 +5507,6 @@ function kanbanTavleHTML(){
   if(!alle.length)return h+'<div class="card"><div class="empty">Ingen prosjekter enn\u00e5.</div></div>';
 
   // Ukens timer mot taket, for de to fasene som faktisk har et tak
-  var farger={ide:'#F2E9D8',plan:'',arbeid:'',ferdig:'#D9E3D6'};
   [['plan','Planlegging',kanbanTakPlan],['arbeid','Gjennomf\u00f8ring',kanbanTakArbeid]].forEach(function(t){
     var brukt=kanbanUkeTimer(t[0]);
     var tak=t[0]==='plan'?kanbanTakPlan:kanbanTakArbeid;
@@ -5514,26 +5517,37 @@ function kanbanTavleHTML(){
       +'</div></div>';
   });
 
-  h+='<div style="display:flex;gap:6px;align-items:flex-start;padding:4px 8px 0;overflow-x:auto">';
+  // Fargeflate bak fasene: bare Ideer beholder sin lyse bakgrunn. Ferdigstilt
+  // hadde en grønn flate her før — tatt bort, siden ferdigstilte prosjekter
+  // ikke skal se ut som en suksess å feire, bare noe som er unnagjort.
+  var farger={ide:'#F2E9D8',plan:'',arbeid:'',ferdig:''};
+  h+='<div style="padding:4px 8px 0">';
   KANBAN_FASER.forEach(function(f,fi){
     var iFase=alle.filter(function(iv){return kanbanFase(iv)===f[0];})
       .sort(function(a,b){return nbSort(dispName(a),dispName(b));});
-    h+='<div style="flex:1;min-width:118px;background:'+(farger[f[0]]||'transparent')+';border-radius:10px;padding:2px">'
-      +'<div style="padding:6px 4px 4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grp)">'
-      +f[1]+' <span style="font-weight:400;color:var(--rose)">'+iFase.length+'</span></div>';
+    var apen=!!kanbanApen[f[0]];
+    var erFerdig=f[0]==='ferdig';
+    h+='<div style="background:'+(farger[f[0]]||'transparent')+';border-radius:10px;padding:2px;margin-bottom:6px">'
+      +'<div style="display:flex;align-items:center;gap:6px;padding:8px 6px;cursor:pointer" onclick="toggleKanbanFase(\''+f[0]+'\')">'
+      +'<span class="s-arrow'+(apen?' open':'')+'" style="font-size:11px">\u25b6\ufe0e</span>'
+      +'<span style="flex:1;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grp)">'
+      +f[1]+' <span style="font-weight:400;color:var(--rose)">'+iFase.length+'</span></span>'
+      +'</div>';
+    if(apen){
     if(!iFase.length){
-      h+='<div style="font-size:11px;color:var(--muted);padding:4px 4px 8px">\u2013</div>';
+      h+='<div style="font-size:11px;color:var(--muted);padding:0 10px 10px">\u2013</div>';
     }
-    // Ideer og Ferdigstilt f\u00e5r en dempet, m\u00f8rk gr\u00e5brun tekst i stedet for full svart \u2014
-    // det er de to fasene der ingenting krever like mye oppmerksomhet akkurat n\u00e5
-    var demp=(f[0]==='ide'||f[0]==='ferdig')?'#7A7166':'var(--ink)';
+    // Ideer får en dempet, mørk gråbrun tekst i stedet for full svart — det er
+    // fasen der ingenting krever like mye oppmerksomhet akkurat nå. Ferdigstilt
+    // får grå, kursiv tekst — unnagjort, ikke noe å legge vekt på lenger.
+    var demp=f[0]==='ide'?'#7A7166':'var(--ink)';
     iFase.forEach(function(iv){
       var col=catColor((iv.catIds&&iv.catIds[0])||iv.catId)||'var(--line)';
       var t=kanbanTimerIgjen(iv);
       var frist=iv.endDate?fmtDate(iv.endDate):'';
       var forsinket=iv.endDate&&!iv.completedDate&&iv.endDate<isoDate(today);
-      h+='<div style="background:var(--card);border:1px solid var(--line);border-left:3px solid '+col+';border-radius:8px;padding:6px 7px;margin-bottom:5px">'
-        +'<div style="font-size:11.5px;font-weight:700;line-height:1.25;cursor:pointer;color:'+demp+'" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</div>'
+      h+='<div style="background:var(--card);border:1px solid var(--line);border-left:3px solid '+col+';border-radius:8px;padding:6px 7px;margin:0 4px 5px'+(erFerdig?';font-style:italic':'')+'">'
+        +'<div style="font-size:11.5px;font-weight:700;line-height:1.25;cursor:pointer;color:'+(erFerdig?'var(--muted)':demp)+'" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</div>'
         +(t!==null?'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(t).replace('.',',')+' t igjen</div>':'')
         +(frist?'<div style="font-size:10px;margin-top:1px;color:'+(forsinket?'var(--red)':'var(--muted)')+'">'+(iv.completedDate?'\u2713 '+fmtDate(iv.completedDate):'frist '+frist)+'</div>':'')
         +((f[0]==='plan'||f[0]==='arbeid')?(function(){
@@ -5559,6 +5573,7 @@ function kanbanTavleHTML(){
         +(fi<3?'<button class="icon-btn" style="font-size:11px;padding:1px 6px;margin-left:auto" onclick="kanbanFlytt(\''+q(iv.id)+'\',1)">\u203a</button>':'')
         +'</div></div>';
     });
+    }
     h+='</div>';
   });
   h+='</div>';
