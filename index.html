@@ -3785,6 +3785,20 @@ function load(){
     save();
   }
 
+  // Å angre en ferdigstilling fjernet ikke anerkjennelsen — den ble stående
+  // og feire seg selv på forsida i opptil et døgn etter at feilen var rettet.
+  // Rydder opp den ene gangen.
+  var vimpelopprydd1=false;try{vimpelopprydd1=!!localStorage.getItem(SK+'_vimpelopprydd1');}catch(e){}
+  if(!vimpelopprydd1){
+    achievements=achievements.filter(function(a){
+      if(a.kind!=='project')return true;
+      var inv=invById(a.key.slice(5)); // 'proj:'+id
+      return!inv||!!inv.completedDate;
+    });
+    try{localStorage.setItem(SK+'_vimpelopprydd1','1');}catch(e){}
+    save();
+  }
+
   // Oppnådde resultater manglet dato. Henter den fra et koblet prosjekt der den
   // finnes; ellers settes måneden resultatet selv var satt til, som beste anslag.
   var ad1=false;try{ad1=!!localStorage.getItem(SK+'_achieveddato1');}catch(e){}
@@ -5432,11 +5446,12 @@ function kanbanKortHTML(iv,f,fi,tett){
   var erFerdig=f[0]==='ferdig';
   var demp=f[0]==='ide'?'#7A7166':'var(--ink)';
   var kanUke=(f[0]==='plan'||f[0]==='arbeid');
-  // Kategorien vises alltid som en stikkordbrikke — det er den obligatoriske
-  // hashtaggen. Egne stikkord fra prosjektets Stikkord-felt kommer i tillegg.
-  var katNavn=catId?catById(catId):null;
-  var katTag=katNavn?'<span class="tag-pill" style="background:'+col+';border-color:'+col+';color:'+textOn(col)+'">#'+esc(katNavn.name.toLowerCase().replace(/[^a-zæøå0-9]+/g,''))+'</span>':'';
-  var tagRad=(katTag||(iv.tags&&iv.tags.length))?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">'+katTag+tagPillsHTML(iv.tags).replace(/^<div[^>]*>|<\/div>$/g,'')+'</div>':'';
+  // Kategorien er et strukturelt merke, ikke et stikkord — den vises derfor
+  // med samme merke-stil som resten av appen bruker for kategori (catPillsHTML),
+  // ikke som en hashtag blant prosjektets egne stikkord. Mangler kategorien,
+  // sier merket det rett ut i stedet for å bare være fraværende.
+  var katRad=catId?catPillsHTML([catId]):'<div class="entry-cats"><span class="entry-cat" style="background:none;border:1px dashed var(--amber);color:var(--amber);cursor:pointer" onclick="event.stopPropagation();openEditInv(\''+q(iv.id)+'\')">Ingen kategori \u2014 velg</span></div>';
+  var tagRad=(iv.tags&&iv.tags.length)?tagPillsHTML(iv.tags):'';
   if(tett){
     return'<div style="background:var(--card);border:1px solid var(--line);border-left:5px solid '+col+';border-radius:8px;padding:5px 7px;margin:0 4px 4px;opacity:.72">'
       +'<div style="display:flex;align-items:center;gap:6px">'
@@ -5456,6 +5471,7 @@ function kanbanKortHTML(iv,f,fi,tett){
     +'<div style="flex:1;font-size:13.5px;font-weight:700;line-height:1.25;cursor:pointer;color:'+(erFerdig?'var(--muted)':demp)+'" onclick="goInventar(\''+q(iv.id)+'\')">'+esc(dispName(iv))+'</div>'
     +'<button class="icon-btn" style="font-size:11px;padding:1px 6px;flex-shrink:0" onclick="event.stopPropagation();openEditInv(\''+q(iv.id)+'\')">\u270e</button>'
     +'</div>'
+    +katRad
     +tagRad
     +(t!==null?'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+String(t).replace('.',',')+' t igjen</div>':'')
     +(frist?'<div style="font-size:10px;margin-top:1px;color:'+(forsinket?'var(--red)':'var(--muted)')+'">'+(iv.completedDate?'\u2713 '+fmtDate(iv.completedDate):'frist '+frist)+'</div>':'')
@@ -6114,7 +6130,14 @@ var skjulteEntries=[];
 var investGlobalOrder=[];
 function toggleProjectDone(invId){
   var inv=invById(invId);if(!inv)return;
-  if(inv.completedDate){delete inv.completedDate;(inv.resultIds||[]).forEach(function(rid){settResultatOppnadd(resultById(rid),false);});save();render();return;}
+  if(inv.completedDate){
+    delete inv.completedDate;
+    (inv.resultIds||[]).forEach(function(rid){settResultatOppnadd(resultById(rid),false);});
+    // Fjerner anerkjennelsen igjen — en feilklikket ferdigstilling skal ikke
+    // stå og feire seg selv på forsida etter at den er angret.
+    achievements=achievements.filter(function(a){return a.key!=='proj:'+inv.id;});
+    save();render();return;
+  }
   inv.completedDate=isoDate(today);
   (inv.resultIds||[]).forEach(function(rid){settResultatOppnadd(resultById(rid),true,inv.completedDate);});
   addAchievement('project','proj:'+inv.id,inv.name,inv.goalIds||[],inv.catId?[inv.catId]:[],'');
@@ -9283,11 +9306,14 @@ function hjemViewHTML(){
     freshAch.forEach(function(a){
       var isResult=a.kind==='result';
       var fx=achFxClass(a.kind);
-      var edgeCol=isResult?(catColor((a.cats||[])[0])||'var(--rose)'):null;
+      var edgeCol=(isResult||a.kind==='project')?(catColor((a.cats||[])[0])||'var(--rose)'):null;
       h+='<div class="card'+(fx?' '+fx:'')+'" style="position:relative;overflow:hidden;padding:14px 16px;margin-top:8px'+(edgeCol?';border-left:4px solid '+edgeCol:'')+'">'
         +achFxHTML(a.kind)
         +'<div style="position:relative">'
-        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose)">'+(isResult?'\ud83c\udfc6 Prosjekt n\u00e5dd':a.kind==='project'?'\ud83c\udfc1 Prosjekt fullf\u00f8rt':a.kind==='routine'?'\ud83d\udd01 Rutine \u00b7 '+esc(a.detail||''):'\u2713 Milep\u00e6l haket av')+'</div>'
+        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--rose);display:flex;align-items:center;gap:5px">'
+        +(a.kind==='project'?vimpelSVG(15,edgeCol||'#B08D7C',darkHex((edgeCol&&edgeCol.charAt(0)==='#')?edgeCol:'#B08D7C',0.32),null,0,''):'')
+        +'<span>'+(isResult?'\ud83c\udfc6 Prosjekt n\u00e5dd':a.kind==='project'?'Prosjekt fullf\u00f8rt':a.kind==='routine'?'\ud83d\udd01 Rutine \u00b7 '+esc(a.detail||''):'\u2713 Milep\u00e6l haket av')+'</span>'
+        +'</div>'
         +'<div style="font-size:15px;font-weight:800;margin-top:3px">'+esc(a.name)+'</div>'
         +(a.detail&&a.kind!=='routine'?'<div style="font-size:12px;color:var(--muted);margin-top:5px">'+esc(a.detail)+'</div>':'')
         +'</div></div>';
