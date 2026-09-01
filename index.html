@@ -2582,21 +2582,15 @@ function ballonghimmelHTML(){
     })
     .sort(function(a,b){return nbSort(a.tag,b.tag);}); // fast rekkefølge, fritt blandet i størrelse
   if(!rader.length)return'';
-  var h='<div class="sec-title">Mest takknemlig for</div><div class="card"><div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:16px 14px 12px">';
+  // Ingen overskrift, ingen hashtag-tekst — ballongen er nok i seg selv.
+  // Trykk gir forklaringen, med vei videre til stikkordsiden.
+  var h='<div class="card"><div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:16px 14px 12px">';
   rader.forEach(function(r){
     var H=stikkordBallongStorrelse(r.n);
-    var Ffinal=Math.min(16,Math.max(9,H*0.16));
-    var visTekst='#'+r.tag;
-    var passerPaa=(visTekst.length*Ffinal*0.46)<=H*0.58;
-    h+='<button type="button" style="background:none;border:none;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px" onclick="goTagAlle(\''+q(r.tag)+'\')" title="'+esc(visTekst+' · '+r.n+' ganger')+'">';
-    if(passerPaa){
-      var localFont=Ffinal*38/H;
-      h+=stikkordBallongSVG(H,r.farge,visTekst,localFont,textOn(r.farge));
-    } else {
-      h+=stikkordBallongSVG(H,r.farge,null,0,'')
-        +'<span style="font-size:11px;color:var(--ink)">'+esc(visTekst)+'</span>';
-    }
-    h+='</button>';
+    var info='#'+r.tag+' \u2013 tagget '+r.n+' ganger';
+    h+='<button type="button" style="background:none;border:none;padding:0;cursor:pointer" onclick="'+infoPopupOnclick(info,'goTagAlle(\''+q(r.tag)+'\')','\u00c5pne stikkordsiden')+'">'
+      +stikkordBallongSVG(H,r.farge,null,0,'')
+      +'</button>';
   });
   h+='</div></div>';
   return h;
@@ -7465,7 +7459,11 @@ function modalHTML(){
   if(!modal)return'';
   var f=mf(),step=modal.step,body='';
 
-  if(step==='persontags'){
+  if(step==='info'){
+    body='<div class="modal-title">'+esc(modal.tekst)+'</div>'
+      +(modal.klikk?'<button class="save-btn" onclick="closeModal();'+modal.klikk+'">'+esc(modal.knapp||'Åpne')+' \u203a</button>':'');
+
+  } else if(step==='persontags'){
     var suggested=Object.keys(allTags()).filter(function(t){return (f.tags||[]).map(normTag).indexOf(normTag(t))<0;}).sort(function(a,b){return allTags()[b]-allTags()[a]||nbSort(a,b);}).slice(0,10);
     body='<div class="modal-title">'+((f.tags||[]).length?'Rediger hashtagger':'Tilknytt hashtagger')+'</div>'
       +'<div class="hint" style="line-height:1.6">Velg hvilke stikkord som handler om '+esc(f.person)+'. Innlegg i takknemlighetsboka med disse stikkordene vises p\u00e5 personens side. Du velger selv \u2014 slik at #Oda g\u00e5r til riktig Oda, og folk med samme navn holdes fra hverandre.</div>'
@@ -9314,8 +9312,14 @@ function hjemViewHTML(){
   var ym=curYear+'-'+pad(curMonth);
   var h='<div class="view-title" style="font-size:18px">'+cap(UKEDAGER_FULL[dow(today)])+' '+today.getDate()+'. '+MND_FULL[today.getMonth()]+' '+today.getFullYear()+'</div>';
 
+  // Vimpelsnora — rett under banneret, det aller første som møter deg
+  h+=vimpelsnorHTML();
+
   // Hurtiglogging — det første som møter deg
   h+=quickLogHTML();
+
+  // Takknemlighetsballongene — rett under lagre-knappen på hurtigloggingen
+  h+=ballonghimmelHTML();
 
   // Ferske anerkjennelser (siste 24 timer) — milepæler og prosjekter
   // Påminnelse om kvartalsplanlegging — vises i starten av hvert kvartal til den er gjort
@@ -9427,8 +9431,6 @@ function hjemViewHTML(){
     h+='<div class="view-sub" style="padding-top:12px;color:var(--red)">\u2713 Alt som h\u00f8rer til i dag og denne uka er gjort.</div>';
   }
 
-  h+=ballonghimmelHTML();
-
   var lb=0;try{lb=Number(localStorage.getItem(SK+'_backup')||0);}catch(e){}
   var bDays=lb?Math.floor((Date.now()-lb)/86400000):null;
   var bWarn=bDays===null||bDays>30;
@@ -9460,8 +9462,6 @@ function hjemViewHTML(){
     });
     h+='</div>';
   }
-
-  h+=vimpelsnorHTML();
 
   return h;
 }
@@ -9990,6 +9990,13 @@ function vimpelSVG(px,farge,morkFarge,tekst,localFont,tekstFarge){
 // Hver rad henger fire vimpler på en svakt buet hyssing, samme farge som
 // ballongenes snor. Navnet står under tuppen, alltid — det holder seg lesbart
 // uansett lengde, i stedet for å måtte passe akkurat på selve vimpelen.
+// Bygger onclick for en liten forklarings-popup — trykk på ballongen eller
+// vimpelen, se hva den markerer, trykk deg videre om du vil. Escaper riktig
+// uansett hvordan klikkKode selv ble satt sammen, i stedet for å måtte telle
+// anførselstegn for hånd hver gang dette brukes.
+function infoPopupOnclick(tekst,klikkKode,knappTekst){
+  return'modal={step:\'info\',tekst:\''+q(tekst)+'\',klikk:\''+String(klikkKode).replace(/'/g,"\\'")+'\',knapp:\''+q(knappTekst)+'\'};render()';
+}
 function vimpelsnorRadHTML(rad){
   var W=340,H=126;
   var P0=[18,12],P1=[170,30],P2=[322,12];
@@ -10005,15 +10012,13 @@ function vimpelsnorRadHTML(rad){
     var pt=punkt(TS[i]);
     var rot=(i%2===0)?-3:3;
     var scale=pH/100;
-    var navn='#'+String(item.navn||'').toLowerCase().replace(/[^a-zæøåA-ZÆØÅ0-9]+/g,'');
-    s+='<g style="cursor:pointer" onclick="'+item.klikk+'">'
+    s+='<g style="cursor:pointer" onclick="'+infoPopupOnclick(item.info,item.videre,item.knapp)+'">'
       +'<g transform="translate('+(pt[0]-pW/2).toFixed(1)+' '+pt[1].toFixed(1)+') rotate('+rot+' '+(pW/2).toFixed(1)+' 0) scale('+scale.toFixed(3)+')">'
       +'<path d="M0 0 L72 0 L36 100 Z" style="fill:'+item.farge+'"/>'
       +'<path d="M46 11 L72 11 L36 100 Z" style="fill:#000;opacity:.14"/>'
       +'<path d="M0 0 L72 0 L68 11 L4 11 Z" style="fill:'+item.mork+'"/>'
       +'<ellipse cx="17" cy="27" rx="7" ry="15" transform="rotate(-8 17 27)" style="fill:#fff;opacity:.16"/>'
       +'</g>'
-      +'<text x="'+pt[0].toFixed(1)+'" y="'+(pt[1]+pH+13).toFixed(1)+'" text-anchor="middle" font-size="10.5" fill="var(--ink)">'+esc(navn)+'</text>'
       +'</g>';
   });
   s+='</svg>';
@@ -10024,17 +10029,22 @@ function vimpelsnorHTML(){
   // Å hake av «feire med vimpel» er et ønske, ikke en garanti — rutinen må
   // faktisk ha nådd terskelen, og prosjektet må faktisk være ferdigstilt,
   // før noe dukker opp her. Krysset alene henger ikke opp noe med det samme.
+  // Ingen overskrift, ingen navn under — trykk for å få vite hva vimpelen markerer.
   var fraRutiner=routines.filter(function(r){return r.vimpel&&rutineTotalTelling(r)>=VIMPEL_RUTINE_TERSKEL;}).map(function(r){
     var farge=itemColor(r.cats||[])||'#B08D7C';
-    return{navn:r.name,farge:farge,mork:darkHex(farge,0.32),klikk:'openEditRoutine(\''+q(r.id)+'\')'};
+    return{farge:farge,mork:darkHex(farge,0.32),
+      info:r.name+' \u2013 gjort '+rutineTotalTelling(r)+' ganger',
+      videre:'openEditRoutine(\''+q(r.id)+'\')',knapp:'Rediger rutinen'};
   });
   var fraProsjekter=alleProsjekter().filter(function(iv){return iv.vimpel&&iv.completedDate;}).map(function(iv){
     var farge=itemColor((iv.catIds||[]).concat(iv.catId?[iv.catId]:[]))||'#B08D7C';
-    return{navn:dispName(iv),farge:farge,mork:darkHex(farge,0.32),klikk:'goInventar(\''+q(iv.id)+'\')'};
+    return{farge:farge,mork:darkHex(farge,0.32),
+      info:dispName(iv)+' \u2013 ferdigstilt',
+      videre:'goInventar(\''+q(iv.id)+'\')',knapp:'\u00c5pne prosjektet'};
   });
   var alle=fraRutiner.concat(fraProsjekter);
   if(!alle.length)return'';
-  var h='<div class="sec-title">Vimpelsnora</div><div class="card" style="padding:16px 10px 14px">';
+  var h='<div class="card" style="padding:16px 10px 14px">';
   for(var i=0;i<alle.length;i+=4)h+=vimpelsnorRadHTML(alle.slice(i,i+4));
   h+='</div>';
   return h;
