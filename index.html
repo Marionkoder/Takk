@@ -8732,6 +8732,7 @@ function modalHTML(){
     var dOpts='<option value=""'+(!f.day?' selected':'')+'>—</option>';
     for(var dd=1;dd<=31;dd++){dOpts+='<option value="'+dd+'"'+(Number(f.day)===dd?' selected':'')+'>'+dd+'.</option>';}
     body='<div class="modal-title">'+(f.memorial?(isEditE?'Rediger minnebursdag':'Ny minnebursdag'):f.bday?(isEditE?'Rediger bursdag':'Ny bursdag'):(isEditE?'Rediger hendelse':'Ny hendelse'))+'</div>'
+      +(isEditE&&!f.bday?'<button class="icon-btn" style="font-size:12px;margin-bottom:10px'+(eventById(f.id)&&eventById(f.id).vimpel?';color:var(--red);border-color:var(--red)':'')+'" onclick="toggleHendelseVimpel(\''+q(f.id)+'\')">'+(eventById(f.id)&&eventById(f.id).vimpel?'\u2691 Trykk for \u00e5 fjerne vimpelfeiring':'\u2690 Trykk for \u00e5 feire med vimpel')+'</button>':'')
       +(f.memorial?'<div class="hint">En minnebursdag markeres p\u00e5 dagen uten alder, gratulasjon eller gaveid\u00e9er. Hashtagger virker som ellers.</div>':'')
       +'<label class="field-lbl">'+(f.bday?'Navn p\u00e5 den som har bursdag':'Hva skjer?')+'</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="'+(f.bday?'F.eks. Jenny':'Beskriv hendelsen …')+'" oninput="mf().name=this.value;updateSaveBtn()">'
@@ -9970,6 +9971,15 @@ function toggleRutineVimpel(id){
   var r=routineById(id);if(!r)return;
   r.vimpel=!r.vimpel;save();render();
 }
+function eventById(id){return events.find(function(e){return e.id===id;});}
+// Samme regel som for prosjekter: det må faktisk ha skjedd, ikke bare være
+// planlagt, før det er noe å feire. For en gjentakende hendelse holder det at
+// den er avhaket minst én gang noensinne — det trenger ikke være akkurat i år.
+function eventEverDone(e){return e.repeat?!!(e.log&&e.log.length):!!e.done;}
+function toggleHendelseVimpel(id){
+  var e=eventById(id);if(!e)return;
+  e.vimpel=!e.vimpel;save();render();
+}
 function toggleProsjektVimpel(id){
   var iv=invById(id);if(!iv)return;
   iv.vimpel=!iv.vimpel;save();render();
@@ -9998,14 +10008,14 @@ function infoPopupOnclick(tekst,klikkKode,knappTekst){
   return'modal={step:\'info\',tekst:\''+q(tekst)+'\',klikk:\''+String(klikkKode).replace(/'/g,"\\'")+'\',knapp:\''+q(knappTekst)+'\'};render()';
 }
 function vimpelsnorRadHTML(rad){
-  var W=340,H=126;
+  var W=340,H=88;
   var P0=[18,12],P1=[170,30],P2=[322,12];
   function punkt(t){
     var mt=1-t;
     return[mt*mt*P0[0]+2*mt*t*P1[0]+t*t*P2[0],mt*mt*P0[1]+2*mt*t*P1[1]+t*t*P2[1]];
   }
   var TS=[0.16,0.39,0.61,0.84];
-  var pH=66,pW=72*pH/100;
+  var pH=46,pW=72*pH/100;
   var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;height:auto;display:block;margin:0 auto" role="img"><title>Vimpelsnor</title>'
     +'<path d="M'+P0[0]+' '+P0[1]+' Q'+P1[0]+' '+P1[1]+' '+P2[0]+' '+P2[1]+'" fill="none" stroke="var(--ballongsnor)" stroke-width="1.6"/>';
   rad.forEach(function(item,i){
@@ -10025,10 +10035,36 @@ function vimpelsnorRadHTML(rad){
   return s;
 }
 var VIMPEL_RUTINE_TERSKEL=20;
+// Sprer like farger fra hverandre der det er mulig — plukker grådig fra den
+// største gjenværende fargegruppa som ikke er samme farge som forrige. Er en
+// farge i flertall (mer enn halvparten), blir noen naboer like uansett; da
+// gir denne opp og lar det stå, i stedet for å garantere noe som ikke går.
+function unngaSammeFargeNabo(liste,fargeAv){
+  var grupper={};
+  liste.forEach(function(x){var f=fargeAv(x);(grupper[f]=grupper[f]||[]).push(x);});
+  var ut=[],forrige=null;
+  while(ut.length<liste.length){
+    var besteFarge=null;
+    Object.keys(grupper).forEach(function(f){
+      if(!grupper[f].length||f===forrige)return;
+      if(!besteFarge||grupper[f].length>grupper[besteFarge].length)besteFarge=f;
+    });
+    if(!besteFarge){
+      Object.keys(grupper).forEach(function(f){
+        if(!grupper[f].length)return;
+        if(!besteFarge||grupper[f].length>grupper[besteFarge].length)besteFarge=f;
+      });
+    }
+    ut.push(grupper[besteFarge].shift());
+    forrige=besteFarge;
+  }
+  return ut;
+}
 function vimpelsnorHTML(){
   // Å hake av «feire med vimpel» er et ønske, ikke en garanti — rutinen må
-  // faktisk ha nådd terskelen, og prosjektet må faktisk være ferdigstilt,
-  // før noe dukker opp her. Krysset alene henger ikke opp noe med det samme.
+  // faktisk ha nådd terskelen, prosjektet må faktisk være ferdigstilt, og
+  // hendelsen må faktisk ha skjedd, før noe dukker opp her. Krysset alene
+  // henger ikke opp noe med det samme.
   // Ingen overskrift, ingen navn under — trykk for å få vite hva vimpelen markerer.
   var fraRutiner=routines.filter(function(r){return r.vimpel&&rutineTotalTelling(r)>=VIMPEL_RUTINE_TERSKEL;}).map(function(r){
     var farge=itemColor(r.cats||[])||'#B08D7C';
@@ -10042,7 +10078,13 @@ function vimpelsnorHTML(){
       info:dispName(iv)+' \u2013 ferdigstilt',
       videre:'goInventar(\''+q(iv.id)+'\')',knapp:'\u00c5pne prosjektet'};
   });
-  var alle=fraRutiner.concat(fraProsjekter);
+  var fraHendelser=events.filter(function(e){return!e.bday&&e.vimpel&&eventEverDone(e);}).map(function(e){
+    var farge=itemColor(e.cats||[])||'#B08D7C';
+    return{farge:farge,mork:darkHex(farge,0.32),
+      info:e.name+' \u2013 gjennomf\u00f8rt',
+      videre:'openEditEvent(\''+q(e.id)+'\')',knapp:'Rediger hendelsen'};
+  });
+  var alle=unngaSammeFargeNabo(fraRutiner.concat(fraProsjekter,fraHendelser),function(x){return x.farge;});
   if(!alle.length)return'';
   var h='<div class="card" style="padding:16px 10px 14px">';
   for(var i=0;i<alle.length;i+=4)h+=vimpelsnorRadHTML(alle.slice(i,i+4));
