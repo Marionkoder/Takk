@@ -548,6 +548,19 @@ function checkRoutineMilestone(r){
   // stedet for 100. Bytt tilbake til n%100===0 når testingen er ferdig.
   if(n>0&&n%20===0)addAchievement('routine','routine:'+r.id+':'+n,r.name,r.goalIds||[],r.cats||[],n+' ganger');
 }
+// checkRoutineMilestone kjører bare i det øyeblikket du haker av — en rutine
+// som allerede lå godt forbi terskelen før denne funksjonen fantes, har aldri
+// truffet et øyeblikk der sjekken faktisk så et rundt tall. Denne går bakover
+// og fyller inn alle rundingene som allerede er passert, hver gang appen åpnes.
+// addAchievement dedupliserer på nøkkel, så det er trygt å kjøre om igjen.
+function etterslepRutineMilepaeler(){
+  routines.forEach(function(r){
+    var n=(r.log||[]).length;
+    for(var k=20;k<=n;k+=20){
+      addAchievement('routine','routine:'+r.id+':'+k,r.name,r.goalIds||[],r.cats||[],k+' ganger');
+    }
+  });
+}
 function goOppnadd(){view={kind:'oppnadd'};window._achDel=null;drawerOpen=false;render();}
 function askDeleteAch(id){window._achDel=id;render();}
 function cancelDeleteAch(){window._achDel=null;render();}
@@ -3825,6 +3838,11 @@ function load(){
     try{localStorage.setItem(SK+'_katrydd2','1');}catch(e){}
     save();
   }
+
+  // Kjøres hver oppstart, ikke bare én gang — billig, og fanger opp rutiner
+  // som har passert flere nye rundinger siden sist appen var åpen.
+  etterslepRutineMilepaeler();
+  save();
 
   // Oppnådde resultater manglet dato. Henter den fra et koblet prosjekt der den
   // finnes; ellers settes måneden resultatet selv var satt til, som beste anslag.
