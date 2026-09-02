@@ -10103,13 +10103,13 @@ function vimpelsnorHTML(){
   var fraProsjekter=alleProsjekter().filter(function(iv){return iv.vimpel&&iv.completedDate;}).map(function(iv){
     var farge=itemColor((iv.catIds||[]).concat(iv.catId?[iv.catId]:[]))||'#B08D7C';
     return{farge:farge,mork:darkHex(farge,0.32),
-      info:dispName(iv)+' \u2013 ferdigstilt',
+      info:dispName(iv),
       videre:'goInventar(\''+q(iv.id)+'\')',knapp:'\u00c5pne prosjektet'};
   });
   var fraHendelser=events.filter(function(e){return!e.bday&&e.vimpel&&eventEverDone(e);}).map(function(e){
     var farge=itemColor(e.cats||[])||'#B08D7C';
     return{farge:farge,mork:darkHex(farge,0.32),
-      info:e.name+' \u2013 gjennomf\u00f8rt',
+      info:e.name,
       videre:'openEditEvent(\''+q(e.id)+'\')',knapp:'Rediger hendelsen'};
   });
   var alle=unngaSammeFargeNabo(fraRutiner.concat(fraProsjekter,fraHendelser),function(x){return x.farge;});
