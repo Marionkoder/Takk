@@ -10032,16 +10032,19 @@ function vimpelSVG(px,farge,morkFarge,tekst,localFont,tekstFarge){
 function infoPopupOnclick(tekst,klikkKode,knappTekst){
   return'modal={step:\'info\',tekst:\''+q(tekst)+'\',klikk:\''+String(klikkKode).replace(/'/g,"\\'")+'\',knapp:\''+q(knappTekst)+'\'};render()';
 }
+var VIMPEL_PER_BUE=12;
 function vimpelsnorRadHTML(rad){
-  var W=340,H=88;
-  var P0=[18,12],P1=[170,30],P2=[322,12];
+  var W=420,H=76;
+  var P0=[15,10],P1=[210,26],P2=[405,10];
   function punkt(t){
     var mt=1-t;
     return[mt*mt*P0[0]+2*mt*t*P1[0]+t*t*P2[0],mt*mt*P0[1]+2*mt*t*P1[1]+t*t*P2[1]];
   }
-  var TS=[0.16,0.39,0.61,0.84];
-  var pH=46,pW=72*pH/100;
-  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;height:auto;display:block;margin:0 auto" role="img"><title>Vimpelsnor</title>'
+  var TS=[0.05,0.132,0.214,0.295,0.377,0.459,0.541,0.623,0.705,0.786,0.868,0.95];
+  var pH=40,pW=72*pH/100;
+  // Fast pikselbredde, ikke prosent — den skal ligge fast i en horisontalt
+  // scrollbar rad av buer, ikke krympe eller vokse med kortet rundt.
+  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:'+W+'px;height:'+H+'px;flex-shrink:0;display:block" role="img"><title>Vimpelsnor</title>'
     +'<path d="M'+P0[0]+' '+P0[1]+' Q'+P1[0]+' '+P1[1]+' '+P2[0]+' '+P2[1]+'" fill="none" stroke="var(--ballongsnor)" stroke-width="1.6"/>';
   rad.forEach(function(item,i){
     var pt=punkt(TS[i]);
@@ -10111,9 +10114,11 @@ function vimpelsnorHTML(){
   });
   var alle=unngaSammeFargeNabo(fraRutiner.concat(fraProsjekter,fraHendelser),function(x){return x.farge;});
   if(!alle.length)return'';
-  var h='<div class="card" style="padding:16px 10px 14px">';
-  for(var i=0;i<alle.length;i+=4)h+=vimpelsnorRadHTML(alle.slice(i,i+4));
-  h+='</div>';
+  // Én bue rommer tolv. Blir det flere, kommer neste bue ved siden av, ikke
+  // under — du blar bortover for å se den, i stedet for at siden vokser nedover.
+  var h='<div class="card" style="padding:16px 0 14px;overflow-x:auto"><div style="display:flex;gap:22px;padding:0 10px;width:max-content">';
+  for(var i=0;i<alle.length;i+=VIMPEL_PER_BUE)h+=vimpelsnorRadHTML(alle.slice(i,i+VIMPEL_PER_BUE));
+  h+='</div></div>';
   return h;
 }
 
