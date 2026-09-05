@@ -1371,6 +1371,7 @@ function folkViewHTML(){
     return h+'<div class="card"><div class="empty">Denne siden viser alt som h\u00f8rer til hovedkategorien \u00abFolk\u00bb. Opprett en hovedkategori med det navnet under Administrer for \u00e5 ta den i bruk.</div></div>'+katSideSlutt();
   }
   var ids=catIdsUnder(cat);
+  h+=vimpelsnorForKategoriHTML(cat.id);
   var inCat=function(list){return(list||[]).some(function(c){return ids.indexOf(c)>=0;});};
   var bdays=events.filter(function(e){return e.bday;});
 
@@ -1391,7 +1392,6 @@ function folkViewHTML(){
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
   var sky=cloudSectionHTML(counts,true,'folk','Ti på topp',true);
   if(sky)h+=sky;
-  h+=vimpelsnorForKategoriHTML(cat.id);
 
   // Bursdager og planer side om side
   var soon=bdays.filter(function(e){
@@ -1509,6 +1509,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
     return h+'<div class="card"><div class="empty">Denne siden viser alt som h\u00f8rer til hovedkategorien \u00ab'+esc(tittel)+'\u00bb. Opprett en hovedkategori med det navnet under Administrer for \u00e5 ta den i bruk.</div></div>'+katSideSlutt();
   }
   var ids=catIdsUnder(cat);
+  h+=vimpelsnorForKategoriHTML(cat.id);
   var inCat=function(list){return(list||[]).some(function(c){return ids.indexOf(c)>=0;});};
 
   var gs=goals.filter(function(g){return inCat(g.cats);});
@@ -1549,7 +1550,6 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
       +'<div class="card">'+(naere.length?naere.map(evRad).join(''):'<div class="empty">Ingen planer framover.</div>')+'</div>'
     +'</div>'
     +'</div>';
-  h+=vimpelsnorForKategoriHTML(cat.id);
   // Gantt for prosjektene i denne kategorien
   var katRader=ganttRows().filter(function(rad){
     return(rad.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;});
@@ -10037,7 +10037,7 @@ function unngaSammeFargeNabo(liste,fargeAv){
 // fargestyrke i stedet. Bleik ved femti, full kategorifarge ved fem hundre,
 // dypere enn selve kategorifargen ved tusen, så styrken fortsetter å øke
 // selv forbi det rene.
-var STIKKORD_INTENSITET=[[50,0.62],[100,0.46],[150,0.32],[200,0.18],[250,0.06],[500,0],[1000,-0.22]];
+var STIKKORD_INTENSITET=[[20,0.74],[50,0.62],[100,0.46],[150,0.32],[200,0.18],[250,0.06],[500,0],[1000,-0.22]];
 function stikkordFarge(hex,n){
   var f=STIKKORD_INTENSITET[0][1];
   for(var i=0;i<STIKKORD_INTENSITET.length;i++)if(n>=STIKKORD_INTENSITET[i][0])f=STIKKORD_INTENSITET[i][1];
@@ -10068,7 +10068,7 @@ function vimpelsnorHTML(){
   // Ingen overskrift, ingen hashtag-tekst på selve vimpelen — trykk gir
   // forklaringen, med vei videre til stikkordsiden.
   var telling=allTags();
-  var rader=Object.keys(telling).filter(function(t){return telling[t]>=50;})
+  var rader=Object.keys(telling).filter(function(t){return telling[t]>=20;})
     .map(function(t){
       var cid=tagCats[t];
       return stikkordVimpelRad(t,telling[t],(cid&&catColor(cid))||'#B08D7C');
@@ -10076,15 +10076,17 @@ function vimpelsnorHTML(){
     .sort(function(a,b){return nbSort(a.info,b.info);}); // fast rekkefølge før fargespredningen omfordeler
   return vimpelBuerHTML(rader);
 }
-// Samme snor, men bare stikkord tilordnet akkurat denne kategorien — ikke
-// underkategorier med sin egen farge — så alle vimplene på én kategoriside
-// deler fargetone, bare i ulik styrke.
+// Samme snor, men bare stikkord tilordnet denne kategorien ELLER en av dens
+// underkategorier — underkategoristikkord får underkategoriens egen farge,
+// gradert på samme måte, så én kategoriside kan vise mer enn én fargetone
+// om underkategoriene har egne farger.
 function vimpelsnorForKategoriHTML(catId){
-  var grunnfarge=catColor(catId);
-  if(!grunnfarge)return'';
+  if(!catColor(catId))return'';
+  var underIds=cats.filter(function(c){return c.parentId===catId;}).map(function(c){return c.id;});
+  var relevanteIds=[catId].concat(underIds);
   var telling=allTags();
-  var rader=Object.keys(telling).filter(function(t){return telling[t]>=50&&tagCats[t]===catId;})
-    .map(function(t){return stikkordVimpelRad(t,telling[t],grunnfarge);})
+  var rader=Object.keys(telling).filter(function(t){return telling[t]>=20&&relevanteIds.indexOf(tagCats[t])>=0;})
+    .map(function(t){return stikkordVimpelRad(t,telling[t],catColor(tagCats[t]));})
     .sort(function(a,b){return nbSort(a.info,b.info);});
   return vimpelBuerHTML(rader);
 }
@@ -11388,6 +11390,10 @@ function hashtagsViewHTML(){
   var tags=Object.keys(counts);
   if(!tags.length)return h+'<div class="card"><div class="empty">Ingen stikkord enn\u00e5. Legg til stikkord n\u00e5r du skriver innlegg.</div></div>';
   var mains=cats.filter(function(c){return!c.parentId;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  // Fargen er den samme for alle stikkord i en kategori — regnet ut én gang
+  // her i stedet for på nytt for hver eneste stikkord × kategori-kombinasjon,
+  // som med mange stikkord og kategorier fort ble tusenvis av like oppslag.
+  var mainFarge={};mains.forEach(function(mc){mainFarge[mc.id]=catColor(mc.id);});
 
   // Søk og sortering
   h+='<div style="padding:8px 12px 0">'
@@ -11414,15 +11420,17 @@ function hashtagsViewHTML(){
       +'<div class="chips">'
       +'<button class="chip'+(!tagCats[t]?' on':'')+'" onclick="setTagCat(\''+q(t)+'\',\'\')">Ingen</button>'
       +mains.map(function(mc){
-        var on=tagCats[t]===mc.id;var col=catColor(mc.id);
+        var on=tagCats[t]===mc.id;var col=mainFarge[mc.id];
         return'<button class="chip'+(on?' on':'')+'"'+(on&&col?' style="background:'+col+';border-color:'+col+';color:'+textOn(col)+'"':'')+' onclick="setTagCat(\''+q(t)+'\',\''+q(mc.id)+'\')">'+esc(mc.name)+'</button>';
       }).join('')
       +'</div></div>';
   };
-  // Kollapsbar seksjon — åpen som standard, husker tilstand mellom visninger
+  // Kollapsbar seksjon — LUKKET som standard nå. Det tunge rutenettet av
+  // stikkord × kategori-knapper bygges bare for seksjoner du faktisk åpner,
+  // ikke for alle sammen ved hver eneste tegning av siden.
   var seksjon=function(nokkel,tittel,farge,liste){
     if(!liste.length)return'';
-    var apen=!tagKollaps[nokkel];
+    var apen=!!tagKollaps[nokkel];
     return'<div class="sec-title" style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleTagKollaps(\''+q(nokkel)+'\')">'
       +(farge?'<span style="width:11px;height:11px;border-radius:50%;background:'+farge+';display:inline-block;flex-shrink:0"></span>':'')
       +'<span style="flex:1">'+esc(tittel)+' <span style="font-weight:400;color:var(--rose)">\u00b7 '+liste.length+'</span></span>'
@@ -11434,16 +11442,17 @@ function hashtagsViewHTML(){
   var noe=false;
   var frittHTML=seksjon('__fritt','Frittst\u00e5ende gleder','',fritt);
   if(frittHTML){h+=frittHTML;noe=true;}
+  // plassert bygges i samme runde som seksjonene, i stedet for i en egen
+  // ekstra runde over alle stikkord × kategorier etterpå.
+  var plassert={};fritt.forEach(function(t){plassert[t]=1;});
   mains.forEach(function(mc){
     var mine=tags.filter(function(t){return tagCats[t]===mc.id;}).sort(sorter);
-    var s=seksjon(mc.id,mc.name,catColor(mc.id),mine);
+    mine.forEach(function(t){plassert[t]=1;});
+    var s=seksjon(mc.id,mc.name,mainFarge[mc.id],mine);
     if(s){h+=s;noe=true;}
   });
   // Stikkord knyttet til en underkategori, eller til en kategori som er slettet,
   // ville ellers falle utenfor alle seksjonene og bli usynlige
-  var plassert={};
-  fritt.forEach(function(t){plassert[t]=1;});
-  mains.forEach(function(mc){tags.forEach(function(t){if(tagCats[t]===mc.id)plassert[t]=1;});});
   var hjemlose=tags.filter(function(t){return!plassert[t];}).sort(sorter);
   if(hjemlose.length){
     var under=cats.filter(function(c){return c.parentId;});
@@ -11452,7 +11461,7 @@ function hashtagsViewHTML(){
       if(c){var p=cats.find(function(x){return x.id===c.parentId;});return(p?p.name+' / ':'')+c.name;}
       return'kategorien finnes ikke lenger';
     };
-    var apenH=!tagKollaps['__hjemlose'];
+    var apenH=!!tagKollaps['__hjemlose'];
     h+='<div class="sec-title" style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleTagKollaps(\'__hjemlose\')">'
       +'<span style="flex:1">Andre plasseringer <span style="font-weight:400;color:var(--rose)">\u00b7 '+hjemlose.length+'</span></span>'
       +'<span style="color:var(--rose)">'+(apenH?'\u2039':'\u203a')+'</span></div>';
