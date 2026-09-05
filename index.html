@@ -2508,53 +2508,6 @@ function ballongSVG(px,farge){
     +'</svg>';
 }
 
-// ── Ballonghimmel ──────────────────────────────────────────────────────
-// Erstatter mosaikken. Ett stikkord får sin egen ballong når det er brukt
-// 50 ganger i dagboka — ikke før. Fargen kommer fra kategorien stikkordet er
-// tilordnet (respekterer en underkategoris egen farge, om den har en).
-// Størrelsen vokser i faste trinn, aldri jevnt, så en dobling faktisk kjennes.
-var STIKKORD_STORRELSE=[[50,46],[100,60],[150,72],[200,82],[250,91],[500,120],[1000,155]];
-function stikkordBallongStorrelse(n){
-  var s=STIKKORD_STORRELSE[0][1];
-  for(var i=0;i<STIKKORD_STORRELSE.length;i++)if(n>=STIKKORD_STORRELSE[i][0])s=STIKKORD_STORRELSE[i][1];
-  return s;
-}
-// Egen tegning, ikke ballongSVG, fordi denne kan bære teksten selv når det er
-// plass. Teksten er alltid samme lokale enhet som selve ballongen, så den
-// skalerer nøyaktig i takt med størrelsen uten noe eget regnestykke.
-function stikkordBallongSVG(px,farge,tekst,localFont,tekstFarge){
-  var h=px;
-  return'<svg viewBox="0 0 26 38" style="height:'+h+'px;width:auto;flex-shrink:0" aria-hidden="true">'
-    +'<path d="M13 1.6C18.6 1.6 22.6 6.2 22.6 11.9C22.6 18 18.5 24 13 26.6C7.5 24 3.4 18 3.4 11.9C3.4 6.2 7.4 1.6 13 1.6Z" style="fill:'+farge+'"/>'
-    +'<path d="M13 26.6C18.5 24 22.6 18 22.6 11.9C22.6 8.6 21.3 5.7 19.2 3.8C20.3 5.5 20.9 7.6 20.9 9.9C20.9 16 16.8 22 11.3 24.6C10.6 25 10 25.3 13 26.6Z" style="fill:#2A2A2A;opacity:.22"/>'
-    +'<ellipse cx="8.8" cy="8.2" rx="1.7" ry="2.9" transform="rotate(-25 8.8 8.2)" style="fill:#fff;opacity:.4"/>'
-    +'<path d="M11.4 26.2L14.6 26.2L13 29Z" style="fill:'+farge+'"/>'
-    +'<path d="M13 29c0 2.2 2.6 2.6 2.6 4.8 0 1.8-2.2 2.2-2.2 3.4" style="fill:none;stroke:var(--ballongsnor);stroke-width:1;stroke-linecap:round"/>'
-    +(tekst?'<text x="13" y="14" text-anchor="middle" font-size="'+localFont.toFixed(2)+'" fill="'+tekstFarge+'">'+esc(tekst)+'</text>':'')
-    +'</svg>';
-}
-function ballonghimmelHTML(){
-  var telling=allTags();
-  var rader=Object.keys(telling).filter(function(t){return telling[t]>=50;})
-    .map(function(t){
-      var cid=tagCats[t];
-      return{tag:t,n:telling[t],farge:(cid&&catColor(cid))||'#B08D7C'};
-    })
-    .sort(function(a,b){return nbSort(a.tag,b.tag);}); // fast rekkefølge, fritt blandet i størrelse
-  if(!rader.length)return'';
-  // Ingen overskrift, ingen hashtag-tekst — ballongen er nok i seg selv.
-  // Trykk gir forklaringen, med vei videre til stikkordsiden.
-  var h='<div class="card"><div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:16px 14px 12px">';
-  rader.forEach(function(r){
-    var H=stikkordBallongStorrelse(r.n);
-    var info='#'+r.tag+' \u2013 tagget '+r.n+' ganger';
-    h+='<button type="button" style="background:none;border:none;padding:0;cursor:pointer" onclick="'+infoPopupOnclick(info,'goTagAlle(\''+q(r.tag)+'\')','\u00c5pne stikkordsiden')+'">'
-      +stikkordBallongSVG(H,r.farge,null,0,'')
-      +'</button>';
-  });
-  h+='</div></div>';
-  return h;
-}
 // Åpner i ny fane, slik at hovedappen blir stående. Navigerer appen bort fra
 // seg selv i frittstående PWA-modus, har brukeren ingen tilbakeknapp.
 // Sjekker to ting: om fila finnes, og om lagringen faktisk deles. Det siste er
@@ -8003,7 +7956,6 @@ function modalHTML(){
         +'<button class="chip-new" style="margin-top:6px" onclick="addMaintEq()">+ utstyr</button>';
     }
     body='<div class="modal-title">'+(isProjM?(isEditI?'Rediger '+prosjekttypeName(f.subtype).toLowerCase():(f.subtype?'Nytt '+prosjekttypeName(f.subtype).toLowerCase():'Nytt prosjekt')):(isEditI?'Rediger liste':'Ny liste'))+'</div>'
-      +(isProjM&&isEditI?'<button class="icon-btn" style="font-size:12px;margin-bottom:10px'+(invById(f.id)&&invById(f.id).vimpel?';color:var(--red);border-color:var(--red)':'')+'" onclick="toggleProsjektVimpel(\''+q(f.id)+'\')">'+(invById(f.id)&&invById(f.id).vimpel?'\u2691 Trykk for \u00e5 fjerne vimpelfeiring':'\u2690 Trykk for \u00e5 feire med vimpel')+'</button>':'')
       +'<label class="field-lbl">Navn</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="'+(isProjM?'F.eks. Strikke kofte, Pusse opp badet \u2026':'F.eks. Kapselgarderobe, Hyttetur \u2026')+'" oninput="mf().name=this.value;updateSaveBtn()">'
       +(isProjM?'':'<label class="field-lbl">Type</label>'
@@ -8769,7 +8721,6 @@ function modalHTML(){
     var dOpts='<option value=""'+(!f.day?' selected':'')+'>—</option>';
     for(var dd=1;dd<=31;dd++){dOpts+='<option value="'+dd+'"'+(Number(f.day)===dd?' selected':'')+'>'+dd+'.</option>';}
     body='<div class="modal-title">'+(f.memorial?(isEditE?'Rediger minnebursdag':'Ny minnebursdag'):f.bday?(isEditE?'Rediger bursdag':'Ny bursdag'):(isEditE?'Rediger hendelse':'Ny hendelse'))+'</div>'
-      +(isEditE&&!f.bday?'<button class="icon-btn" style="font-size:12px;margin-bottom:10px'+(eventById(f.id)&&eventById(f.id).vimpel?';color:var(--red);border-color:var(--red)':'')+'" onclick="toggleHendelseVimpel(\''+q(f.id)+'\')">'+(eventById(f.id)&&eventById(f.id).vimpel?'\u2691 Trykk for \u00e5 fjerne vimpelfeiring':'\u2690 Trykk for \u00e5 feire med vimpel')+'</button>':'')
       +(f.memorial?'<div class="hint">En minnebursdag markeres p\u00e5 dagen uten alder, gratulasjon eller gaveid\u00e9er. Hashtagger virker som ellers.</div>':'')
       +'<label class="field-lbl">'+(f.bday?'Navn p\u00e5 den som har bursdag':'Hva skjer?')+'</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="'+(f.bday?'F.eks. Jenny':'Beskriv hendelsen …')+'" oninput="mf().name=this.value;updateSaveBtn()">'
@@ -9358,7 +9309,6 @@ function hjemViewHTML(){
   h+=quickLogHTML();
 
   // Takknemlighetsballongene — rett under lagre-knappen på hurtigloggingen
-  h+=ballonghimmelHTML();
 
   // Ferske anerkjennelser (siste 24 timer) — milepæler og prosjekter
   // Påminnelse om kvartalsplanlegging — vises i starten av hvert kvartal til den er gjort
@@ -10002,22 +9952,7 @@ function rapportSamletViewHTML(innebygd){
 // prosjekt som en anerkjennelse (achievements); vimpelen er bare et flagg på
 // den anerkjennelsen — «denne var verdt å henge opp». Bare første hundring per
 // rutine kan flagges, ikke to hundre, tre hundre og så videre.
-// Vimpelen er nå et valg du tar direkte på rutinen eller prosjektet — ikke
-// lenger koblet til en bestemt runding. Enklere, og du kan feire hva du vil,
-// ikke bare det som traff et tall.
 function eventById(id){return events.find(function(e){return e.id===id;});}
-// Samme regel som for prosjekter: det må faktisk ha skjedd, ikke bare være
-// planlagt, før det er noe å feire. For en gjentakende hendelse holder det at
-// den er avhaket minst én gang noensinne — det trenger ikke være akkurat i år.
-function eventEverDone(e){return e.repeat?!!(e.log&&e.log.length):!!e.done;}
-function toggleHendelseVimpel(id){
-  var e=eventById(id);if(!e)return;
-  e.vimpel=!e.vimpel;save();render();
-}
-function toggleProsjektVimpel(id){
-  var iv=invById(id);if(!iv)return;
-  iv.vimpel=!iv.vimpel;save();render();
-}
 function vimpelSVG(px,farge,morkFarge,tekst,localFont,tekstFarge){
   var h=px,w=h*72/100;
   // Samme prinsipp som ballongen: en mørk kile på høyre side for skygge, og
@@ -10096,26 +10031,36 @@ function unngaSammeFargeNabo(liste,fargeAv){
   }
   return ut;
 }
+// Samme sju terskler som ballongene brukte til størrelse — her styrer de
+// fargestyrke i stedet. Bleik ved femti, full kategorifarge ved fem hundre,
+// dypere enn selve kategorifargen ved tusen, så styrken fortsetter å øke
+// selv forbi det rene.
+var STIKKORD_INTENSITET=[[50,0.62],[100,0.46],[150,0.32],[200,0.18],[250,0.06],[500,0],[1000,-0.22]];
+function stikkordFarge(hex,n){
+  var f=STIKKORD_INTENSITET[0][1];
+  for(var i=0;i<STIKKORD_INTENSITET.length;i++)if(n>=STIKKORD_INTENSITET[i][0])f=STIKKORD_INTENSITET[i][1];
+  return f>=0?lysHex(hex,f):darkHex(hex,-f);
+}
 function vimpelsnorHTML(){
-  // Å hake av «feire med vimpel» er et ønske, ikke en garanti — prosjektet må
-  // faktisk være ferdigstilt, og hendelsen må faktisk ha skjedd, før noe
-  // dukker opp her. Krysset alene henger ikke opp noe med det samme.
-  // Rutiner er ikke med her lenger — flamme og totaltall på selve rutine-
-  // radene viser status godt nok uten en egen vimpel i tillegg.
-  // Ingen overskrift, ingen navn under — trykk for å få vite hva vimpelen markerer.
-  var fraProsjekter=alleProsjekter().filter(function(iv){return iv.vimpel&&iv.completedDate;}).map(function(iv){
-    var farge=itemColor((iv.catIds||[]).concat(iv.catId?[iv.catId]:[]))||'#B08D7C';
-    return{farge:farge,mork:darkHex(farge,0.32),
-      info:dispName(iv),
-      videre:'goInventar(\''+q(iv.id)+'\')',knapp:'\u00c5pne prosjektet'};
-  });
-  var fraHendelser=events.filter(function(e){return!e.bday&&e.vimpel&&eventEverDone(e);}).map(function(e){
-    var farge=itemColor(e.cats||[])||'#B08D7C';
-    return{farge:farge,mork:darkHex(farge,0.32),
-      info:e.name,
-      videre:'openEditEvent(\''+q(e.id)+'\')',knapp:'Rediger hendelsen'};
-  });
-  var alle=unngaSammeFargeNabo(fraProsjekter.concat(fraHendelser),function(x){return x.farge;});
+  // Overtatt fra ballonghimmelen: de stikkordene som faktisk gjentar seg mest,
+  // ikke enkelthendelser du velger ut. Appen skal underbygge rutiner og
+  // gjentakelse, og et stikkord brukt over femti ganger ER en gjentakelse.
+  // Ingen overskrift, ingen hashtag-tekst på selve vimpelen — trykk gir
+  // forklaringen, med vei videre til stikkordsiden.
+  var telling=allTags();
+  var alle=unngaSammeFargeNabo(
+    Object.keys(telling).filter(function(t){return telling[t]>=50;})
+      .map(function(t){
+        var cid=tagCats[t];
+        var grunn=(cid&&catColor(cid))||'#B08D7C';
+        var farge=stikkordFarge(grunn,telling[t]);
+        return{farge:farge,mork:darkHex(farge,0.32),
+          info:'#'+t+' \u2013 tagget '+telling[t]+' ganger',
+          videre:'goTagAlle(\''+q(t)+'\')',knapp:'\u00c5pne stikkordsiden'};
+      })
+      .sort(function(a,b){return nbSort(a.info,b.info);}), // fast rekkefølge før fargespredningen omfordeler
+    function(x){return x.farge;}
+  );
   if(!alle.length)return'';
   // Én bue rommer tolv. Blir det flere, kommer neste bue ved siden av, ikke
   // under — du blar bortover for å se den, i stedet for at siden vokser nedover.
