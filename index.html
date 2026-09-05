@@ -2865,6 +2865,23 @@ function personTagsFor(person){
   if(!bd||!bd.personTags)return [];
   return bd.personTags.map(normTag).filter(Boolean);
 }
+// Den andre veien: gitt et stikkord, hvilken person identifiserer det? Uten
+// denne var koblingen bare synlig fra personen, aldri fra stikkordet selv —
+// #jenny ga ingen anelse om at det faktisk var Jenny.
+// Å bare ligge i personTags er ikke nok — den lista kan inneholde stikkord
+// som bare skal SAMLES på personsiden, uten selv å VÆRE personen (torsdags-
+// sjakk hos Jenny er et delt tidsfordriv, ikke et navn på henne). Stikkordet
+// må derfor også begynne med fornavnet, som «jenny» eller «jennya» gjør og
+// «torsdagssjakk» ikke gjør.
+function personForTag(tag){
+  var nt=normTag(tag);
+  return events.find(function(e){
+    if(!e.bday)return false;
+    if(!(e.personTags||[]).some(function(pt){return normTag(pt)===nt;}))return false;
+    var forNavn=normTag((e.name||'').split(' ')[0]);
+    return!!forNavn&&nt.indexOf(forNavn)===0;
+  });
+}
 var view={kind:'hjem',month:curMonth,year:curYear};
 var navHistory=[];
 // Generisk tilbakeknapp: går til den faktiske forrige siden, uansett hvordan
@@ -4146,6 +4163,8 @@ function tagAlleViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">#'+esc(tag)+'</div>'
     +'<div class="view-sub">'+funnet.length+' innlegg'+(hendelser.length?', '+hendelser.length+' hendelse'+(hendelser.length===1?'':'r'):'')+', uansett m\u00e5ned eller kategori.</div>';
+  var person=personForTag(tag);
+  if(person)h+='<div class="card" style="padding:10px 14px;cursor:pointer" onclick="goGavePerson(\''+q(person.name)+'\')"><div class="entry-row" style="padding:0"><div class="entry-body"><div class="entry-text">Dette stikkordet er '+esc(person.name)+'</div><div class="entry-date">\u00c5pne personens side</div></div><span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   if(!funnet.length&&!hendelser.length)return h+'<div class="card"><div class="empty">Ingen innlegg eller hendelser med dette stikkordet.</div></div>';
   h+=tagMonsterHTML(tag);
   if(hendelser.length){
@@ -10057,8 +10076,9 @@ function vimpelBuerHTML(rader){
 }
 function stikkordVimpelRad(t,n,grunnfarge){
   var farge=stikkordFarge(grunnfarge,n);
+  var person=personForTag(t);
   return{farge:farge,mork:darkHex(farge,0.32),
-    info:'#'+t+' \u2013 tagget '+n+' ganger',
+    info:'#'+t+(person?' \u2013 '+person.name:'')+' \u2013 tagget '+n+' ganger',
     videre:'goTagAlle(\''+q(t)+'\')',knapp:'\u00c5pne stikkordsiden'};
 }
 function vimpelsnorHTML(){
