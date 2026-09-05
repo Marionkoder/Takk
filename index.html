@@ -1494,7 +1494,7 @@ function katRutineKnapperHTML(rts){
   var h=rts.map(function(r){
     var m=rutineMengde(r);
     return'<div class="entry-row tett" style="cursor:pointer" onclick="openEditRoutine(\''+q(r.id)+'\')">'
-      +'<div class="entry-body"><div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
+      +'<div class="entry-body"><div class="entry-text">'+rutineFlammeHTML(r)+esc(r.name)+rutineTallHTML(r)+rutineStjerneHTML(r)+'</div>'
       +'<div class="entry-date">'+esc(freqShort(r))
       +(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div></div>'
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
@@ -6856,6 +6856,64 @@ function rutineStjerneMilepael(r){
   for(var i=0;i<mp.length;i++){if(total>=mp[i])naadd=mp[i];else break;}
   return naadd;
 }
+// Ser på de siste tre gangene rutinen SKULLE vært gjort — dagen, uka eller
+// måneden, avhengig av frekvens — og teller hvor mange av dem som faktisk ble
+// gjort. Krever tre reelle perioder bak seg; en helt ny rutine får ingen dom
+// ennå, siden det ikke finnes nok historie å dømme den på.
+function rutineSisteTre(r){
+  var f=r.freq||'monthly',log=r.log||[],perioder=[];
+  if(f==='daily'){
+    var rd=r.days||[],d=new Date(today),vakt=0;
+    while(perioder.length<3&&vakt<3660){
+      vakt++;
+      if(!rd.length||rd.indexOf(dow(d))>=0)perioder.push({key:'d'+isoDate(d)});
+      d.setDate(d.getDate()-1);
+    }
+  } else if(isWeekly(r)){
+    var wd=new Date(today),vakt2=0;
+    while(perioder.length<3&&vakt2<520){
+      vakt2++;
+      var wk=weekNum(wd);
+      var ok=!(f==='odd'&&wk%2===0)&&!(f==='even'&&wk%2===1);
+      if(ok)perioder.push({key:'w'+weekYear(wd)+'-'+pad(wk),ukePrefiks:true});
+      wd.setDate(wd.getDate()-7);
+    }
+  } else if(f==='yearly'){
+    var y=curYear,vakt3=0;
+    while(perioder.length<3&&vakt3<80){vakt3++;perioder.push({key:'y'+y});y--;}
+  } else {
+    var rm=r.months||[],my=curYear,mm=curMonth,vakt4=0;
+    while(perioder.length<3&&vakt4<960){
+      vakt4++;
+      if(!rm.length||rm.indexOf(mm)>=0)perioder.push({key:my+'-'+pad(mm)});
+      mm--;if(mm<1){mm=12;my--;}
+    }
+  }
+  if(perioder.length<3)return null;
+  var gjort=0;
+  perioder.forEach(function(p){
+    var funnet=p.ukePrefiks
+      ?log.some(function(l){return l===p.key||l.indexOf(p.key+'#')===0;})
+      :log.indexOf(p.key)>=0;
+    if(funnet)gjort++;
+  });
+  return{gjort:gjort,mulige:3};
+}
+// Flammen tennes når rutinen er gjort minst to av de tre siste gangene den
+// skulle vært gjort — et signal om at dette går bra akkurat nå, uansett om
+// den er daglig, ukentlig eller månedlig.
+function rutineIIld(r){
+  var s=rutineSisteTre(r);
+  return!!(s&&s.gjort>=2);
+}
+function rutineFlammeHTML(r){
+  return rutineIIld(r)?'<span style="margin-right:3px" title="Gjort minst to av de tre siste gangene">\ud83d\udd25</span>':'';
+}
+// Det faktiske totalantallet, alltid synlig — ikke bare ved en runding slik
+// stjerna viser.
+function rutineTallHTML(r){
+  return' <span style="font-size:11px;color:var(--muted);font-weight:400">'+rutineTotalTelling(r)+'</span>';
+}
 function rutineStjerneHTML(r){
   var mp=rutineStjerneMilepael(r);
   if(!mp)return'';
@@ -6873,7 +6931,7 @@ function rutineDetaljViewHTML(){
   var koblede=entriesForRoutine(r.id);
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div style="display:flex;align-items:center;gap:8px;padding:2px 12px 0">'
-    +'<div class="view-title" style="padding:0;flex:1">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
+    +'<div class="view-title" style="padding:0;flex:1">'+rutineFlammeHTML(r)+esc(r.name)+rutineTallHTML(r)+rutineStjerneHTML(r)+'</div>'
     +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="openEditRoutine(\''+q(r.id)+'\')">\u270e</button>'
     +'</div>'
     +'<div class="view-sub">'+esc(freqShort(r))+(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div>';
@@ -8649,8 +8707,7 @@ function modalHTML(){
       return'<button class="chip'+((f.months||[]).includes(i+1)?' on':'')+'" onclick="toggleFormMonth('+(i+1)+')">'+m.slice(0,3)+'</button>';
     }).join('');
     body='<div class="modal-title">'+(isEditR?'Rediger rutine':'Ny rutine')+'</div>'
-      +(isEditR?'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Gjennomf\u00f8rt totalt: <b style="color:var(--ink)">'+rutineTotalTelling(routineById(f.id))+'</b> ganger</div>'
-        +'<button class="icon-btn" style="font-size:12px;margin-bottom:10px'+(routineById(f.id)&&routineById(f.id).vimpel?';color:var(--red);border-color:var(--red)':'')+'" onclick="toggleRutineVimpel(\''+q(f.id)+'\')">'+(routineById(f.id)&&routineById(f.id).vimpel?'\u2691 Trykk for \u00e5 fjerne vimpelfeiring':'\u2690 Trykk for \u00e5 feire med vimpel')+'</button>':'')
+      +(isEditR?'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Gjennomf\u00f8rt totalt: <b style="color:var(--ink)">'+rutineTotalTelling(routineById(f.id))+'</b> ganger</div>':'')
       +'<label class="field-lbl">Hva skal gjøres?</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="Beskriv rutinen …" oninput="mf().name=this.value;updateSaveBtn()">'
       +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt</span></label>'
@@ -9948,10 +10005,6 @@ function rapportSamletViewHTML(innebygd){
 // Vimpelen er nå et valg du tar direkte på rutinen eller prosjektet — ikke
 // lenger koblet til en bestemt runding. Enklere, og du kan feire hva du vil,
 // ikke bare det som traff et tall.
-function toggleRutineVimpel(id){
-  var r=routineById(id);if(!r)return;
-  r.vimpel=!r.vimpel;save();render();
-}
 function eventById(id){return events.find(function(e){return e.id===id;});}
 // Samme regel som for prosjekter: det må faktisk ha skjedd, ikke bare være
 // planlagt, før det er noe å feire. For en gjentakende hendelse holder det at
@@ -10018,7 +10071,6 @@ function vimpelsnorRadHTML(rad){
   s+='</svg>';
   return s;
 }
-var VIMPEL_RUTINE_TERSKEL=20;
 // Sprer like farger fra hverandre der det er mulig — plukker grådig fra den
 // største gjenværende fargegruppa som ikke er samme farge som forrige. Er en
 // farge i flertall (mer enn halvparten), blir noen naboer like uansett; da
@@ -10045,17 +10097,12 @@ function unngaSammeFargeNabo(liste,fargeAv){
   return ut;
 }
 function vimpelsnorHTML(){
-  // Å hake av «feire med vimpel» er et ønske, ikke en garanti — rutinen må
-  // faktisk ha nådd terskelen, prosjektet må faktisk være ferdigstilt, og
-  // hendelsen må faktisk ha skjedd, før noe dukker opp her. Krysset alene
-  // henger ikke opp noe med det samme.
+  // Å hake av «feire med vimpel» er et ønske, ikke en garanti — prosjektet må
+  // faktisk være ferdigstilt, og hendelsen må faktisk ha skjedd, før noe
+  // dukker opp her. Krysset alene henger ikke opp noe med det samme.
+  // Rutiner er ikke med her lenger — flamme og totaltall på selve rutine-
+  // radene viser status godt nok uten en egen vimpel i tillegg.
   // Ingen overskrift, ingen navn under — trykk for å få vite hva vimpelen markerer.
-  var fraRutiner=routines.filter(function(r){return r.vimpel&&rutineTotalTelling(r)>=VIMPEL_RUTINE_TERSKEL;}).map(function(r){
-    var farge=itemColor(r.cats||[])||'#B08D7C';
-    return{farge:farge,mork:darkHex(farge,0.32),
-      info:r.name+' \u2013 gjort '+rutineTotalTelling(r)+' ganger',
-      videre:'openEditRoutine(\''+q(r.id)+'\')',knapp:'Rediger rutinen'};
-  });
   var fraProsjekter=alleProsjekter().filter(function(iv){return iv.vimpel&&iv.completedDate;}).map(function(iv){
     var farge=itemColor((iv.catIds||[]).concat(iv.catId?[iv.catId]:[]))||'#B08D7C';
     return{farge:farge,mork:darkHex(farge,0.32),
@@ -10068,7 +10115,7 @@ function vimpelsnorHTML(){
       info:e.name,
       videre:'openEditEvent(\''+q(e.id)+'\')',knapp:'Rediger hendelsen'};
   });
-  var alle=unngaSammeFargeNabo(fraRutiner.concat(fraProsjekter,fraHendelser),function(x){return x.farge;});
+  var alle=unngaSammeFargeNabo(fraProsjekter.concat(fraHendelser),function(x){return x.farge;});
   if(!alle.length)return'';
   // Én bue rommer tolv. Blir det flere, kommer neste bue ved siden av, ikke
   // under — du blar bortover for å se den, i stedet for at siden vokser nedover.
@@ -11815,7 +11862,7 @@ function planleggingViewHTML(){
       utenR.forEach(function(r){
         var mc=mainCatOf(r.cats);
         h+='<div class="entry-row" style="cursor:pointer" onclick="goKategoriside(\''+q(mc?mc.id:'')+'\')"><div class="entry-body">'
-          +'<div class="entry-text">'+esc(r.name)+rutineStjerneHTML(r)+'</div>'
+          +'<div class="entry-text">'+rutineFlammeHTML(r)+esc(r.name)+rutineTallHTML(r)+rutineStjerneHTML(r)+'</div>'
           +ankerLinjeHTML(r)
           +'</div><span style="align-self:center;color:var(--rose)">\u203a</span></div>';
       });
