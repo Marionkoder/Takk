@@ -436,7 +436,6 @@ function bdayForPerson(person){return events.find(function(e){return e.bday&&(e.
 var DEFAULT_UNITS=['bokser','dl','g','kg','kroner','liter','ml','n\u00f8ster','stk'];
 var customUnits=[];
 var weeklyAvailableHours=0;
-var soundOn=true;
 // Hvilke kategorisider som vises i menyen. Ny bruker starter med Folk og Utstyr;
 // resten skrus på ved behov under Innstillinger → Personlig.
 var KAT_SIDER=[
@@ -473,45 +472,6 @@ function sidebarKinds(n){
 }
 var showMens=true;
 var mensManuellSyklus=null,mensManuellVarighet=null;
-// Original seiersfanfare — syntetisert, ingen lydfiler. Stigende treklang som lander
-// på oktaven, med en varm messinglignende klang (sagtann + mykt filter).
-var _audioCtx=null;
-function audioCtx(){
-  if(!_audioCtx){
-    var AC=window.AudioContext||window.webkitAudioContext;
-    if(!AC)return null;
-    _audioCtx=new AC();
-  }
-  if(_audioCtx.state==='suspended')_audioCtx.resume();
-  return _audioCtx;
-}
-function playTone(ctx,freq,startAt,dur,gainPeak){
-  var osc=ctx.createOscillator(),gain=ctx.createGain(),filt=ctx.createBiquadFilter();
-  osc.type='sawtooth';
-  osc.frequency.setValueAtTime(freq,startAt);
-  filt.type='lowpass';
-  filt.frequency.setValueAtTime(2200,startAt);
-  filt.Q.setValueAtTime(0.7,startAt);
-  gain.gain.setValueAtTime(0.0001,startAt);
-  gain.gain.exponentialRampToValueAtTime(gainPeak,startAt+0.035);
-  gain.gain.exponentialRampToValueAtTime(0.0001,startAt+dur);
-  osc.connect(filt);filt.connect(gain);gain.connect(ctx.destination);
-  osc.start(startAt);osc.stop(startAt+dur+0.05);
-}
-function playFanfare(){
-  if(!soundOn)return;
-  var ctx=audioCtx();if(!ctx)return;
-  var t=ctx.currentTime+0.03;
-  // C – E – G – C: klassisk oppadgående figur, siste tone holdes lenger
-  var notes=[[523.25,0.00,0.20],[659.25,0.13,0.20],[783.99,0.26,0.22],[1046.50,0.42,0.85]];
-  notes.forEach(function(n,i){
-    playTone(ctx,n[0],t+n[1],n[2],i===3?0.22:0.16);
-    // Oktav under gir fylde uten å bli skarpt
-    playTone(ctx,n[0]/2,t+n[1],n[2],i===3?0.10:0.07);
-  });
-  // Kvinten legges til på sluttakkorden så den klinger som en akkord, ikke en enkelttone
-  playTone(ctx,1567.98,t+0.42,0.80,0.07);
-}
 var places={l1:[],l2:[],l3:[]};
 var achievements=[];
 var achDismissed=[];
@@ -2998,7 +2958,6 @@ function load(){
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
   try{weeklyAvailableHours=Number(localStorage.getItem(SK+'_availhours'))||0;}catch(e){weeklyAvailableHours=0;}
-  try{soundOn=localStorage.getItem(SK+'_sound')!=='0';}catch(e){soundOn=true;}
   try{var tp=Number(localStorage.getItem(SK+'_taktplan'));if(tp||tp===0)kanbanTakPlan=tp;}catch(e){}
   try{visTestBursdag=localStorage.getItem(SK+'_testbursdag')==='1';}catch(e){}
   try{visTest17Mai=localStorage.getItem(SK+'_test17mai')==='1';}catch(e){}
@@ -4075,7 +4034,6 @@ function save(){
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
   try{localStorage.setItem(SK+'_availhours',String(weeklyAvailableHours));}catch(e){}
-  try{localStorage.setItem(SK+'_sound',soundOn?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_taktplan',String(kanbanTakPlan));}catch(e){}
   try{localStorage.setItem(SK+'_testbursdag',visTestBursdag?'1':'0');}catch(e){}
   try{localStorage.setItem(SK+'_test17mai',visTest17Mai?'1':'0');}catch(e){}
@@ -4677,7 +4635,6 @@ function saveEditResult(){
   (r.milestones||[]).forEach(function(m){if(m.done)addAchievement('milestone','ms:'+r.id+':'+m.id,m.name,[r.valueId],catsForResult(r),r.name);});
   if(r.achieved&&!wasAchieved){
     addAchievement('result','res:'+r.id,r.name,[r.valueId],catsForResult(r),'');
-    playFanfare();
     if((r.equipmentIds||[]).length)markEquipmentUsed(r.equipmentIds,r.name+' '+MND_FULL[r.month-1]+' '+r.year);
   }
   r.forutsetninger=(f.forutsetninger||'').trim();r.risikoer=(f.risikoer||'').trim();
@@ -6155,7 +6112,6 @@ function toggleProjectDone(invId){
   inv.completedDate=isoDate(today);
   (inv.resultIds||[]).forEach(function(rid){settResultatOppnadd(resultById(rid),true,inv.completedDate);});
   addAchievement('project','proj:'+inv.id,inv.name,inv.goalIds||[],inv.catId?[inv.catId]:[],'');
-  playFanfare();
   var ut=findFixedList('utstyr');
   if(ut){
     var usedIds=(inv.items||[]).map(function(x){return x.syncId;}).filter(function(sid){return sid&&(ut.items||[]).some(function(m){return m.id===sid;});});
@@ -11349,14 +11305,6 @@ function innstillingerViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Administrer</div>'
     +'<div class="entry-date">kategorier og utstyrstyper, plassering, hashtagger</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
-  h+='<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1"><div class="entry-text">Lydeffekter</div>'
-    +'<div class="entry-date">seiersfanfare n\u00e5r et prosjekt fullf\u00f8res</div></div>'
-    +'<button class="chip'+(soundOn?' on':'')+'" onclick="soundOn=!soundOn;save();if(soundOn)playFanfare();render()">'+(soundOn?'P\u00e5':'Av')+'</button>'
-    +'</div>'
-    +(soundOn?'<button class="icon-btn" style="font-size:11px;margin-top:8px" onclick="playFanfare()">Spill av</button>':'')
-    +'</div>';
   var hasPin=!!pinData();
   h+='<div class="card"><div class="entry-row" style="cursor:pointer" onclick="openPinSetup()">'
     +'<div class="entry-body"><div class="entry-text">PIN-l\u00e5s</div>'
@@ -11413,7 +11361,15 @@ function frittTagCloudHTML(){
   return inlineCloudHTML(counts,'fritt');
 }
 var tagSok='',tagSort='freq',tagKollaps={};
-function setTagSok(v){tagSok=v;render();}
+// Hvert tastetrykk bygde om hele stikkordlista — én rad per stikkord, én
+// knapp per hovedkategori i hver rad. Med mange stikkord ble det tungt å
+// skrive i søkefeltet. Venter til du faktisk stopper å skrive.
+var _tagSokTimer=null;
+function setTagSok(v){
+  tagSok=v;
+  clearTimeout(_tagSokTimer);
+  _tagSokTimer=setTimeout(render,180);
+}
 function toggleTagKollaps(k){tagKollaps[k]=!tagKollaps[k];render();}
 function hashtagsViewHTML(){
   var h='<div class="view-sub" style="padding-top:8px">Knytt hvert stikkord til en kategori. To personer med samme fornavn kan for eksempel tagges med fullt navn eller som Jenny A. og Jenny N.</div>';
