@@ -1391,6 +1391,7 @@ function folkViewHTML(){
   entries.forEach(function(e){(e.tags||[]).forEach(function(t){if(counts.hasOwnProperty(t))counts[t]++;});});
   var sky=cloudSectionHTML(counts,true,'folk','Ti på topp',true);
   if(sky)h+=sky;
+  h+=vimpelsnorForKategoriHTML(cat.id);
 
   // Bursdager og planer side om side
   var soon=bdays.filter(function(e){
@@ -1548,6 +1549,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
       +'<div class="card">'+(naere.length?naere.map(evRad).join(''):'<div class="empty">Ingen planer framover.</div>')+'</div>'
     +'</div>'
     +'</div>';
+  h+=vimpelsnorForKategoriHTML(cat.id);
   // Gantt for prosjektene i denne kategorien
   var katRader=ganttRows().filter(function(rad){
     return(rad.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;});
@@ -10041,26 +10043,10 @@ function stikkordFarge(hex,n){
   for(var i=0;i<STIKKORD_INTENSITET.length;i++)if(n>=STIKKORD_INTENSITET[i][0])f=STIKKORD_INTENSITET[i][1];
   return f>=0?lysHex(hex,f):darkHex(hex,-f);
 }
-function vimpelsnorHTML(){
-  // Overtatt fra ballonghimmelen: de stikkordene som faktisk gjentar seg mest,
-  // ikke enkelthendelser du velger ut. Appen skal underbygge rutiner og
-  // gjentakelse, og et stikkord brukt over femti ganger ER en gjentakelse.
-  // Ingen overskrift, ingen hashtag-tekst på selve vimpelen — trykk gir
-  // forklaringen, med vei videre til stikkordsiden.
-  var telling=allTags();
-  var alle=unngaSammeFargeNabo(
-    Object.keys(telling).filter(function(t){return telling[t]>=50;})
-      .map(function(t){
-        var cid=tagCats[t];
-        var grunn=(cid&&catColor(cid))||'#B08D7C';
-        var farge=stikkordFarge(grunn,telling[t]);
-        return{farge:farge,mork:darkHex(farge,0.32),
-          info:'#'+t+' \u2013 tagget '+telling[t]+' ganger',
-          videre:'goTagAlle(\''+q(t)+'\')',knapp:'\u00c5pne stikkordsiden'};
-      })
-      .sort(function(a,b){return nbSort(a.info,b.info);}), // fast rekkefølge før fargespredningen omfordeler
-    function(x){return x.farge;}
-  );
+// Deles av forsidas snor og hver kategoriside sin egen — bare radene ulikt
+// filtrert, selve bue-oppdelingen og fargespredningen er felles.
+function vimpelBuerHTML(rader){
+  var alle=unngaSammeFargeNabo(rader,function(x){return x.farge;});
   if(!alle.length)return'';
   // Én bue rommer tolv. Blir det flere, kommer neste bue ved siden av, ikke
   // under — du blar bortover for å se den, i stedet for at siden vokser nedover.
@@ -10068,6 +10054,39 @@ function vimpelsnorHTML(){
   for(var i=0;i<alle.length;i+=VIMPEL_PER_BUE)h+=vimpelsnorRadHTML(alle.slice(i,i+VIMPEL_PER_BUE));
   h+='</div></div>';
   return h;
+}
+function stikkordVimpelRad(t,n,grunnfarge){
+  var farge=stikkordFarge(grunnfarge,n);
+  return{farge:farge,mork:darkHex(farge,0.32),
+    info:'#'+t+' \u2013 tagget '+n+' ganger',
+    videre:'goTagAlle(\''+q(t)+'\')',knapp:'\u00c5pne stikkordsiden'};
+}
+function vimpelsnorHTML(){
+  // De stikkordene som faktisk gjentar seg mest, ikke enkelthendelser du
+  // velger ut. Appen skal underbygge rutiner og gjentakelse, og et stikkord
+  // brukt over femti ganger ER en gjentakelse.
+  // Ingen overskrift, ingen hashtag-tekst på selve vimpelen — trykk gir
+  // forklaringen, med vei videre til stikkordsiden.
+  var telling=allTags();
+  var rader=Object.keys(telling).filter(function(t){return telling[t]>=50;})
+    .map(function(t){
+      var cid=tagCats[t];
+      return stikkordVimpelRad(t,telling[t],(cid&&catColor(cid))||'#B08D7C');
+    })
+    .sort(function(a,b){return nbSort(a.info,b.info);}); // fast rekkefølge før fargespredningen omfordeler
+  return vimpelBuerHTML(rader);
+}
+// Samme snor, men bare stikkord tilordnet akkurat denne kategorien — ikke
+// underkategorier med sin egen farge — så alle vimplene på én kategoriside
+// deler fargetone, bare i ulik styrke.
+function vimpelsnorForKategoriHTML(catId){
+  var grunnfarge=catColor(catId);
+  if(!grunnfarge)return'';
+  var telling=allTags();
+  var rader=Object.keys(telling).filter(function(t){return telling[t]>=50&&tagCats[t]===catId;})
+    .map(function(t){return stikkordVimpelRad(t,telling[t],grunnfarge);})
+    .sort(function(a,b){return nbSort(a.info,b.info);});
+  return vimpelBuerHTML(rader);
 }
 
 function oppsummeringViewHTML(){
