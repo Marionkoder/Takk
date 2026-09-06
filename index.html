@@ -9390,7 +9390,7 @@ function hjemViewHTML(){
       var d=daysToNextBday(e);
       var nAge=bdayNextAge(e);
       var round=isRoundBdayNext(e);
-      h+='<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;align-items:center">'
+      h+='<div class="entry-row'+(round?' confetti round-bday':'')+'" style="position:relative;align-items:center;cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
         +(round?confettiHTML():'')
         +'<span style="flex-shrink:0;display:flex;align-items:center">'+personBallongSVG(e.name,34)+'</span>'
         +'<div class="entry-body"><div class="entry-text">'+esc(e.name)
