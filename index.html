@@ -34,7 +34,7 @@
   --blaa:#87A7BC;--blaa-skygge:#3E7C96;--ballongsnor:#B08D7C;--lv1:#7A2E28;--lv2:#9C3D2E;--lv3:#BF5638;--lv4:#E07348;--lv5:#FF9466;--lv6:#C68A1E;--lv7:#4E7B8C;
   --font:"Nunito","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
-body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;min-height:100vh}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;min-height:100vh;overflow-wrap:break-word;-webkit-hyphens:auto;-ms-hyphens:auto;hyphens:auto}
 button,.chip,.icon-btn,.cb-item,.inp,select,textarea{touch-action:manipulation}
 .pin-bg{touch-action:manipulation}
 
@@ -155,7 +155,7 @@ body.spesialdag-bg-17mai{--bg:#5B6E85}
 .catbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 12px}
 .cat-box{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:10px;padding:5px 8px;min-width:0}
 .cb-hd{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:1px}
-.cb-item{display:block;width:100%;text-align:left;background:none;border:none;font-family:inherit;font-size:12px;line-height:1.3;color:var(--ink);padding:1px 0;cursor:pointer;border-radius:4px}
+.cb-item{display:block;width:100%;text-align:left;background:none;border:none;font-family:inherit;font-size:12px;line-height:1.3;color:var(--ink);padding:1px 0;cursor:pointer;border-radius:4px;overflow-wrap:break-word;-webkit-hyphens:auto;-ms-hyphens:auto;hyphens:auto}
 .cb-item .o{color:var(--rose)}
 .kal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px}
 .mm{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 6px;cursor:pointer;font-family:inherit;text-align:left;color:var(--ink)}
@@ -9029,6 +9029,11 @@ function routineTimeLogRowsHTML(items){
     }).join('')+'</div>';
 }
 function catBoxesHTML(items){
+  // Et ord som «Røykvarslere/brannslukningsapparat» har ingen mellomrom å
+  // bryte på, og en skråstrek er ikke i seg selv et bruddpunkt for
+  // nettleseren — den lar heller teksten flyte utenfor boksen. <wbr> rett
+  // etter hver skråstrek gir et foretrukket sted å bryte, uten å tvinge det.
+  var medBrytpunkt=function(txt){return esc(txt).replace(/\//g,'/<wbr>');};
   if(!items.length)return'';
   var groups={},order=[];
   items.forEach(function(it){
@@ -9050,13 +9055,13 @@ function catBoxesHTML(items){
         if(it.done){
           // Nettopp haket av — kort respons i kategoriens farge
           var nettopp=it.key&&recentDone[it.key];
-          return'<button class="cb-item'+(nettopp?' rutine-ok':'')+'" style="opacity:.5'+(nettopp&&col?';--ok-farge:'+col:'')+'" onclick="'+it.click+'"><span style="color:var(--red)">\u2713</span> <span style="text-decoration:line-through">'+esc(it.label)+'</span>'
+          return'<button class="cb-item'+(nettopp?' rutine-ok':'')+'" style="opacity:.5'+(nettopp&&col?';--ok-farge:'+col:'')+'" onclick="'+it.click+'"><span style="color:var(--red)">\u2713</span> <span style="text-decoration:line-through">'+medBrytpunkt(it.label)+'</span>'
             +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')
             +(it.minsteGjort?' <span style="color:var(--muted);font-size:10px">(minsteversjon)</span>':'')+'</button>';
         }
         // Ankret rutine hvis anker nettopp ble haket av: «nå er det din tur»
         var klar=it.nesteUt?' style="box-shadow:inset 0 0 0 1.5px var(--red)"':'';
-        return'<button class="cb-item"'+klar+' onclick="'+it.click+'"><span class="o">\u25cb</span> '+esc(it.label)
+        return'<button class="cb-item"'+klar+' onclick="'+it.click+'"><span class="o">\u25cb</span> '+medBrytpunkt(it.label)
           +(it.sub?' <span style="color:var(--muted);font-size:10px">'+esc(it.sub)+'</span>':'')
           +(it.anker?'<span style="display:block;color:var(--muted);font-size:10px">'+esc(it.anker)+'</span>':'')
           +'</button>'
