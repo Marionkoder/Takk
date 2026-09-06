@@ -4895,7 +4895,11 @@ function gavePersonViewHTML(){
     }
   }
 
-  // Takknemlig for — innlegg som handler om personen (via valgte hashtagger)
+  h+=personMonsterHTML(pn);
+
+  // Takknemlig for — innlegg som handler om personen (via valgte hashtagger).
+  // Helt nederst, med vilje: stikkordene som ofte dukker opp sammen med
+  // personen sier noe raskt, dagboksnotatene er det som tar tid å lese.
   var pTags2=personTagsFor(pn);
   var pEntries=entriesForPerson(pn);
   h+='<div class="sec-title">Takknemlig for</div>';
@@ -4906,8 +4910,6 @@ function gavePersonViewHTML(){
   } else {
     h+='<div class="card">'+pEntries.map(entryRowHTML).join('')+'</div>';
   }
-
-  h+=personMonsterHTML(pn);
 
   return h;
 }
