@@ -10061,7 +10061,7 @@ function unngaSammeFargeNabo(liste,fargeAv){
 // fargestyrke i stedet. Bleik ved femti, full kategorifarge ved fem hundre,
 // dypere enn selve kategorifargen ved tusen, så styrken fortsetter å øke
 // selv forbi det rene.
-var STIKKORD_INTENSITET=[[20,0.74],[50,0.62],[100,0.46],[150,0.32],[200,0.18],[250,0.06],[500,0],[1000,-0.22]];
+var STIKKORD_INTENSITET=[[20,0.52],[50,0.38],[100,0.26],[150,0.16],[200,0.08],[250,0.02],[500,0],[1000,-0.22]];
 function stikkordFarge(hex,n){
   var f=STIKKORD_INTENSITET[0][1];
   for(var i=0;i<STIKKORD_INTENSITET.length;i++)if(n>=STIKKORD_INTENSITET[i][0])f=STIKKORD_INTENSITET[i][1];
