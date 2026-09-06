@@ -4050,7 +4050,14 @@ function goPlanlegging(){view={kind:'planlegging'};drawerOpen=false;render();}
 // alltid her, og ser ALLE innlegg merket med det, uansett måned eller kategori.
 // Det var nettopp fraværet av dette — flere ulike, sm\u00e5 filtreringer spredt utover
 // forskjellige sider — som gjorde at innlegg kunne se ut som de manglet enkelte steder.
-function goTagAlle(tag){view={kind:'tagalle',tag:tag};drawerOpen=false;render();}
+function goTagAlle(tag){
+  // Er stikkordet en persons eget navn, går vi rett til personsida i stedet
+  // for den generiske stikkordsida — den viser allerede gaver, hendelser og
+  // innlegg samlet, rikere enn to sider som bare pekte på hverandre.
+  var person=personForTag(tag);
+  if(person){goGavePerson(person.name);return;}
+  view={kind:'tagalle',tag:tag};drawerOpen=false;render();
+}
 // Mønsteranalyse for et stikkord: hva henger sammen med det, og er det faktisk
 // uvanlig ofte — ikke bare mye, siden noe kan være mye brukt overalt uten at det
 // sier noe spesielt om akkurat dette stikkordet. Styrke = andel blant de taggede
@@ -4163,8 +4170,6 @@ function tagAlleViewHTML(){
   var h='<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">#'+esc(tag)+'</div>'
     +'<div class="view-sub">'+funnet.length+' innlegg'+(hendelser.length?', '+hendelser.length+' hendelse'+(hendelser.length===1?'':'r'):'')+', uansett m\u00e5ned eller kategori.</div>';
-  var person=personForTag(tag);
-  if(person)h+='<div class="card" style="padding:10px 14px;cursor:pointer" onclick="goGavePerson(\''+q(person.name)+'\')"><div class="entry-row" style="padding:0"><div class="entry-body"><div class="entry-text">Dette stikkordet er '+esc(person.name)+'</div><div class="entry-date">\u00c5pne personens side</div></div><span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
   if(!funnet.length&&!hendelser.length)return h+'<div class="card"><div class="empty">Ingen innlegg eller hendelser med dette stikkordet.</div></div>';
   h+=tagMonsterHTML(tag);
   if(hendelser.length){
