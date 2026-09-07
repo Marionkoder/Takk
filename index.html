@@ -10123,6 +10123,52 @@ function vimpelsnorForKategoriHTML(catId){
   return vimpelBuerHTML(rader);
 }
 
+// Samme regnestykke som «Dukker ofte opp sammen med», bare uten et fast
+// startpunkt — går gjennom hele dagboka og finner selv hvilke PAR av stikkord
+// som opptrer sammen langt oftere enn tilfeldig, i stedet for at du må velge
+// et stikkord først for å se hva som henger sammen med akkurat det.
+// Regnes over deler (bolker), ikke hele innlegg, av samme grunn som ellers:
+// et innlegg om «tur med Jenny» og «operaen med Knut» skal ikke late som
+// Jenny og operaen hører sammen.
+function stikkordParHTML(){
+  var alle=[];
+  entries.forEach(function(e){bolkerFra(e).forEach(function(b){alle.push(b);});});
+  var totalN=alle.length;
+  var h='<div class="sec-title">Stikkord som opptrer sammen</div>'
+    +'<div class="hint" style="padding:0 12px 8px">Par som dukker opp sammen langt oftere enn tilfeldig skulle tilsi, regnet ut fra hvor vanlig hvert stikkord er for seg selv. Krever minst tre delte forekomster f\u00f8r noe regnes som et m\u00f8nster, ikke st\u00f8y.</div>';
+  if(totalN<8){
+    h+='<div class="card"><div class="empty">For lite \u00e5 gå p\u00e5 ennå \u2014 dukker opp etter hvert som du skriver mer.</div></div>';
+    return h;
+  }
+  var solo={},par={};
+  alle.forEach(function(b){
+    var tags=(b.tags||[]).slice().sort();
+    tags.forEach(function(t){solo[t]=(solo[t]||0)+1;});
+    for(var i=0;i<tags.length;i++)for(var j=i+1;j<tags.length;j++){
+      var key=tags[i]+'\u0001'+tags[j];
+      par[key]=(par[key]||0)+1;
+    }
+  });
+  var rader=Object.keys(par).map(function(key){
+    var deler=key.split('\u0001'),a=deler[0],b2=deler[1];
+    var sammen=par[key];
+    var forventet=(solo[a]*solo[b2])/totalN;
+    var styrke=forventet>0?sammen/forventet:null;
+    return{a:a,b:b2,sammen:sammen,styrke:styrke};
+  }).filter(function(x){return x.sammen>=3&&x.styrke!==null&&x.styrke>=1.5;})
+    .sort(function(a,b){return(b.styrke-a.styrke)||(b.sammen-a.sammen);})
+    .slice(0,10);
+  if(!rader.length){
+    h+='<div class="card"><div class="empty">Ingen tydelige par ennå.</div></div>';
+    return h;
+  }
+  h+='<div class="card">'+rader.map(function(x){
+    return'<div class="entry-row tett"><div class="entry-body" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">'+tagPillHTML(x.a)+'<span style="color:var(--muted)">+</span>'+tagPillHTML(x.b)+'</div>'
+      +'<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--muted)">'+x.sammen+' ganger</div>'
+      +'<div style="font-size:11px;color:var(--red)">\u00d7'+x.styrke.toFixed(1)+' vanligere enn tilfeldig</div></div></div>';
+  }).join('')+'</div>';
+  return h;
+}
 function oppsummeringViewHTML(){
   var h='';
   var sorted=entries.slice().sort(function(a,b){return a.date<b.date?-1:1;});
@@ -10138,6 +10184,8 @@ function oppsummeringViewHTML(){
   } else {
     h+=cloud;
   }
+
+  h+=stikkordParHTML();
 
   // Kategorier etter hyppighet
   var mains=cats.filter(function(c){return!c.parentId;});
