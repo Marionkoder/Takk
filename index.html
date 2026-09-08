@@ -9382,7 +9382,7 @@ function hjemViewHTML(){
       +'<div style="font-size:13px;color:var(--muted);cursor:pointer" onclick="goGavePerson(\''+q(e.name)+'\')">'
       +(personTagsFor(e.name).length
         ? (cnt>0?'Du har merket '+cnt+' innlegg i takknemlighetsboka med '+esc(e.name)+' i året som har gått.'
-                :'Du har ikke merket noen innlegg med '+esc(e.name)+' i året som har gått.')
+                :'Ingen innlegg med '+esc(e.name)+' ennå i år \u2014 kanskje verdt \u00e5 skrive noe i dag?')
         :'Knytt en hashtagg til '+esc(e.name)+' for å telle takknemlighet gjennom året.')
       +' \u203a</div>'
       +'</div></div>'
@@ -10135,7 +10135,7 @@ function stikkordParHTML(){
   entries.forEach(function(e){bolkerFra(e).forEach(function(b){alle.push(b);});});
   var totalN=alle.length;
   var h='<div class="sec-title">Stikkord som opptrer sammen</div>'
-    +'<div class="hint" style="padding:0 12px 8px">Par som dukker opp sammen langt oftere enn tilfeldig skulle tilsi, regnet ut fra hvor vanlig hvert stikkord er for seg selv. Krever minst tre delte forekomster f\u00f8r noe regnes som et m\u00f8nster, ikke st\u00f8y.</div>';
+    +'<div class="hint" style="padding:0 12px 8px">Par som dukker opp sammen merkbart oftere enn tilfeldig, men ikke nesten alltid \u2014 de faste duoene er sannsynligvis bare en fast m\u00e5te \u00e5 tagge p\u00e5, ikke en oppdagelse. Krever minst tre delte forekomster f\u00f8r noe regnes som et m\u00f8nster, ikke st\u00f8y.</div>';
   if(totalN<8){
     h+='<div class="card"><div class="empty">For lite \u00e5 gå p\u00e5 ennå \u2014 dukker opp etter hvert som du skriver mer.</div></div>';
     return h;
@@ -10154,8 +10154,14 @@ function stikkordParHTML(){
     var sammen=par[key];
     var forventet=(solo[a]*solo[b2])/totalN;
     var styrke=forventet>0?sammen/forventet:null;
-    return{a:a,b:b2,sammen:sammen,styrke:styrke};
-  }).filter(function(x){return x.sammen>=3&&x.styrke!==null&&x.styrke>=1.5;})
+    // Nesten total overlapp — den ene, eller begge, dukker opp sammen med
+    // den andre nesten hver eneste gang — er en fast duo, ikke et funn. Da
+    // er stikkordene i praksis synonymer i din egen tagging, og styrketallet
+    // ville uansett blitt kunstig høyt av nettopp den grunnen.
+    var overlappA=sammen/solo[a],overlappB=sammen/solo[b2];
+    var fastDuo=Math.max(overlappA,overlappB)>=0.85;
+    return{a:a,b:b2,sammen:sammen,styrke:styrke,fastDuo:fastDuo};
+  }).filter(function(x){return x.sammen>=3&&x.styrke!==null&&x.styrke>=1.5&&!x.fastDuo;})
     .sort(function(a,b){return(b.styrke-a.styrke)||(b.sammen-a.sammen);})
     .slice(0,10);
   if(!rader.length){
@@ -11817,7 +11823,7 @@ function planleggingViewHTML(){
         +(editMode?'<button class="icon-btn" style="font-size:11px;padding:2px 7px" onclick="event.stopPropagation();openEditGoal(\''+q(g.id)+'\')">\u270e</button>':'')
         +'</div>';
       if((g.span||'livet')==='fem'&&!resultsFor(g.id).length){
-        h+='<div style="padding:0 14px 8px;font-size:12px;color:var(--amber)">\u26a0 Fem\u00e5rig styringsgrunnverdi uten prosjekt \u2014 legg til minst ett prosjekt som viser at du lever den.</div>';
+        h+='<div style="padding:0 14px 8px;font-size:12px;color:var(--muted)">F\u00f8lger ikke noe prosjekt ennå \u2014 et prosjekt her kan gi den noe konkret \u00e5 bygge p\u00e5.</div>';
       }
       if(open){
         h+='<div style="padding:0 14px 12px 34px">';
