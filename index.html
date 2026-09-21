@@ -5822,6 +5822,95 @@ function mensViewHTML(){
       +(m.note?'<div class="entry-date">'+esc(m.note)+'</div>':'')+'</div>'
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
   }).join('')+'</div>';
+  h+=mensStikkordPerDagHTML();
+  h+=mensStikkordParHTML();
+  return h;
+}
+// Hvor mange syklusdager vi ser på — forbi dette regnes det som ukjent, en
+// altfor lenge siden siste registrerte start, ikke en reell, veldig lang
+// syklus. Én «instans» per faktiske dato, ikke per bolk — flere innlegg
+// samme dato slås sammen til det ene stikkordsettet for dagen, siden det er
+// datoen, ikke det enkelte innlegget, som har et syklusdagnummer.
+var MENS_DAG_TAK=40;
+function mensDagInstanser(){
+  var perDato={};
+  entries.forEach(function(e){
+    var dag=mensSyklusdagForDato(e.date);
+    if(!dag||dag>MENS_DAG_TAK)return;
+    bolkerFra(e).forEach(function(b){
+      if(!(b.tags||[]).length)return;
+      perDato[e.date]=perDato[e.date]||{dag:dag,tags:{}};
+      b.tags.forEach(function(t){perDato[e.date].tags[t]=1;});
+    });
+  });
+  return Object.keys(perDato).map(function(k){return{dag:perDato[k].dag,tags:Object.keys(perDato[k].tags)};});
+}
+function mensStikkordPerDagHTML(){
+  var instanser=mensDagInstanser();
+  if(!instanser.length)return'';
+  var perDag={};
+  instanser.forEach(function(inst){
+    perDag[inst.dag]=perDag[inst.dag]||{};
+    inst.tags.forEach(function(t){perDag[inst.dag][t]=(perDag[inst.dag][t]||0)+1;});
+  });
+  var dager=Object.keys(perDag).map(Number).sort(function(a,b){return a-b;});
+  var h='<div class="sec-title" style="margin-top:14px">Stikkord per syklusdag</div>'
+    +'<div class="hint" style="padding:0 12px 8px">Hvilke stikkord som dukker opp p\u00e5 hvilken dag i syklusen, samlet p\u00e5 tvers av alle registrerte sykluser.</div>'
+    +'<div class="card" style="padding:6px 0">';
+  dager.forEach(function(d){
+    var tags=perDag[d];
+    var topp=Object.keys(tags).sort(function(a,b){return tags[b]-tags[a];}).slice(0,6);
+    h+='<div style="padding:6px 14px;border-bottom:1px solid var(--line)">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--grp);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Dag '+d+'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'+topp.map(function(t){
+        return'<span style="display:inline-flex;align-items:center;gap:2px">'+tagPillHTML(t)+'<span style="font-size:10px;color:var(--muted)">'+tags[t]+'</span></span>';
+      }).join('')+'</div></div>';
+  });
+  h+='</div>';
+  return h;
+}
+// Regnes ut PER dagnummer, ikke på tvers av dem — et par som opptrer sammen
+// på dag 2 tre ganger og et par som tilfeldigvis opptrer sammen på tre helt
+// ulike dager er ikke det samme mønsteret, selv om et enkelt, samlet tall
+// ikke ville sett forskjellen. Krever at paret gjentar seg minst to ganger
+// og i minst 60 % av gangene den dagen faktisk har registreringer.
+function mensStikkordParHTML(){
+  var instanser=mensDagInstanser();
+  var perDag={};
+  instanser.forEach(function(inst){(perDag[inst.dag]=perDag[inst.dag]||[]).push(inst.tags);});
+  var h='<div class="sec-title" style="margin-top:14px">Stikkord som ofte opptrer samme syklusdag</div>'
+    +'<div class="hint" style="padding:0 12px 8px">Par som gjentar seg p\u00e5 samme dagnummer i syklusen, sykluss etter syklus \u2014 ikke bare stikkord som tilfeldigvis har delt en dato en enkelt gang.</div>';
+  var noenPar=false,kortInnhold='';
+  Object.keys(perDag).map(Number).sort(function(a,b){return a-b;}).forEach(function(d){
+    var instTags=perDag[d];
+    if(instTags.length<2)return; // ingen gjentakelse å måle mønster i ennå
+    var solo={},par={};
+    instTags.forEach(function(tags){
+      var sortert=tags.slice().sort();
+      sortert.forEach(function(t){solo[t]=(solo[t]||0)+1;});
+      for(var i=0;i<sortert.length;i++)for(var j=i+1;j<sortert.length;j++){
+        var key=sortert[i]+'\u0001'+sortert[j];
+        par[key]=(par[key]||0)+1;
+      }
+    });
+    var rader=Object.keys(par).map(function(key){
+      var deler=key.split('\u0001');
+      return{a:deler[0],b:deler[1],sammen:par[key]};
+    }).filter(function(x){return x.sammen>=2&&(x.sammen/instTags.length)>=0.6;})
+      .sort(function(a,b){return b.sammen-a.sammen;});
+    if(!rader.length)return;
+    noenPar=true;
+    kortInnhold+='<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;color:var(--grp);text-transform:uppercase;letter-spacing:.04em">Dag '+d+'</div>'
+      +rader.map(function(x){
+        return'<div class="entry-row tett"><div class="entry-body" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">'+tagPillHTML(x.a)+'<span style="color:var(--muted)">+</span>'+tagPillHTML(x.b)+'</div>'
+          +'<div style="font-size:12px;color:var(--muted);flex-shrink:0">'+x.sammen+' av '+instTags.length+' ganger</div></div>';
+      }).join('');
+  });
+  if(!noenPar){
+    h+='<div class="card"><div class="empty">Ingen tydelige par enn\u00e5 \u2014 dukker opp etter at samme dag i syklusen har gjentatt et m\u00f8nster noen ganger.</div></div>';
+    return h;
+  }
+  h+='<div class="card">'+kortInnhold+'</div>';
   return h;
 }
 function openMensModal(){modal={step:'mens',form:{start:isoDate(today),end:'',note:''}};render();}
