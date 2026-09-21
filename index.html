@@ -5823,7 +5823,6 @@ function mensViewHTML(){
       +'<span style="align-self:center;color:var(--rose)">\u203a</span></div>';
   }).join('')+'</div>';
   h+=mensStikkordPerDagHTML();
-  h+=mensStikkordParHTML();
   return h;
 }
 // Hvor mange syklusdager vi ser på — forbi dette regnes det som ukjent, en
@@ -5832,6 +5831,53 @@ function mensViewHTML(){
 // samme dato slås sammen til det ene stikkordsettet for dagen, siden det er
 // datoen, ikke det enkelte innlegget, som har et syklusdagnummer.
 var MENS_DAG_TAK=40;
+// Samme dag, uansett syklusdag: alt du har tagget på én og samme dato slås
+// sammen til ett sett, og par telles på tvers av alle datoer. Styrke regnes
+// mot det du ville forventet om stikkordene var uavhengige av hverandre, og
+// faste duoer (nesten alltid sammen) holdes ute — de er en vane å tagge på,
+// ikke en oppdagelse.
+function stikkordSammeDagHTML(){
+  var perDato={};
+  entries.forEach(function(e){
+    bolkerFra(e).forEach(function(b){
+      (b.tags||[]).forEach(function(t){(perDato[e.date]=perDato[e.date]||{})[t]=1;});
+    });
+  });
+  var dager=Object.keys(perDato).map(function(d){return Object.keys(perDato[d]).sort();}).filter(function(t){return t.length;});
+  var totalN=dager.length;
+  var h='<div class="sec-title" style="margin-top:14px">Stikkord som ofte brukes samme dag</div>'
+    +'<div class="hint" style="padding:0 12px 8px">Uavhengig av syklusdag: par som havner p\u00e5 samme dato merkbart oftere enn tilfeldig skulle tilsi. Par som nesten alltid st\u00e5r sammen er holdt utenfor \u2014 det er som regel bare en fast m\u00e5te \u00e5 tagge p\u00e5.</div>';
+  if(totalN<8){
+    h+='<div class="card"><div class="empty">For lite \u00e5 g\u00e5 p\u00e5 enn\u00e5.</div></div>';
+    return h;
+  }
+  var solo={},par={};
+  dager.forEach(function(tags){
+    tags.forEach(function(t){solo[t]=(solo[t]||0)+1;});
+    for(var i=0;i<tags.length;i++)for(var j=i+1;j<tags.length;j++){
+      var key=tags[i]+'\u0001'+tags[j];
+      par[key]=(par[key]||0)+1;
+    }
+  });
+  var rader=Object.keys(par).map(function(key){
+    var d=key.split('\u0001'),a=d[0],b=d[1],sammen=par[key];
+    var forventet=solo[a]*solo[b]/totalN;
+    return{a:a,b:b,sammen:sammen,styrke:forventet>0?sammen/forventet:0,
+      fastDuo:Math.max(sammen/solo[a],sammen/solo[b])>=0.85};
+  }).filter(function(x){return x.sammen>=3&&x.styrke>=1.5&&!x.fastDuo;})
+    .sort(function(a,b){return(b.styrke-a.styrke)||(b.sammen-a.sammen);})
+    .slice(0,10);
+  if(!rader.length){
+    h+='<div class="card"><div class="empty">Ingen tydelige par enn\u00e5.</div></div>';
+    return h;
+  }
+  h+='<div class="card">'+rader.map(function(x){
+    return'<div class="entry-row tett"><div class="entry-body" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">'+tagPillHTML(x.a)+'<span style="color:var(--muted)">+</span>'+tagPillHTML(x.b)+'</div>'
+      +'<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--muted)">'+x.sammen+' dager</div>'
+      +'<div style="font-size:11px;color:var(--muted)">\u00d7'+x.styrke.toFixed(1)+' oftere enn tilfeldig</div></div></div>';
+  }).join('')+'</div>';
+  return h;
+}
 function mensDagInstanser(){
   var perDato={};
   entries.forEach(function(e){
@@ -5847,70 +5893,28 @@ function mensDagInstanser(){
 }
 function mensStikkordPerDagHTML(){
   var instanser=mensDagInstanser();
-  if(!instanser.length)return'';
-  var perDag={};
+  var perDag={},antall={};
   instanser.forEach(function(inst){
     perDag[inst.dag]=perDag[inst.dag]||{};
+    antall[inst.dag]=(antall[inst.dag]||0)+1;
     inst.tags.forEach(function(t){perDag[inst.dag][t]=(perDag[inst.dag][t]||0)+1;});
   });
-  var dager=Object.keys(perDag).map(Number).sort(function(a,b){return a-b;});
-  var h='<div class="sec-title" style="margin-top:14px">Stikkord per syklusdag</div>'
-    +'<div class="hint" style="padding:0 12px 8px">Hvilke stikkord som dukker opp p\u00e5 hvilken dag i syklusen, samlet p\u00e5 tvers av alle registrerte sykluser.</div>'
-    +'<div class="card" style="padding:6px 0">';
-  dager.forEach(function(d){
+  var h='<div class="sec-title" style="margin-top:14px">Vanlige stikkord per syklusdag</div>'
+    +'<div class="hint" style="padding:0 12px 8px">Bare stikkord som g\u00e5r igjen p\u00e5 samme dag i syklusen \u2014 minst to ganger. Det som bare har skjedd \u00e9n gang, er ikke med.</div>';
+  var rader='';
+  Object.keys(perDag).map(Number).sort(function(a,b){return a-b;}).forEach(function(d){
     var tags=perDag[d];
-    var topp=Object.keys(tags).sort(function(a,b){return tags[b]-tags[a];}).slice(0,6);
-    h+='<div style="padding:6px 14px;border-bottom:1px solid var(--line)">'
+    var igjen=Object.keys(tags).filter(function(t){return tags[t]>=2;})
+      .sort(function(a,b){return tags[b]-tags[a]||nbSort(a,b);}).slice(0,6);
+    if(!igjen.length)return;
+    rader+='<div style="padding:6px 14px;border-bottom:1px solid var(--line)">'
       +'<div style="font-size:11px;font-weight:700;color:var(--grp);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Dag '+d+'</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'+topp.map(function(t){
-        return'<span style="display:inline-flex;align-items:center;gap:2px">'+tagPillHTML(t)+'<span style="font-size:10px;color:var(--muted)">'+tags[t]+'</span></span>';
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'+igjen.map(function(t){
+        return'<span style="display:inline-flex;align-items:center;gap:3px">'+tagPillHTML(t)+'<span style="font-size:10px;color:var(--muted)">'+tags[t]+' av '+antall[d]+'</span></span>';
       }).join('')+'</div></div>';
   });
-  h+='</div>';
-  return h;
-}
-// Regnes ut PER dagnummer, ikke på tvers av dem — et par som opptrer sammen
-// på dag 2 tre ganger og et par som tilfeldigvis opptrer sammen på tre helt
-// ulike dager er ikke det samme mønsteret, selv om et enkelt, samlet tall
-// ikke ville sett forskjellen. Krever at paret gjentar seg minst to ganger
-// og i minst 60 % av gangene den dagen faktisk har registreringer.
-function mensStikkordParHTML(){
-  var instanser=mensDagInstanser();
-  var perDag={};
-  instanser.forEach(function(inst){(perDag[inst.dag]=perDag[inst.dag]||[]).push(inst.tags);});
-  var h='<div class="sec-title" style="margin-top:14px">Stikkord som ofte opptrer samme syklusdag</div>'
-    +'<div class="hint" style="padding:0 12px 8px">Par som gjentar seg p\u00e5 samme dagnummer i syklusen, sykluss etter syklus \u2014 ikke bare stikkord som tilfeldigvis har delt en dato en enkelt gang.</div>';
-  var noenPar=false,kortInnhold='';
-  Object.keys(perDag).map(Number).sort(function(a,b){return a-b;}).forEach(function(d){
-    var instTags=perDag[d];
-    if(instTags.length<2)return; // ingen gjentakelse å måle mønster i ennå
-    var solo={},par={};
-    instTags.forEach(function(tags){
-      var sortert=tags.slice().sort();
-      sortert.forEach(function(t){solo[t]=(solo[t]||0)+1;});
-      for(var i=0;i<sortert.length;i++)for(var j=i+1;j<sortert.length;j++){
-        var key=sortert[i]+'\u0001'+sortert[j];
-        par[key]=(par[key]||0)+1;
-      }
-    });
-    var rader=Object.keys(par).map(function(key){
-      var deler=key.split('\u0001');
-      return{a:deler[0],b:deler[1],sammen:par[key]};
-    }).filter(function(x){return x.sammen>=2&&(x.sammen/instTags.length)>=0.6;})
-      .sort(function(a,b){return b.sammen-a.sammen;});
-    if(!rader.length)return;
-    noenPar=true;
-    kortInnhold+='<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;color:var(--grp);text-transform:uppercase;letter-spacing:.04em">Dag '+d+'</div>'
-      +rader.map(function(x){
-        return'<div class="entry-row tett"><div class="entry-body" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">'+tagPillHTML(x.a)+'<span style="color:var(--muted)">+</span>'+tagPillHTML(x.b)+'</div>'
-          +'<div style="font-size:12px;color:var(--muted);flex-shrink:0">'+x.sammen+' av '+instTags.length+' ganger</div></div>';
-      }).join('');
-  });
-  if(!noenPar){
-    h+='<div class="card"><div class="empty">Ingen tydelige par enn\u00e5 \u2014 dukker opp etter at samme dag i syklusen har gjentatt et m\u00f8nster noen ganger.</div></div>';
-    return h;
-  }
-  h+='<div class="card">'+kortInnhold+'</div>';
+  h+=rader?'<div class="card" style="padding:6px 0">'+rader+'</div>'
+    :'<div class="card"><div class="empty">Ingen stikkord g\u00e5r igjen p\u00e5 samme syklusdag enn\u00e5.</div></div>';
   return h;
 }
 function openMensModal(){modal={step:'mens',form:{start:isoDate(today),end:'',note:''}};render();}
