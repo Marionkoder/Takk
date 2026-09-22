@@ -2928,6 +2928,7 @@ function load(){
   try{investGlobalOrder=JSON.parse(localStorage.getItem(SK+'_investglobalrekk')||'[]');}catch(e){investGlobalOrder=[];}
   try{gifts=JSON.parse(localStorage.getItem(SK+'_gifts')||'[]');}catch(e){gifts=[];}
   try{tagCats=JSON.parse(localStorage.getItem(SK+'_tagcats')||'{}');}catch(e){tagCats={};}
+  try{ordValg=JSON.parse(localStorage.getItem(SK+'_ordvalg')||'null')||{ignorer:[],taMed:[]};}catch(e){ordValg={ignorer:[],taMed:[]};}
   try{customUnits=JSON.parse(localStorage.getItem(SK+'_units')||'[]');}catch(e){customUnits=[];}
   try{weeklyAvailableHours=Number(localStorage.getItem(SK+'_availhours'))||0;}catch(e){weeklyAvailableHours=0;}
   try{var tp=Number(localStorage.getItem(SK+'_taktplan'));if(tp||tp===0)kanbanTakPlan=tp;}catch(e){}
@@ -4004,6 +4005,7 @@ function save(){
   try{localStorage.setItem(SK+'_investglobalrekk',JSON.stringify(investGlobalOrder));}catch(e){}
   try{localStorage.setItem(SK+'_gifts',JSON.stringify(gifts));}catch(e){}
   try{localStorage.setItem(SK+'_tagcats',JSON.stringify(tagCats));}catch(e){}
+  try{localStorage.setItem(SK+'_ordvalg',JSON.stringify(ordValg));}catch(e){}
   try{localStorage.setItem(SK+'_units',JSON.stringify(customUnits));}catch(e){}
   try{localStorage.setItem(SK+'_availhours',String(weeklyAvailableHours));}catch(e){}
   try{localStorage.setItem(SK+'_taktplan',String(kanbanTakPlan));}catch(e){}
@@ -4106,55 +4108,6 @@ function personMonsterHTML(person){
     +'</div>'
     +'<div class="hint" style="padding:0 12px 4px">Styrke sammenligner med hvor vanlig stikkordet er i hele dagboka, s\u00e5 noe du skriver mye om ellers ikke teller som s\u00e6rlig for '+esc(person)+'.</div>';
 }
-// En liten tidslinje rundt stikkordet: hva står dagen før, samme dato og
-// dagen etter en dag med dette stikkordet, sammenlignet med hvor vanlig det er ellers?
-// Teller bare nabodager der du faktisk skrev noe — en dag uten innlegg sier
-// ingenting om hva som skjedde, og skal ikke telle som «ikke skjedd».
-function tagFoerEtterHTML(tag){
-  var nt=normTag(tag),perDato={};
-  entries.forEach(function(e){
-    bolkerFra(e).forEach(function(b){
-      (b.tags||[]).forEach(function(t){(perDato[e.date]=perDato[e.date]||{})[normTag(t)]=1;});
-    });
-  });
-  var alleDatoer=Object.keys(perDato),N=alleDatoer.length;
-  if(N<14)return'';
-  var basis={};
-  alleDatoer.forEach(function(d){Object.keys(perDato[d]).forEach(function(t){basis[t]=(basis[t]||0)+1;});});
-  var mine=alleDatoer.filter(function(d){return perDato[d][nt];});
-  if(mine.length<4)return'';
-  var flytt=function(iso,n){var x=new Date(iso+'T12:00:00');x.setDate(x.getDate()+n);return isoDate(x);};
-  var side=function(n){
-    var teller={},grunnlag=0;
-    mine.forEach(function(d){
-      var nb=perDato[flytt(d,n)];
-      if(!nb)return;
-      grunnlag++;
-      Object.keys(nb).forEach(function(t){if(t!==nt)teller[t]=(teller[t]||0)+1;});
-    });
-    if(grunnlag<3)return{grunnlag:grunnlag,rader:[]};
-    var rader=Object.keys(teller).map(function(t){
-      var andel=teller[t]/grunnlag,vanlig=basis[t]/N;
-      return{t:t,n:teller[t],andel:andel,styrke:vanlig>0?andel/vanlig:0};
-    }).filter(function(x){return x.n>=3&&x.styrke>=1.5;})
-      .sort(function(a,b){return(b.styrke-a.styrke)||(b.n-a.n);}).slice(0,6);
-    return{grunnlag:grunnlag,rader:rader};
-  };
-  var foer=side(-1),samme=side(0),etter=side(1);
-  if(!foer.rader.length&&!samme.rader.length&&!etter.rader.length)return'';
-  var blokk=function(tittel,res){
-    if(!res.rader.length)return'';
-    return'<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;color:var(--grp);text-transform:uppercase;letter-spacing:.04em">'+tittel+'</div>'
-      +res.rader.map(function(x){
-        return'<div class="entry-row tett"><div class="entry-body">'+tagPillHTML(x.t)+'</div>'
-          +'<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--muted)">'+x.n+' av '+res.grunnlag+' ganger</div>'
-          +'<div style="font-size:11px;color:var(--muted)">\u00d7'+x.styrke.toFixed(1)+' oftere enn vanlig</div></div></div>';
-      }).join('');
-  };
-  return'<div class="sec-title">F\u00f8r, samme dag og etter</div>'
-    +'<div class="hint" style="padding:0 12px 8px">Stikkord som oftere enn vanlig st\u00e5r dagen f\u00f8r, samme dag eller dagen etter #'+esc(tag)+'. Samme dag teller alt du skrev den datoen, ogs\u00e5 i andre innlegg. Kan gi hint om mulige \u00e5rsaker og virkninger, men sier ikke sikkert hva som f\u00f8rer til hva.</div>'
-    +'<div class="card">'+blokk('Dagen f\u00f8r',foer)+blokk('Samme dag',samme)+blokk('Dagen etter',etter)+'</div>';
-}
 function tagMonsterHTML(tag){
   // Regnes over DELER, ikke innlegg. Skriver du «tur med Jenny» og «operaen med
   // Knut» i samme innlegg, hørte Jenny aldri til operaen — og med innlegget som
@@ -4221,7 +4174,6 @@ function tagAlleViewHTML(){
     +'<div class="view-sub">'+funnet.length+' innlegg'+(hendelser.length?', '+hendelser.length+' hendelse'+(hendelser.length===1?'':'r'):'')+', uansett m\u00e5ned eller kategori.</div>';
   if(!funnet.length&&!hendelser.length)return h+'<div class="card"><div class="empty">Ingen innlegg eller hendelser med dette stikkordet.</div></div>';
   h+=tagMonsterHTML(tag);
-  h+=tagFoerEtterHTML(tag);
   if(hendelser.length){
     h+='<div class="sec-title">Hendelser</div><div class="card">'+hendelser.map(function(e){
       return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
@@ -6835,7 +6787,7 @@ function toggleFormGoal(id){
 
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,stillingKriterier:stillingKriterier,stillinger:stillinger,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,stillingKriterier:stillingKriterier,stillinger:stillinger,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,ordValg:ordValg,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -6854,7 +6806,7 @@ function importJSON(){
       try{
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
-        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];datingKriterier=d.datingKriterier||[];datingPersoner=d.datingPersoner||[];stillingKriterier=d.stillingKriterier||[];stillinger=d.stillinger||[];skjulteEntries=d.skjulteEntries||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];datingKriterier=d.datingKriterier||[];datingPersoner=d.datingPersoner||[];stillingKriterier=d.stillingKriterier||[];stillinger=d.stillinger||[];skjulteEntries=d.skjulteEntries||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};ordValg=d.ordValg||{ignorer:[],taMed:[]};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -10073,9 +10025,11 @@ function rapportSamletViewHTML(innebygd){
     +'<button class="chip'+(rapportPeriode==='maaned'?' on':'')+'" onclick="goRapport(view.month||curMonth,view.year||curYear)">M\u00e5ned</button>'
     +'<button class="chip'+(rapportPeriode==='aar'?' on':'')+'" onclick="goArsrapport(view.year||curYear)">\u00c5r</button>'
     +'<button class="chip'+(rapportPeriode==='alltid'?' on':'')+'" onclick="goOppsummering()">Totalt</button>'
+    +'<button class="chip'+(rapportPeriode==='monstre'?' on':'')+'" onclick="rapportPeriode=\'monstre\';view={kind:\'rapportsamlet\'};render()">M\u00f8nstre</button>'
     +'</div>';
   if(rapportPeriode==='aar')h+=arsrapportViewHTML();
   else if(rapportPeriode==='alltid')h+=oppsummeringViewHTML();
+  else if(rapportPeriode==='monstre')h+=monstreViewHTML();
   else h+=rapportViewHTML();
   return h;
 }
@@ -10223,6 +10177,163 @@ function vimpelsnorForKategoriHTML(catId){
   return vimpelBuerHTML(rader);
 }
 
+// ── Mønstre ────────────────────────────────────────────────────────────
+// Fire måter å se det stikkordene alene ikke viser. Stikkord inneholder bare
+// det du allerede har satt navn på; to av disse ser derfor på selve teksten.
+// Seksjonene er lukket som standard, så fanen er rolig å åpne.
+var monstreApen={};
+// Dine egne justeringer av ordlista: ord du vil slippe å se, og ord du vil
+// ha med selv om de står på standardlista over småord (som «glad»).
+var ordValg={ignorer:[],taMed:[]};
+function toggleMonstre(k){monstreApen[k]=!monstreApen[k];render();}
+var ORD_STOPP=('og i jeg det at en et den til er som på de med han av ikke der så var meg seg men ble har om vi min mitt ha hadde hun nå over da ved fra du ut sin dem oss opp man kan hans hvor eller hva skal selv her alle vil bli blitt kunne inn når være kom noen noe ville dere deres kun ja etter ned skulle denne for deg si sine sitt mot meget hvorfor dette disse uten hvordan ingen din ditt blir samme hvilken hvilke sånn mellom vår våre hver hvem hvis både bare enn fordi før mange også slik vært veldig litt mye fikk får gikk går fått sammen dag dagen dager hele helt enda ennå ganske fortsatt igjen allerede faktisk kanskje egentlig liksom derfor mens under siden neste første andre tredje etter hvert gang ganger gjøre gjorde gjort gjør være skulle måtte måtte måtte syntes synes tror tenke tenkte hadde hatt sier sa sagt ser så sett kommer kom kommet tatt tar tok takk takknemlig takknemlighet takknemlige glad glade fint fin fine godt god gode bra').split(' ');
+function tekstOrd(txt){
+  return String(txt||'').toLowerCase().replace(/#[^\s#]+/g,' ').split(/[^a-zæøåäöüéèáàóò]+/).filter(function(w){return w.length>=4;});
+}
+function monstreSeksjon(k,tittel,antall,innhold){
+  var apen=!!monstreApen[k];
+  return'<div class="sec-title" style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleMonstre(\''+k+'\')">'
+    +'<span class="s-arrow'+(apen?' open':'')+'" style="font-size:10px">\u25b6\ufe0e</span>'
+    +'<span style="flex:1">'+tittel+(antall!==null?' <span style="font-weight:400;color:var(--rose)">\u00b7 '+antall+'</span>':'')+'</span></div>'
+    +(apen?innhold:'');
+}
+function ordTelling(){
+  var tagOrd={};
+  entries.forEach(function(e){bolkerFra(e).forEach(function(b){(b.tags||[]).forEach(function(t){tagOrd[normTag(t)]=1;});});});
+  var stopp={};ORD_STOPP.forEach(function(w){stopp[w]=1;});
+  (ordValg.taMed||[]).forEach(function(w){delete stopp[w];});
+  (ordValg.ignorer||[]).forEach(function(w){stopp[w]=1;});
+  var telling={};
+  entries.forEach(function(e){
+    var sett={};
+    tekstOrd(e.text).forEach(function(w){if(!stopp[w]&&!tagOrd[w])sett[w]=1;});
+    Object.keys(sett).forEach(function(w){telling[w]=(telling[w]||0)+1;});
+  });
+  Object.keys(telling).forEach(function(w){if(telling[w]<3)delete telling[w];});
+  return telling;
+}
+function monstreOrdHTML(telling){
+  var ord=Object.keys(telling).sort(function(a,b){return telling[b]-telling[a]||nbSort(a,b);}).slice(0,40);
+  if(!ord.length)return'<div class="card"><div class="empty">Ingen ord g\u00e5r igjen i minst tre innlegg enn\u00e5.</div></div>'+ordTilpassHTML();
+  var maks=telling[ord[0]];
+  ord.sort(nbSort);
+  return'<div class="hint" style="padding:0 12px 8px">Ord fra selve teksten din som st\u00e5r i minst tre innlegg, uten stikkordene og vanlige sm\u00e5ord. Trykk p\u00e5 et ord for \u00e5 lese innleggene det st\u00e5r i \u2014 der kan du ogs\u00e5 ignorere det.</div>'
+    +'<div class="card"><div class="cloud">'+ord.map(function(w){
+      var r=Math.log(1+telling[w])/Math.log(1+maks);
+      return'<button class="cloud-word lv'+Math.max(1,Math.min(5,1+Math.floor(r*4.99)))+'" style="font-size:'+(12+Math.round(r*14))+'px" onclick="goOrdAlle(\''+q(w)+'\')">'+esc(w)+'</button>';
+    }).join(' ')+'</div></div>'+ordTilpassHTML();
+}
+function ordIgnorer(w){
+  w=String(w||'').toLowerCase().trim();if(!w)return;
+  ordValg.taMed=(ordValg.taMed||[]).filter(function(x){return x!==w;});
+  if((ordValg.ignorer||[]).indexOf(w)<0)ordValg.ignorer=(ordValg.ignorer||[]).concat([w]);
+  save();render();
+}
+function ordAngreIgnorer(w){ordValg.ignorer=(ordValg.ignorer||[]).filter(function(x){return x!==w;});save();render();}
+function ordFangOpp(w){
+  w=String(w||'').toLowerCase().trim().replace(/^#/,'');if(w.length<2)return;
+  ordValg.ignorer=(ordValg.ignorer||[]).filter(function(x){return x!==w;});
+  if((ordValg.taMed||[]).indexOf(w)<0)ordValg.taMed=(ordValg.taMed||[]).concat([w]);
+  save();render();
+}
+function ordAngreFangOpp(w){ordValg.taMed=(ordValg.taMed||[]).filter(function(x){return x!==w;});save();render();}
+function ordTilpassHTML(){
+  var ign=ordValg.ignorer||[],med=ordValg.taMed||[];
+  var brikke=function(w,klikk,tegn){return'<button class="chip" style="font-size:11px" onclick="'+klikk+'(\''+q(w)+'\')">'+esc(w)+' '+tegn+'</button>';};
+  return'<div class="card" style="padding:10px 14px">'
+    +'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Fang opp et ord som ellers filtreres bort (som \u00abglad\u00bb):</div>'
+    +'<div style="display:flex;gap:6px"><input id="ord-fang-inp" class="inp" type="text" style="margin:0;flex:1" placeholder="Skriv et ord \u2026" onkeydown="if(event.key===\'Enter\')ordFangOpp(this.value)">'
+    +'<button class="icon-btn" onclick="ordFangOpp(document.getElementById(\'ord-fang-inp\').value)">Fang opp</button></div>'
+    +(med.length?'<div style="font-size:11px;color:var(--muted);margin:10px 0 4px">Fanget opp \u2014 trykk for \u00e5 fjerne:</div><div class="chips">'+med.map(function(w){return brikke(w,'ordAngreFangOpp','\u00d7');}).join('')+'</div>':'')
+    +(ign.length?'<div style="font-size:11px;color:var(--muted);margin:10px 0 4px">Ignorert \u2014 trykk for \u00e5 vise igjen:</div><div class="chips">'+ign.map(function(w){return brikke(w,'ordAngreIgnorer','\u21ba');}).join('')+'</div>':'')
+    +'</div>';
+}
+function goOrdAlle(w){view={kind:'ordalle',ord:w};drawerOpen=false;render();}
+function ordAlleViewHTML(){
+  var w=view.ord||'';
+  var treff=entries.filter(function(e){return tekstOrd(e.text).indexOf(w)>=0;})
+    .sort(function(a,b){return a.date<b.date?1:-1;});
+  return'<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
+    +'<div class="view-title">\u00ab'+esc(w)+'\u00bb</div>'
+    +'<div class="view-sub">'+treff.length+' innlegg der ordet st\u00e5r, nyeste f\u00f8rst.</div>'
+    +'<div style="padding:0 12px 8px">'+((ordValg.ignorer||[]).indexOf(w)>=0
+      ?'<button class="icon-btn" style="font-size:12px" onclick="ordAngreIgnorer(\''+q(w)+'\')">Vis ordet i ordskya igjen</button>'
+      :'<button class="icon-btn" style="font-size:12px" onclick="ordIgnorer(\''+q(w)+'\')">Ignorer ordet i ordskya</button>')+'</div>'
+    +(treff.length?'<div class="card">'+treff.map(entryRowHTML).join('')+'</div>':'<div class="card"><div class="empty">Ingen innlegg.</div></div>');
+}
+function monstreLengdeData(){
+  var data={},totOrd=0,totN=0;
+  entries.forEach(function(e){
+    var n=String(e.text||'').split(/\s+/).filter(Boolean).length;
+    totOrd+=n;totN++;
+    var sett={};
+    bolkerFra(e).forEach(function(b){(b.tags||[]).forEach(function(t){sett[t]=1;});});
+    Object.keys(sett).forEach(function(t){(data[t]=data[t]||{sum:0,n:0});data[t].sum+=n;data[t].n++;});
+  });
+  var rader=Object.keys(data).filter(function(t){return data[t].n>=3;})
+    .map(function(t){return{t:t,snitt:data[t].sum/data[t].n,n:data[t].n};})
+    .sort(function(a,b){return b.snitt-a.snitt;}).slice(0,8);
+  return{rader:rader,snitt:totN?totOrd/totN:0};
+}
+function monstreLengdeHTML(d){
+  if(!d.rader.length)return'<div class="card"><div class="empty">For lite \u00e5 g\u00e5 p\u00e5 enn\u00e5.</div></div>';
+  var maks=d.rader[0].snitt;
+  return'<div class="hint" style="padding:0 12px 8px">Stikkordene du i snitt skriver lengst om, blant dem du har brukt minst tre ganger. Et innlegg er i snitt '+Math.round(d.snitt)+' ord.</div>'
+    +'<div class="card">'+d.rader.map(function(x){
+      var col=(tagCats[x.t]&&catColor(tagCats[x.t]))||'var(--muted)';
+      return'<div style="padding:7px 14px;border-bottom:1px solid var(--line)">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+tagPillHTML(x.t)
+        +'<span style="flex:1"></span><span style="font-size:11px;color:var(--muted)">'+Math.round(x.snitt)+' ord i snitt \u00b7 '+x.n+' innlegg</span></div>'
+        +'<div style="height:4px;border-radius:2px;background:var(--line)"><div style="height:4px;border-radius:2px;width:'+Math.max(4,Math.round(x.snitt/maks*100))+'%;background:'+col+'"></div></div></div>';
+    }).join('')+'</div>';
+}
+function monstreTagHistorikk(){
+  var h={};
+  entries.forEach(function(e){
+    var sett={};
+    bolkerFra(e).forEach(function(b){(b.tags||[]).forEach(function(t){sett[t]=1;});});
+    Object.keys(sett).forEach(function(t){
+      var x=h[t]=h[t]||{n:0,forst:e.date,sist:e.date};
+      x.n++;if(e.date<x.forst)x.forst=e.date;if(e.date>x.sist)x.sist=e.date;
+    });
+  });
+  return h;
+}
+function monstreGrense(dager){var d=new Date(today);d.setDate(d.getDate()-dager);return isoDate(d);}
+function monstreStilnetListe(hist){
+  var g=monstreGrense(28);
+  return Object.keys(hist).filter(function(t){return hist[t].n>=5&&hist[t].sist<g;})
+    .sort(function(a,b){return hist[b].n-hist[a].n||nbSort(a,b);});
+}
+function monstreStilnetHTML(hist,liste){
+  if(!liste.length)return'<div class="card"><div class="empty">Ingenting her akkurat n\u00e5.</div></div>';
+  return'<div class="hint" style="padding:0 12px 8px">Stikkord du har brukt minst fem ganger, men ikke de siste fire ukene.</div>'
+    +'<div class="card">'+liste.map(function(t){
+      return'<div class="entry-row tett"><div class="entry-body">'+tagPillHTML(t)+'</div>'
+        +'<div style="font-size:12px;color:var(--muted);flex-shrink:0">sist '+fmtDate(hist[t].sist)+'</div></div>';
+    }).join('')+'</div>';
+}
+function monstreNyttListe(hist){
+  var g=monstreGrense(28);
+  return Object.keys(hist).filter(function(t){return hist[t].forst>=g;})
+    .sort(function(a,b){return hist[a].forst<hist[b].forst?1:-1;});
+}
+function monstreNyttHTML(hist,liste){
+  if(!liste.length)return'<div class="card"><div class="empty">Ingen nye stikkord de siste fire ukene.</div></div>';
+  return'<div class="hint" style="padding:0 12px 8px">Stikkord du har brukt for f\u00f8rste gang de siste fire ukene.</div>'
+    +'<div class="card" style="padding:10px 12px"><div style="display:flex;flex-wrap:wrap;gap:6px">'+liste.map(function(t){
+      return'<span style="display:inline-flex;align-items:center;gap:3px">'+tagPillHTML(t)+'<span style="font-size:10px;color:var(--muted)">'+hist[t].n+'</span></span>';
+    }).join('')+'</div></div>';
+}
+function monstreViewHTML(){
+  if(entries.length<5)return'<div class="card"><div class="empty">Skriv noen flere innlegg, s\u00e5 begynner m\u00f8nstrene \u00e5 vise seg her.</div></div>';
+  var telling=ordTelling(),lengde=monstreLengdeData(),hist=monstreTagHistorikk();
+  var stilnet=monstreStilnetListe(hist),nytt=monstreNyttListe(hist);
+  return monstreSeksjon('ord','Ord du skriver, men ikke tagger',Object.keys(telling).length,monstreOrdHTML(telling))
+    +monstreSeksjon('lengde','Hva du skriver mye om',null,monstreLengdeHTML(lengde))
+    +monstreSeksjon('stilnet','Lenge siden sist',stilnet.length,monstreStilnetHTML(hist,stilnet))
+    +monstreSeksjon('nytt','Nytt',nytt.length,monstreNyttHTML(hist,nytt));
+}
 function oppsummeringViewHTML(){
   var h='';
   var sorted=entries.slice().sort(function(a,b){return a.date<b.date?-1:1;});
@@ -12137,6 +12248,7 @@ function render(){
   else if(view.kind==='inventar')content=inventarViewHTML();
   else if(view.kind==='skjulte')content=skjulteInnleggViewHTML();
   else if(view.kind==='tagalle')content=tagAlleViewHTML();
+  else if(view.kind==='ordalle')content=ordAlleViewHTML();
   else if(view.kind==='rutinedetalj')content=rutineDetaljViewHTML();
   else if(view.kind==='kvartal')content=kvartalViewHTML();
   else if(view.kind==='budsjett')content=budsjettViewHTML();
