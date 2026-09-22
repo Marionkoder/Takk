@@ -10070,9 +10070,11 @@ function rapportSamletViewHTML(innebygd){
     +'<button class="chip'+(rapportPeriode==='maaned'?' on':'')+'" onclick="goRapport(view.month||curMonth,view.year||curYear)">M\u00e5ned</button>'
     +'<button class="chip'+(rapportPeriode==='aar'?' on':'')+'" onclick="goArsrapport(view.year||curYear)">\u00c5r</button>'
     +'<button class="chip'+(rapportPeriode==='alltid'?' on':'')+'" onclick="goOppsummering()">Totalt</button>'
+    +'<button class="chip'+(rapportPeriode==='sammedag'?' on':'')+'" onclick="rapportPeriode=\'sammedag\';view={kind:\'rapportsamlet\'};render()">Samme dag</button>'
     +'</div>';
   if(rapportPeriode==='aar')h+=arsrapportViewHTML();
   else if(rapportPeriode==='alltid')h+=oppsummeringViewHTML();
+  else if(rapportPeriode==='sammedag')h+=stikkordSammeDagHTML();
   else h+=rapportViewHTML();
   return h;
 }
