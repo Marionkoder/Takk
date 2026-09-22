@@ -4106,6 +4106,55 @@ function personMonsterHTML(person){
     +'</div>'
     +'<div class="hint" style="padding:0 12px 4px">Styrke sammenligner med hvor vanlig stikkordet er i hele dagboka, s\u00e5 noe du skriver mye om ellers ikke teller som s\u00e6rlig for '+esc(person)+'.</div>';
 }
+// En liten tidslinje rundt stikkordet: hva står dagen før, samme dato og
+// dagen etter en dag med dette stikkordet, sammenlignet med hvor vanlig det er ellers?
+// Teller bare nabodager der du faktisk skrev noe — en dag uten innlegg sier
+// ingenting om hva som skjedde, og skal ikke telle som «ikke skjedd».
+function tagFoerEtterHTML(tag){
+  var nt=normTag(tag),perDato={};
+  entries.forEach(function(e){
+    bolkerFra(e).forEach(function(b){
+      (b.tags||[]).forEach(function(t){(perDato[e.date]=perDato[e.date]||{})[normTag(t)]=1;});
+    });
+  });
+  var alleDatoer=Object.keys(perDato),N=alleDatoer.length;
+  if(N<14)return'';
+  var basis={};
+  alleDatoer.forEach(function(d){Object.keys(perDato[d]).forEach(function(t){basis[t]=(basis[t]||0)+1;});});
+  var mine=alleDatoer.filter(function(d){return perDato[d][nt];});
+  if(mine.length<4)return'';
+  var flytt=function(iso,n){var x=new Date(iso+'T12:00:00');x.setDate(x.getDate()+n);return isoDate(x);};
+  var side=function(n){
+    var teller={},grunnlag=0;
+    mine.forEach(function(d){
+      var nb=perDato[flytt(d,n)];
+      if(!nb)return;
+      grunnlag++;
+      Object.keys(nb).forEach(function(t){if(t!==nt)teller[t]=(teller[t]||0)+1;});
+    });
+    if(grunnlag<3)return{grunnlag:grunnlag,rader:[]};
+    var rader=Object.keys(teller).map(function(t){
+      var andel=teller[t]/grunnlag,vanlig=basis[t]/N;
+      return{t:t,n:teller[t],andel:andel,styrke:vanlig>0?andel/vanlig:0};
+    }).filter(function(x){return x.n>=3&&x.styrke>=1.5;})
+      .sort(function(a,b){return(b.styrke-a.styrke)||(b.n-a.n);}).slice(0,6);
+    return{grunnlag:grunnlag,rader:rader};
+  };
+  var foer=side(-1),samme=side(0),etter=side(1);
+  if(!foer.rader.length&&!samme.rader.length&&!etter.rader.length)return'';
+  var blokk=function(tittel,res){
+    if(!res.rader.length)return'';
+    return'<div style="padding:8px 14px 2px;font-size:11px;font-weight:700;color:var(--grp);text-transform:uppercase;letter-spacing:.04em">'+tittel+'</div>'
+      +res.rader.map(function(x){
+        return'<div class="entry-row tett"><div class="entry-body">'+tagPillHTML(x.t)+'</div>'
+          +'<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--muted)">'+x.n+' av '+res.grunnlag+' ganger</div>'
+          +'<div style="font-size:11px;color:var(--muted)">\u00d7'+x.styrke.toFixed(1)+' oftere enn vanlig</div></div></div>';
+      }).join('');
+  };
+  return'<div class="sec-title">F\u00f8r, samme dag og etter</div>'
+    +'<div class="hint" style="padding:0 12px 8px">Stikkord som oftere enn vanlig st\u00e5r dagen f\u00f8r, samme dag eller dagen etter #'+esc(tag)+'. Samme dag teller alt du skrev den datoen, ogs\u00e5 i andre innlegg. Kan gi hint om mulige \u00e5rsaker og virkninger, men sier ikke sikkert hva som f\u00f8rer til hva.</div>'
+    +'<div class="card">'+blokk('Dagen f\u00f8r',foer)+blokk('Samme dag',samme)+blokk('Dagen etter',etter)+'</div>';
+}
 function tagMonsterHTML(tag){
   // Regnes over DELER, ikke innlegg. Skriver du «tur med Jenny» og «operaen med
   // Knut» i samme innlegg, hørte Jenny aldri til operaen — og med innlegget som
@@ -4172,6 +4221,7 @@ function tagAlleViewHTML(){
     +'<div class="view-sub">'+funnet.length+' innlegg'+(hendelser.length?', '+hendelser.length+' hendelse'+(hendelser.length===1?'':'r'):'')+', uansett m\u00e5ned eller kategori.</div>';
   if(!funnet.length&&!hendelser.length)return h+'<div class="card"><div class="empty">Ingen innlegg eller hendelser med dette stikkordet.</div></div>';
   h+=tagMonsterHTML(tag);
+  h+=tagFoerEtterHTML(tag);
   if(hendelser.length){
     h+='<div class="sec-title">Hendelser</div><div class="card">'+hendelser.map(function(e){
       return'<div class="entry-row" style="cursor:pointer" onclick="openEditEvent(\''+q(e.id)+'\')">'
@@ -5831,53 +5881,6 @@ function mensViewHTML(){
 // samme dato slås sammen til det ene stikkordsettet for dagen, siden det er
 // datoen, ikke det enkelte innlegget, som har et syklusdagnummer.
 var MENS_DAG_TAK=40;
-// Samme dag, uansett syklusdag: alt du har tagget på én og samme dato slås
-// sammen til ett sett, og par telles på tvers av alle datoer. Styrke regnes
-// mot det du ville forventet om stikkordene var uavhengige av hverandre, og
-// faste duoer (nesten alltid sammen) holdes ute — de er en vane å tagge på,
-// ikke en oppdagelse.
-function stikkordSammeDagHTML(){
-  var perDato={};
-  entries.forEach(function(e){
-    bolkerFra(e).forEach(function(b){
-      (b.tags||[]).forEach(function(t){(perDato[e.date]=perDato[e.date]||{})[t]=1;});
-    });
-  });
-  var dager=Object.keys(perDato).map(function(d){return Object.keys(perDato[d]).sort();}).filter(function(t){return t.length;});
-  var totalN=dager.length;
-  var h='<div class="sec-title" style="margin-top:14px">Stikkord som ofte brukes samme dag</div>'
-    +'<div class="hint" style="padding:0 12px 8px">Uavhengig av syklusdag: par som havner p\u00e5 samme dato merkbart oftere enn tilfeldig skulle tilsi. Par som nesten alltid st\u00e5r sammen er holdt utenfor \u2014 det er som regel bare en fast m\u00e5te \u00e5 tagge p\u00e5.</div>';
-  if(totalN<8){
-    h+='<div class="card"><div class="empty">For lite \u00e5 g\u00e5 p\u00e5 enn\u00e5.</div></div>';
-    return h;
-  }
-  var solo={},par={};
-  dager.forEach(function(tags){
-    tags.forEach(function(t){solo[t]=(solo[t]||0)+1;});
-    for(var i=0;i<tags.length;i++)for(var j=i+1;j<tags.length;j++){
-      var key=tags[i]+'\u0001'+tags[j];
-      par[key]=(par[key]||0)+1;
-    }
-  });
-  var rader=Object.keys(par).map(function(key){
-    var d=key.split('\u0001'),a=d[0],b=d[1],sammen=par[key];
-    var forventet=solo[a]*solo[b]/totalN;
-    return{a:a,b:b,sammen:sammen,styrke:forventet>0?sammen/forventet:0,
-      fastDuo:Math.max(sammen/solo[a],sammen/solo[b])>=0.85};
-  }).filter(function(x){return x.sammen>=3&&x.styrke>=1.5&&!x.fastDuo;})
-    .sort(function(a,b){return(b.styrke-a.styrke)||(b.sammen-a.sammen);})
-    .slice(0,10);
-  if(!rader.length){
-    h+='<div class="card"><div class="empty">Ingen tydelige par enn\u00e5.</div></div>';
-    return h;
-  }
-  h+='<div class="card">'+rader.map(function(x){
-    return'<div class="entry-row tett"><div class="entry-body" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">'+tagPillHTML(x.a)+'<span style="color:var(--muted)">+</span>'+tagPillHTML(x.b)+'</div>'
-      +'<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--muted)">'+x.sammen+' dager</div>'
-      +'<div style="font-size:11px;color:var(--muted)">\u00d7'+x.styrke.toFixed(1)+' oftere enn tilfeldig</div></div></div>';
-  }).join('')+'</div>';
-  return h;
-}
 function mensDagInstanser(){
   var perDato={};
   entries.forEach(function(e){
@@ -10070,11 +10073,9 @@ function rapportSamletViewHTML(innebygd){
     +'<button class="chip'+(rapportPeriode==='maaned'?' on':'')+'" onclick="goRapport(view.month||curMonth,view.year||curYear)">M\u00e5ned</button>'
     +'<button class="chip'+(rapportPeriode==='aar'?' on':'')+'" onclick="goArsrapport(view.year||curYear)">\u00c5r</button>'
     +'<button class="chip'+(rapportPeriode==='alltid'?' on':'')+'" onclick="goOppsummering()">Totalt</button>'
-    +'<button class="chip'+(rapportPeriode==='sammedag'?' on':'')+'" onclick="rapportPeriode=\'sammedag\';view={kind:\'rapportsamlet\'};render()">Samme dag</button>'
     +'</div>';
   if(rapportPeriode==='aar')h+=arsrapportViewHTML();
   else if(rapportPeriode==='alltid')h+=oppsummeringViewHTML();
-  else if(rapportPeriode==='sammedag')h+=stikkordSammeDagHTML();
   else h+=rapportViewHTML();
   return h;
 }
