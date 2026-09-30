@@ -483,7 +483,7 @@ function addAchievement(kind,key,name,goalIds,cats,detail){
     ts:Date.now(),date:isoDate(today)});
 }
 function achKindLabel(k){
-  return k==='milestone'?'Milepæl':k==='result'?'Prosjekt n\u00e5dd':k==='project'?'Prosjekt fullført':k==='routine'?'Rutine':'Oppnådd';
+  return k==='milestone'?'Milepæl':k==='result'?'Prosjekt n\u00e5dd':k==='project'?'Prosjekt fullført':'Oppnådd';
 }
 // Et resultat lagret f\u00f8r bare at det VAR oppn\u00e5dd, ikke n\u00e5r. Uten dato kan ikke
 // rapportene skille «skjedde denne m\u00e5neden» fra «skjedde en gang».
@@ -501,25 +501,6 @@ function catsForResult(r){
   if(r.subCats&&r.subCats.length)return r.subCats;
   var g=goalById(r.valueId);
   return g?(g.cats||[]):[];
-}
-function checkRoutineMilestone(r){
-  var n=(r.log||[]).length;
-  // MIDLERTIDIG for å teste vimpelfunksjonen: terskelen er satt til 20 i
-  // stedet for 100. Bytt tilbake til n%100===0 når testingen er ferdig.
-  if(n>0&&n%20===0)addAchievement('routine','routine:'+r.id+':'+n,r.name,r.goalIds||[],r.cats||[],n+' ganger');
-}
-// checkRoutineMilestone kjører bare i det øyeblikket du haker av — en rutine
-// som allerede lå godt forbi terskelen før denne funksjonen fantes, har aldri
-// truffet et øyeblikk der sjekken faktisk så et rundt tall. Denne går bakover
-// og fyller inn alle rundingene som allerede er passert, hver gang appen åpnes.
-// addAchievement dedupliserer på nøkkel, så det er trygt å kjøre om igjen.
-function etterslepRutineMilepaeler(){
-  routines.forEach(function(r){
-    var n=(r.log||[]).length;
-    for(var k=20;k<=n;k+=20){
-      addAchievement('routine','routine:'+r.id+':'+k,r.name,r.goalIds||[],r.cats||[],k+' ganger');
-    }
-  });
 }
 var BEREDSKAP_SEKSJONER=[
   {id:'bs_betaling',name:'Betaling'},
@@ -1478,7 +1459,7 @@ function folkViewHTML(){
   // Rutiner nederst, som på de andre kategorisidene — inkludert underkategorier,
   // ellers kan en rutine bli avhakbar uten å bli redigerbar.
   var rtsF=routines.filter(function(r){
-    return(r.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;});
+    return!r.avsluttet&&(r.cats||[]).some(function(cid){return ids.indexOf(cid)>=0;});
   }).sort(function(a,b){return nbSort(a.name,b.name);});
   h+=katRutineKnapperHTML(rtsF);
 
@@ -1611,7 +1592,7 @@ function katSideHTML(navn, tittel, skyNokkel, ekstra){
   // Rutiner nederst — avhaking og redigering samlet i ett kort. Tar med
   // underkategorier også, ellers blir en rutine avhakbar uten å være
   // redigerbar — nøyaktig det som gjorde noen rutiner uredigerbare før.
-  var rts=routines.filter(function(r){return inCat(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
+  var rts=routines.filter(function(r){return!r.avsluttet&&inCat(r.cats);}).sort(function(a,b){return nbSort(a.name,b.name);});
   h+=katRutineKnapperHTML(rts);
 
   return h+katSideSlutt();
@@ -3707,9 +3688,19 @@ function load(){
     save();
   }
 
-  // Kjøres hver oppstart, ikke bare én gang — billig, og fanger opp rutiner
-  // som har passert flere nye rundinger siden sist appen var åpen.
-  etterslepRutineMilepaeler();
+  // Rutiner lagde tidligere en intern anerkjennelse hver 20. gang som ingenting
+  // viste. Fjernet — rydder bort de gamle som ligger igjen i lagringen.
+  (function(){
+    var før=achievements.length;
+    achievements=achievements.filter(function(a){return a.kind!=='routine';});
+    if(achievements.length!==før)save();
+  })();
+
+  // Eksisterende rutiner uten startdato: anslås fra tidligste avhaking eller
+  // koblede innlegg. Rutiner uten spor får dato første gang de hakes av.
+  routines.forEach(function(r){
+    if(!r.startDate){var s0=rutineAnslagStart(r);if(s0)r.startDate=s0;}
+  });
   save();
 
   // Oppnådde resultater manglet dato. Henter den fra et koblet prosjekt der den
@@ -4280,7 +4271,7 @@ function ankerListeHTML(f){
   }).join('');
   var brukte=ank.filter(function(a){return a.k==='r';}).map(function(a){return a.id;});
   var kand=routines.filter(function(r){
-    return brukte.indexOf(r.id)<0&&!ankerGirSykel(f.id||'',r.id);
+    return!r.avsluttet&&brukte.indexOf(r.id)<0&&!ankerGirSykel(f.id||'',r.id);
   }).sort(function(a,b){return nbSort(a.name,b.name);});
   h+='<div style="display:flex;gap:8px;margin-top:6px">'
     +'<input id="anker-inp" class="inp" type="text" style="flex:1" placeholder="F.eks. etter at deigen hever \u2026" value="'+esc(f._ankerInn||'')+'" oninput="mf()._ankerInn=this.value" onkeydown="if(event.key===\'Enter\'){event.preventDefault();leggTilAnkerTekst();}">'
@@ -4340,8 +4331,8 @@ function toggleRoutine(id,ym,minste){
   // forskjell på en full og en minimal dag.
   if(wasOn)r.minsteLog=r.minsteLog.filter(function(l){return l!==ym;});
   else if(minste)r.minsteLog=[].concat(r.minsteLog,[ym]);
+  if(!wasOn&&!r.startDate){var sd0=logNokkelTilDato(ym),naa0=isoDate(today);r.startDate=(sd0&&sd0<naa0)?sd0:naa0;}
   if(!wasOn&&(r.equipmentIds||[]).length)markEquipmentUsed(r.equipmentIds,r.name+' '+fmtDate(isoDate(today)));
-  checkRoutineMilestone(r);
   save();render();
 }
 function toggleEvent(id,year){
@@ -6436,7 +6427,7 @@ function rutineChipsHTML(rangert,valgte,klikk){
 }
 
 function activeRoutinesNow(){
-  return routines.filter(function(r){return!(r.months&&r.months.length)||r.months.indexOf(curMonth)>=0;})
+  return routines.filter(function(r){return!r.avsluttet&&(!(r.months&&r.months.length)||r.months.indexOf(curMonth)>=0);})
     .sort(function(a,b){return nbSort(a.name,b.name);});
 }
 function logTime(kind,refId,hours){
@@ -6862,7 +6853,7 @@ function openEditEntry(id){
   render();
 }
 function openRoutineModal(){
-  modal={step:'routine',form:{name:'',cats:[],months:[],days:[],perWeek:'',tags:[],goalIds:[],resultIds:[],equipmentIds:[],freq:'',ease:'',ankere:[],minste:'',_ankerInn:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine',form:{name:'',startDate:isoDate(today),cats:[],months:[],days:[],perWeek:'',tags:[],goalIds:[],resultIds:[],equipmentIds:[],freq:'',ease:'',ankere:[],minste:'',_ankerInn:'',minutes:'',trackHours:false,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 // Rutine-detaljside: hvordan går det med rutinen, og alle dagbokinnlegg du har
@@ -6882,6 +6873,132 @@ function rutineTotalTelling(r){
   (r.log||[]).forEach(function(k){sett[k]=1;});
   entriesForRoutine(r.id).forEach(function(e){sett[rutineLoggNokkel(r,e.date)]=1;});
   return Object.keys(sett).length;
+}
+// ── Avslutning av rutiner ──────────────────────────────────────────────────
+// En rutine kan ha en slutt: koblet til et resultat («ny jobb») avsluttes den når
+// resultatet er nådd. Avsluttede rutiner forsvinner fra de aktive listene, men
+// historikken består — også i månedene de var i bruk. Sletting virker som før.
+function rutineErAvsluttet(r){return!!r.avsluttet;}
+function rutineVisesIMaaned(r,m,y,strengt){
+  if(!r.avsluttet)return true;
+  var slutt=Number(r.avsluttet.slice(0,4))*100+Number(r.avsluttet.slice(5,7));
+  var denne=y*100+m;
+  return strengt?denne<slutt:denne<=slutt;
+}
+function rutineHarMaal(r){
+  return(r.resultIds||[]).some(function(id){var x=resultById(id);return x&&!x.achieved;});
+}
+function rutineForslagAvslutt(r){
+  if(r.avsluttet||r.avsluttNei)return false;
+  var rs=(r.resultIds||[]).map(resultById).filter(Boolean);
+  return rs.length>0&&rs.every(function(x){return x.achieved;});
+}
+function avsluttRutine(id){
+  var r=routines.find(function(x){return x.id===id;});if(!r)return;
+  r.avsluttet=isoDate(today);save();render();
+}
+function gjenopptaRutine(id){
+  var r=routines.find(function(x){return x.id===id;});if(!r)return;
+  delete r.avsluttet;r.avsluttNei=true;save();render();
+}
+function beholdRutine(id){
+  var r=routines.find(function(x){return x.id===id;});if(!r)return;
+  r.avsluttNei=true;save();render();
+}
+function rutineAvsluttHTML(r){
+  if(r.avsluttet){
+    return'<div class="card" style="padding:12px 14px;margin-top:8px;display:flex;align-items:center;gap:8px">'
+      +'<div style="flex:1;font-size:13px">Avsluttet '+esc(fmtDate(r.avsluttet))+' \u2014 '+rutineTotalTelling(r)+' ganger. Godt jobbet.</div>'
+      +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="gjenopptaRutine(\''+q(r.id)+'\')">Ta opp igjen</button>'
+      +'</div>';
+  }
+  if(!rutineForslagAvslutt(r))return'';
+  var navn=(r.resultIds||[]).map(resultById).filter(Boolean).map(resultShortTitle).join(', ');
+  return'<div class="card" style="padding:12px 14px;margin-top:8px">'
+    +'<div style="font-size:15px;font-weight:800">Målet er nådd \ud83c\udf89</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-top:4px">\u00ab'+esc(navn)+'\u00bb \u2014 vil du avslutte denne rutinen?</div>'
+    +'<div class="chips" style="margin-top:10px">'
+    +'<button class="chip" onclick="avsluttRutine(\''+q(r.id)+'\')">Ja, avslutt</button>'
+    +'<button class="chip" onclick="beholdRutine(\''+q(r.id)+'\')">La den gå videre</button>'
+    +'</div></div>';
+}
+// ── Rutine-automatisering ──────────────────────────────────────────────────
+// En rutine kan regnes som automatisert etter minst 3 måneder og minst 50 ganger.
+// Tallet åpner bare for spørsmålet — det er svaret ditt som avgjør. Spørsmålet
+// stilles stille, bare i rutinens egen detaljside, aldri som varsel.
+var AUTO_MIN_MAANEDER=3,AUTO_MIN_GANGER=50,AUTO_UTSETT_DAGER=30,BYGGING_GRENSE=3;
+function logNokkelTilDato(k){
+  k=String(k||'');var m;
+  if((m=k.match(/^d(\d{4}-\d{2}-\d{2})/)))return m[1];
+  if((m=k.match(/^w(\d{4})-(\d{1,2})/))){
+    var jan4=new Date(Number(m[1]),0,4);
+    var mon=new Date(jan4);
+    mon.setDate(jan4.getDate()-((jan4.getDay()+6)%7)+(Number(m[2])-1)*7);
+    return isoDate(mon);
+  }
+  if((m=k.match(/^(\d{4})-(\d{2})/)))return m[1]+'-'+m[2]+'-01';
+  if((m=k.match(/^y(\d{4})/)))return m[1]+'-01-01';
+  return null;
+}
+// Beste anslag på når rutinen startet, fra tidligste avhaking eller koblede innlegg.
+function rutineAnslagStart(r){
+  var best=null;
+  (r.log||[]).forEach(function(k){var d=logNokkelTilDato(k);if(d&&(!best||d<best))best=d;});
+  entriesForRoutine(r.id).forEach(function(e){if(e.date&&(!best||e.date<best))best=e.date;});
+  return best;
+}
+function rutineStart(r){return r.startDate||rutineAnslagStart(r)||null;}
+function leggTilMaaneder(iso,n){
+  var d=new Date(iso+'T00:00:00'),dag=d.getDate();
+  d.setDate(1);d.setMonth(d.getMonth()+n);
+  d.setDate(Math.min(dag,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));
+  return isoDate(d);
+}
+function rutineKanSpoerresAuto(r){
+  if(r.autoDato||r.avsluttet||rutineHarMaal(r))return false;
+  var s=rutineStart(r);if(!s)return false;
+  var naa=isoDate(today);
+  if(leggTilMaaneder(s,AUTO_MIN_MAANEDER)>naa)return false;
+  if(rutineTotalTelling(r)<AUTO_MIN_GANGER)return false;
+  if(r.autoUtsatt&&r.autoUtsatt>naa)return false;
+  return true;
+}
+// Under bygging: ikke automatisert, og enten i sine tre første måneder eller
+// besvart med «ikke ennå». Rutiner som bare ligger der uten svar, teller ikke.
+function rutineUnderBygging(r){
+  if(r.autoDato||r.avsluttet)return false;
+  if(r.autoUtsatt)return true;
+  var s=rutineStart(r);
+  return!!s&&leggTilMaaneder(s,AUTO_MIN_MAANEDER)>isoDate(today);
+}
+function antallUnderBygging(){return routines.filter(rutineUnderBygging).length;}
+function svarRutineAuto(id,ja){
+  var r=routines.find(function(x){return x.id===id;});if(!r)return;
+  if(ja){r.autoDato=isoDate(today);delete r.autoUtsatt;}
+  else{var d=new Date(today);d.setDate(d.getDate()+AUTO_UTSETT_DAGER);r.autoUtsatt=isoDate(d);}
+  save();render();
+}
+function angreRutineAuto(id){
+  var r=routines.find(function(x){return x.id===id;});if(!r)return;
+  delete r.autoDato;
+  var d=new Date(today);d.setDate(d.getDate()+AUTO_UTSETT_DAGER);r.autoUtsatt=isoDate(d);
+  save();render();
+}
+function rutineAutoHTML(r){
+  if(r.autoDato){
+    return'<div class="card" style="padding:12px 14px;margin-top:8px;display:flex;align-items:center;gap:8px">'
+      +'<div style="flex:1;font-size:13px">Sitter av seg selv \u2014 automatisk siden '+esc(fmtDate(r.autoDato))+'</div>'
+      +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="angreRutineAuto(\''+q(r.id)+'\')">Ikke helt likevel</button>'
+      +'</div>';
+  }
+  if(!rutineKanSpoerresAuto(r))return'';
+  return'<div class="card" style="padding:12px 14px;margin-top:8px">'
+    +'<div style="font-size:15px;font-weight:800">Kjennes denne automatisk nå?</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-top:4px">'+rutineTotalTelling(r)+' ganger siden '+esc(fmtDate(rutineStart(r)))+'</div>'
+    +'<div class="chips" style="margin-top:10px">'
+    +'<button class="chip" onclick="svarRutineAuto(\''+q(r.id)+'\',true)">Ja, den sitter</button>'
+    +'<button class="chip" onclick="svarRutineAuto(\''+q(r.id)+'\',false)">Ikke ennå</button>'
+    +'</div></div>';
 }
 function rutineStjerneMilepael(r){
   var total=rutineTotalTelling(r);
@@ -6968,6 +7085,8 @@ function rutineDetaljViewHTML(){
     +'<button class="icon-btn" style="font-size:11px;padding:4px 9px" onclick="openEditRoutine(\''+q(r.id)+'\')">\u270e</button>'
     +'</div>'
     +'<div class="view-sub">'+esc(freqShort(r))+(m?' \u00b7 '+m.gjort+' av '+m.mulige+' siste to uker':'')+'</div>';
+  h+=rutineAvsluttHTML(r);
+  h+=rutineAutoHTML(r);
   h+='<div class="sec-title">Dagbokinnlegg om denne rutinen \u00b7 '+koblede.length+'</div>';
   if(!koblede.length){
     h+='<div class="card"><div class="empty">Ingen innlegg knyttet til denne rutinen enn\u00e5. Velg rutinen under \u00abKnytt til\u00bb n\u00e5r du skriver et innlegg om den.</div></div>';
@@ -6978,7 +7097,7 @@ function rutineDetaljViewHTML(){
 }
 function openEditRoutine(id){
   var r=routines.find(function(x){return x.id===id;});if(!r)return;
-  modal={step:'routine_edit',form:{id:id,name:r.name,cats:[].concat(r.cats||[]),tags:[].concat(r.tags||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),equipmentIds:[].concat(r.equipmentIds||[]),freq:r.freq||'',ease:r.ease||'',ankere:[].concat(r.ankere||[]),minste:r.minste||'',_ankerInn:'',minutes:r.minutes||'',trackHours:!!r.trackHours,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'routine_edit',form:{id:id,name:r.name,startDate:rutineStart(r)||'',cats:[].concat(r.cats||[]),tags:[].concat(r.tags||[]),months:[].concat(r.months||[]),days:[].concat(r.days||[]),perWeek:(Number(r.perWeek)>1?String(r.perWeek):''),goalIds:[].concat(r.goalIds||[]),resultIds:[].concat(r.resultIds||[]),equipmentIds:[].concat(r.equipmentIds||[]),freq:r.freq||'',ease:r.ease||'',ankere:[].concat(r.ankere||[]),minste:r.minste||'',_ankerInn:'',minutes:r.minutes||'',trackHours:!!r.trackHours,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openBdayModal(memorial){
@@ -7356,6 +7475,8 @@ function saveEditEntry(){
 function routineValid(){
   var f=mf();
   if(!(f.name||'').trim())return false;
+  // Nye rutiner skal ha minst én grunnverdi. Eksisterende uten verdi kan fortsatt redigeres.
+  if(modal&&modal.step==='routine'&&!(f.goalIds||[]).length)return false;
   // Hendelser skal ha en grunnverdi — bursdager er unntatt, de bruker aldri
   // grunnverdi-kobling i det hele tatt.
   if(modal&&(modal.step==='event'||modal.step==='event_edit')&&!f.bday&&!(f.goalIds||[]).length)return false;
@@ -7364,14 +7485,14 @@ function routineValid(){
 function submitRoutine(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
-  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:(f.cats||[]).filter(function(cid){return!!catById(cid);}),tags:f.tags||[],months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),ankere:(f.ankere||[]),minste:(f.minste||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,log:[],minsteLog:[]});
+  routines.push({id:'r'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:(f.cats||[]).filter(function(cid){return!!catById(cid);}),tags:f.tags||[],months:f.months,days:(f.freq==='daily')?(f.days||[]):[],perWeek:(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1),goalIds:f.goalIds||[],resultIds:f.resultIds||[],equipmentIds:f.equipmentIds||[],freq:f.freq||null,ease:(f.ease||'').trim(),ankere:(f.ankere||[]),minste:(f.minste||'').trim(),minutes:Number(f.minutes)||0,trackHours:!!f.trackHours,startDate:f.startDate||isoDate(today),log:[],minsteLog:[]});
   save();closeModal();
 }
 function saveEditRoutine(){
   flushTags(mf());
   var f=mf();var name=(f.name||'').trim();if(!name)return;
   var r=routines.find(function(x){return x.id===f.id;});if(!r)return;
-  r.name=name;r.cats=(f.cats||[]).filter(function(cid){return!!catById(cid);});r.tags=f.tags||[];r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.ankere=(f.ankere||[]);r.minste=(f.minste||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;
+  r.name=name;r.cats=(f.cats||[]).filter(function(cid){return!!catById(cid);});r.tags=f.tags||[];r.months=f.months;r.days=(f.freq==='daily')?(f.days||[]):[];r.perWeek=(isWeeklyFreq(f.freq)?(Number(f.perWeek)||1):1);r.goalIds=f.goalIds||[];r.resultIds=f.resultIds||[];r.equipmentIds=f.equipmentIds||[];r.freq=f.freq||null;r.ease=(f.ease||'').trim();r.ankere=(f.ankere||[]);r.minste=(f.minste||'').trim();r.minutes=Number(f.minutes)||0;r.trackHours=!!f.trackHours;if(f.startDate)r.startDate=f.startDate;
   save();closeModal();
 }
 function submitEvent(){
@@ -8653,7 +8774,7 @@ function modalHTML(){
           if(selCats.length&&(item.cats||[]).some(function(c){return selCats.indexOf(c)>=0;}))return true;
           return false;
         }
-        var allR=routines.slice().sort(function(a,b){return nbSort(a.name,b.name);});
+        var allR=routines.filter(function(r){return!r.avsluttet||(f.routineIds||[]).indexOf(r.id)>=0;}).sort(function(a,b){return nbSort(a.name,b.name);});
         var allE=events.filter(function(e){return!e.bday;}).sort(function(a,b){return nbSort(a.name,b.name);});
         var rList=showAll?allR:allR.filter(function(rt){return matches(rt,f.routineIds);});
         var eList=showAll?allE:allE.filter(function(ev){return matches(ev,f.eventIds);});
@@ -8739,11 +8860,13 @@ function modalHTML(){
       return'<button class="chip'+((f.months||[]).includes(i+1)?' on':'')+'" onclick="toggleFormMonth('+(i+1)+')">'+m.slice(0,3)+'</button>';
     }).join('');
     body='<div class="modal-title">'+(isEditR?'Rediger rutine':'Ny rutine')+'</div>'
+      +(!isEditR&&antallUnderBygging()>=BYGGING_GRENSE?'<div class="hint" style="margin-bottom:10px">Du har '+antallUnderBygging()+' rutiner under bygging nå. Du kan legge til én til \u2014 de deler på oppmerksomheten din.</div>':'')
       +(isEditR?'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Gjennomf\u00f8rt totalt: <b style="color:var(--ink)">'+rutineTotalTelling(routineById(f.id))+'</b> ganger</div>':'')
       +'<label class="field-lbl">Hva skal gjøres?</label>'
       +'<input class="inp" type="text" value="'+esc(f.name||'')+'" placeholder="Beskriv rutinen …" oninput="mf().name=this.value;updateSaveBtn()">'
       +'<label class="field-lbl">Kobling <span style="font-weight:400;text-transform:none;letter-spacing:0">– grunnverdi eller prosjekt</span></label>'
       +'<div class="chips">'+linkChipSection(f)+'</div>'
+      +(!isEditR&&!(f.goalIds||[]).length&&goals.length?'<div class="hint">Velg minst én grunnverdi for å lagre. Et prosjekt eller resultat er valgfritt.</div>':'')
       +'<label class="field-lbl">Anker <span style="font-weight:400;text-transform:none;letter-spacing:0">– noe du allerede gjør, som setter i gang rutinen</span></label>'
       +ankerListeHTML(f)
       +'<label class="field-lbl">Hva gjør dette lettere å huske og gjennomføre? <span style="font-weight:400;text-transform:none;letter-spacing:0">– valgfritt</span></label>'
@@ -8785,12 +8908,15 @@ function modalHTML(){
               +'</div>';
           })():''))
         :'')
+      +'<label class="field-lbl">Startet <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 brukes til å se når en rutine har satt seg</span></label>'
+      +'<input class="inp" type="date" style="width:auto" value="'+esc(f.startDate||'')+'" oninput="mf().startDate=this.value">'
       +equipmentPickerHTML(f)
       +'<label class="field-lbl">Stikkord <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'+tagSectionHTML(f)
       +'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +'<div class="hint">En rutine er noe som skjer fast flere ganger i \u00e5ret. Skjer det \u00e9n gang i \u00e5ret eller sjeldnere, legges det inn som hendelse.</div>'
       +(isEditR?'<button class="icon-btn" style="width:100%;margin-top:6px" onclick="closeModal();goRutineDetalj(\''+q(f.id)+'\')">Se '+entriesForRoutine(f.id).length+' dagbokinnlegg om denne rutinen \u2192</button>':'')
+      +(isEditR&&!routineById(f.id).avsluttet?'<button class="icon-btn" style="width:100%;margin-top:6px" onclick="closeModal();avsluttRutine(\''+q(f.id)+'\')">Avslutt rutinen \u2014 historikken beholdes</button>':'')
       +(isEditR?'<button class="del-full-btn" onclick="deleteRoutine(\''+q(f.id)+'\')">Slett rutine</button>':'')
       +'<button class="save-btn" onclick="'+(isEditR?'saveEditRoutine()':'submitRoutine()')+'" '+(routineValid()?'':'disabled')+'>'+(isEditR?'Lagre endringer':'Lagre rutine')+'</button>';
 
@@ -9145,6 +9271,7 @@ function periodTodoItems(scope){
   routines.forEach(function(r){
     var months=r.months||[];
     if(months.length&&!months.includes(scope.m))return;
+    if(!rutineVisesIMaaned(r,scope.m,scope.y||(scope.ym?Number(scope.ym.slice(0,4)):curYear),true))return;
     var grp=r.freq==='daily'?'daily':r.freq==='yearly'?'yearly':isWeekly(r)?'weekly':'monthly';
     if(scope.onlyGroup&&scope.onlyGroup!==grp)return;
     if(r.freq==='daily'){
@@ -9980,7 +10107,7 @@ function rutinerViewHTML(){
 
   var monthRoutines=routines.filter(function(r){
     var months=r.months||[];
-    return(!months.length||months.includes(m))&&inCat(r.cats);
+    return(!months.length||months.includes(m))&&inCat(r.cats)&&rutineVisesIMaaned(r,m,effY,true);
   }).sort(function(a,b){return nbSort(a.name,b.name);});
   var monthEvents=monthEventsFor(m,effY).filter(function(e){return inCat(e.cats);})
     .sort(function(a,b){return(a.day||99)-(b.day||99)||nbSort(a.name,b.name);});
@@ -9998,6 +10125,13 @@ function rutinerViewHTML(){
   else if(mtodo.total>0)h+='<div class="view-sub" style="color:var(--red)">\u2713 Alt for denne m\u00e5neden er gjort.</div>';
   else h+='<div class="card"><div class="empty">Ingen m\u00e5nedlige rutiner enn\u00e5.</div></div>';
   h+=routineTimeLogRowsHTML(mtodo.items);
+
+  // Avsluttede rutiner: en stille rad nederst, ikke en dom over noe
+  var avsl=catFilter?[]:routines.filter(function(r){return r.avsluttet;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  if(avsl.length){
+    h+='<div class="sec-title">Avsluttede rutiner \u00b7 '+avsl.length+'</div><div class="chips" style="padding:0 12px 8px">'
+      +avsl.map(function(r){return'<button class="chip" onclick="goRutineDetalj(\''+q(r.id)+'\')">'+esc(r.name)+'</button>';}).join('')+'</div>';
+  }
 
   // Kort pengesammendrag for måneden
   h+=periodMoneySummaryHTML(effY,m,'m');
@@ -10248,7 +10382,26 @@ function ordTilpassHTML(){
     +(ign.length?'<div style="font-size:11px;color:var(--muted);margin:10px 0 4px">Ignorert \u2014 trykk for \u00e5 vise igjen:</div><div class="chips">'+ign.map(function(w){return brikke(w,'ordAngreIgnorer','\u21ba');}).join('')+'</div>':'')
     +'</div>';
 }
-function goOrdAlle(w){view={kind:'ordalle',ord:w};drawerOpen=false;render();}
+// Gjør et ord fra teksten om til et stikkord: legges på alle innleggene der
+// ordet står. Har et innlegg flere deler, legges det på den første delen,
+// siden teksten er felles og appen ikke kan vite hvilken del ordet hørte til.
+var ordTilTagArm=null;
+function ordTilStikkord(w){
+  var t=normTag(w);if(!t)return;
+  entries.forEach(function(e){
+    if(tekstOrd(e.text).indexOf(w)<0)return;
+    if(e.bolker&&e.bolker.length){
+      var b=e.bolker[0];b.tags=b.tags||[];
+      if(b.tags.map(normTag).indexOf(t)<0)b.tags.push(t);
+      e.tags=unionAv(e.bolker,'tags');
+    } else {
+      e.tags=e.tags||[];
+      if(e.tags.map(normTag).indexOf(t)<0)e.tags.push(t);
+    }
+  });
+  ordTilTagArm=null;save();goTagAlle(t);
+}
+function goOrdAlle(w){ordTilTagArm=null;view={kind:'ordalle',ord:w};drawerOpen=false;render();}
 function ordAlleViewHTML(){
   var w=view.ord||'';
   var treff=entries.filter(function(e){return tekstOrd(e.text).indexOf(w)>=0;})
@@ -10256,9 +10409,13 @@ function ordAlleViewHTML(){
   return'<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goBack()">\u2039</button></div>'
     +'<div class="view-title">\u00ab'+esc(w)+'\u00bb</div>'
     +'<div class="view-sub">'+treff.length+' innlegg der ordet st\u00e5r, nyeste f\u00f8rst.</div>'
-    +'<div style="padding:0 12px 8px">'+((ordValg.ignorer||[]).indexOf(w)>=0
+    +'<div style="padding:0 12px 8px;display:flex;flex-wrap:wrap;gap:6px">'
+      +(treff.length&&ordTilTagArm!==w?'<button class="icon-btn" style="font-size:12px" onclick="ordTilTagArm=\''+q(w)+'\';render()">Gj\u00f8r til stikkord</button>':'')
+      +((ordValg.ignorer||[]).indexOf(w)>=0
       ?'<button class="icon-btn" style="font-size:12px" onclick="ordAngreIgnorer(\''+q(w)+'\')">Vis ordet i ordskya igjen</button>'
       :'<button class="icon-btn" style="font-size:12px" onclick="ordIgnorer(\''+q(w)+'\')">Ignorer ordet i ordskya</button>')+'</div>'
+    +(ordTilTagArm===w?'<div class="card" style="padding:10px 14px"><div style="font-size:13px;margin-bottom:8px">Legg til #'+esc(normTag(w))+' p\u00e5 '+(treff.length===1?'innlegget':'alle '+treff.length+' innleggene')+' der ordet st\u00e5r?</div>'
+      +'<div class="chips"><button class="chip on" onclick="ordTilStikkord(\''+q(w)+'\')">Ja, legg til</button><button class="chip" onclick="ordTilTagArm=null;render()">Avbryt</button></div></div>':'')
     +(treff.length?'<div class="card">'+treff.map(entryRowHTML).join('')+'</div>':'<div class="card"><div class="empty">Ingen innlegg.</div></div>');
 }
 function monstreLengdeData(){
@@ -10524,7 +10681,7 @@ function rutineMengdeIMnd(r,m,y){
 }
 function rutineStolperHTML(m,y){
   var rader=routines.filter(function(r){
-    var mo=r.months||[];return!mo.length||mo.indexOf(m)>=0;
+    var mo=r.months||[];return(!mo.length||mo.indexOf(m)>=0)&&rutineVisesIMaaned(r,m,y);
   }).map(function(r){
     var andel=0,tekst='\u2013';
     if(r.freq==='daily'){
@@ -10609,7 +10766,7 @@ function rapportViewHTML(){
 
   var monthEntries=entries.filter(function(e){return e.date.slice(0,7)===ym;});
   h+=cloudSectionHTML(tagCountsFor(monthEntries),false,'md'+ym,'Stikkord i '+MND_FULL[m-1]);
-  var monthRoutines=routines.filter(function(r){var mo=r.months||[];return!mo.length||mo.includes(m);});
+  var monthRoutines=routines.filter(function(r){var mo=r.months||[];return(!mo.length||mo.includes(m))&&rutineVisesIMaaned(r,m,y);});
   var doneR=monthRoutines.filter(function(r){return routineMonthStatus(r,m,y).done;});
   var mEvents=monthEventsFor(m,y);
   var doneE=mEvents.filter(function(e){return evDone(e,y);});
@@ -10617,7 +10774,7 @@ function rapportViewHTML(){
   // Forrige måned, til sammenligningstallene
   var pYm=prevY+'-'+pad(prevM);
   var pEntries=entries.filter(function(e){return e.date.slice(0,7)===pYm;});
-  var pRoutines=routines.filter(function(r){var mo=r.months||[];return!mo.length||mo.includes(prevM);});
+  var pRoutines=routines.filter(function(r){var mo=r.months||[];return(!mo.length||mo.includes(prevM))&&rutineVisesIMaaned(r,prevM,prevY);});
   var pDoneR=pRoutines.filter(function(r){return routineMonthStatus(r,prevM,prevY).done;});
   var pDoneE=monthEventsFor(prevM,prevY).filter(function(e){return evDone(e,prevY);});
 
@@ -11967,7 +12124,7 @@ function planleggingViewHTML(){
   } else {
     h+='<div class="card">';
     goals.slice().sort(function(a,b){return nbSort(a.name,b.name);}).forEach(function(g){
-      var linkedR=routines.filter(function(r){return(r.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
+      var linkedR=routines.filter(function(r){return!r.avsluttet&&(r.goalIds||[]).includes(g.id);}).sort(function(a,b){return nbSort(a.name,b.name);});
       var linkedE=events.filter(function(e){return(e.goalIds||[]).includes(g.id);}).sort(function(a,b){return(a.year*100+a.month)-(b.year*100+b.month)||nbSort(a.name,b.name);});
       var open=!!openGoals[g.id];
       h+='<div style="border-bottom:1px solid var(--line)">'
@@ -12048,7 +12205,7 @@ function planleggingViewHTML(){
   // bor nå — samme rekkefølge og samme klikkbare rader som inni en grunnverdi.
   var utenP=alleProsjekter().filter(function(iv){return!(iv.goalIds||[]).length;}).sort(function(a,b){return nbSort(dispName(a),dispName(b));});
   var utenE=events.filter(function(e){return!e.bday&&!(e.goalIds||[]).length;}).sort(function(a,b){return(a.year*10000+a.month*100+(a.day||0))-(b.year*10000+b.month*100+(b.day||0))||nbSort(a.name,b.name);});
-  var utenR=routines.filter(function(r){return!(r.goalIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
+  var utenR=routines.filter(function(r){return!r.avsluttet&&!(r.goalIds||[]).length;}).sort(function(a,b){return nbSort(a.name,b.name);});
   if(utenP.length||utenE.length||utenR.length){
     h+='<div class="sec-title" style="padding-top:14px">Uten grunnverdi</div><div class="card" style="padding:0 0 4px">';
     if(utenP.length){
