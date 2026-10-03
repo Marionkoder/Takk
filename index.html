@@ -84,14 +84,39 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .sec-title{font-size:15px;font-weight:700;color:var(--ink);padding:20px 16px 4px;font-family:var(--font-heading,inherit)}
 .view-sub{font-size:12px;color:var(--muted);padding:0 16px 8px;line-height:1.55}
 .card{background:var(--card);border-radius:14px;overflow:hidden;margin:8px 12px 4px;border:1px solid var(--line)}
-.kort-forhand .kort-side{border:1px solid var(--line);border-radius:12px;padding:16px 12px;margin:8px 0;text-align:center;background:#fff;color:#222}
-.kort-forhand .kort-tittel{font-size:20px;font-weight:800;line-height:1.2;margin-bottom:10px}
-.kort-forhand .kort-bilder{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:8px}
-.kort-forhand .kort-bilder img{height:90px;max-width:46%;object-fit:cover;border-radius:8px;background:var(--line)}
-.kort-forhand .kort-bilder.n1 img{height:150px;max-width:90%}
-.kort-forhand .kort-alder{font-size:14px;color:#555}
-.kort-forhand .kort-linje{font-size:14px;font-style:italic;margin:0 0 8px}
-.kort-forhand .kort-fra{margin-top:10px;font-size:13px}
+.kort-forhand{display:flex;gap:10px;overflow-x:auto;padding:4px 0 8px}
+.kp-hold{flex-shrink:0;font-size:7.5px}
+.kp-nr{font-size:11px;color:var(--muted);margin:0 0 3px}
+.kp{position:relative;box-sizing:border-box;width:20em;height:28.28em;overflow:hidden;background:#fff;color:#2A2A2A;font-family:Georgia,'Times New Roman',serif;flex-shrink:0;border:1px solid rgba(0,0,0,.12);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.kp *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.kp-forside{display:flex;align-items:center;justify-content:center}
+.kp-panel{background:#fff;border-radius:1.2em;width:15em;padding:2em 1em;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1em}
+.kp-panel svg{height:5.5em;width:auto}
+.kp-tittel{font-size:2.1em;font-weight:700;line-height:1.15}
+.kp-side2{display:flex;flex-direction:column;padding:1.2em 1.2em 1.4em}
+.kp-vimpelrad{position:relative;display:flex;justify-content:space-around;align-items:flex-start;padding-top:.6em}
+.kp-snor{position:absolute;left:0;top:0;width:100%;height:2.2em}
+.kp-vk{position:relative;display:flex;flex-direction:column;align-items:center;width:2.5em}
+.kp-vk>svg:first-child{margin-top:.5em}
+.kp-pil{width:.9em;height:3.2em;margin-top:.2em}
+.kp-tagg{writing-mode:vertical-rl;font-size:.95em;font-weight:700;white-space:nowrap;margin-top:.1em;max-height:8em;overflow:hidden}
+.kp-fritekst{flex:1;margin-top:1em;font-size:1em;line-height:1.7em;white-space:pre-wrap;overflow:hidden}
+.kp-fritekst.kp-linjer{background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 1.62em,#cfcfcf 1.62em,#cfcfcf 1.7em)}
+.kp-fra{text-align:right;font-style:italic;font-size:1em;margin-top:.6em}
+.kp-side3{padding:1.6em 1.5em}
+.kp-h{font-size:1.45em;font-weight:700;line-height:1.2;text-align:center}
+.kp-stripe{height:.55em;border-radius:.3em;margin:.6em 0 .8em}
+.kp-minner{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.4em}
+.kp-minner li{display:flex;gap:.6em;line-height:1.3}
+.kp-minner li i{flex-shrink:0;width:.9em;height:.9em;border-radius:50%;margin-top:.25em}
+.kp-dato{font-size:.8em;color:#777;text-transform:uppercase;letter-spacing:.04em;margin-right:.4em}
+.kp-side4{padding:1.6em 1.4em}
+.kp-rutenett{display:grid;gap:.6em}
+.kp-rutenett img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:.5em;background:#eee;display:block}
+.kp-ballongmidt{display:flex;align-items:center;justify-content:center;height:22em}
+.kp-ballongmidt svg{height:7em;width:auto}
+.kp-bunn{position:absolute;left:1.4em;right:1.4em;bottom:1em;margin:0}
+.kp-tom{height:1px}
 .bilde-rad{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}
 .bilde-rad>img{width:60px;height:60px;object-fit:cover;border-radius:10px;background:var(--line);cursor:pointer}
 .bilde-miniatyr{position:relative;display:inline-block}
@@ -275,15 +300,9 @@ textarea.inp{min-height:80px;resize:vertical}
   #print-area .p-note{font-size:9.5pt;color:#444;margin-left:16pt}
   #print-area .p-meta{font-size:10pt;margin:1pt 0}
   #print-area .p-foot{margin-top:16pt;font-size:9pt;color:#666}
-  #print-area .kort-side{box-sizing:border-box;min-height:240mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12mm;page-break-after:always;break-after:page}
-  #print-area .kort-side:last-child{page-break-after:auto;break-after:auto}
-  #print-area .kort-tittel{font-size:30pt;line-height:1.15;margin-bottom:10mm}
-  #print-area .kort-bilder{display:flex;flex-wrap:wrap;gap:4mm;justify-content:center;margin-bottom:8mm}
-  #print-area .kort-bilder img{height:70mm;max-width:80mm;object-fit:cover;border-radius:3mm}
-  #print-area .kort-bilder.n1 img{height:120mm;max-width:150mm}
-  #print-area .kort-alder{font-size:16pt;color:#444}
-  #print-area .kort-linje{font-size:14pt;font-style:italic;margin:0 0 6mm}
-  #print-area .kort-fra{margin-top:10mm;font-size:14pt}
+  #print-area .kort-ark{display:flex;width:297mm;height:210mm;page-break-after:always;break-after:page;overflow:hidden}
+  #print-area .kort-ark:last-child{page-break-after:auto;break-after:auto}
+  #print-area .kp{font-size:7.425mm;border:0}
 }
 </style>
 </head>
@@ -4870,7 +4889,7 @@ function gavePersonViewHTML(){
       +'<div class="chips">'
       +'<button class="chip" style="font-size:11px" onclick="openPersonTags(\''+q(pn)+'\')">'+(pTags.length?'Rediger hashtagger':'Tilknytt hashtagger')+'</button>'
       +'<button class="chip" style="font-size:11px" onclick="openEditEvent(\''+q(bd.id)+'\')">Rediger navn og dato</button>'
-      +(erMinne(bd)?'':'<button class="chip" style="font-size:11px" onclick="openKortForslag(\''+q(pn)+'\')">Lag kortforslag</button>')
+      +(erMinne(bd)?'':'<button class="chip" style="font-size:11px" onclick="openKortForslag(\''+q(pn)+'\')">Lag bursdagskort</button>')
       +(erMinne(bd)?'':'<button class="chip'+(view._fargevelger?' on':'')+'" style="font-size:11px" onclick="view._fargevelger=!view._fargevelger;render()">Ballongfarge</button>')
       +'</div>'
       +(view._fargevelger&&!erMinne(bd)?ballongFargevelgerHTML(pn):'')
@@ -7070,95 +7089,201 @@ function bildeTaggerTilStikkord(bk,bilder){
   });});
 }
 
-/* ── Kortforslag til bursdag ──
-   Et forslag satt sammen av det du allerede har: bilder av personen (tagget eller fra
-   innlegg om personen) og linjer fra dagboken. Ingenting skrives for deg. Du velger hva
-   som tas med. Linjer fra dagboka er av seg selv ikke valgt, de er private til du sier noe annet. */
+/* ── Bursdagskort (brettet A5) ──
+   Fire sider: 1 forside, 2 vimpelrad og plass til egen tekst, 3 favorittminner, 4 bilder.
+   Alt er satt sammen av det du allerede har, ingenting skrives for deg. Linjer fra dagboka
+   er av seg selv ikke valgt, de er private til du sier noe annet. Utskrift: A4 liggende,
+   dobbeltsidig (vend på kortsiden), brett på midten. */
+var KORT_MAKS_MINNER=10,KORT_MAKS_BILDER=12,KORT_MAKS_VIMPLER=7;
+function kortFornavn(person){return String(person||'').trim().split(/\s+/)[0];}
+function kortStripeCSS(){
+  var n=CAT_COLORS.length,d=[];
+  CAT_COLORS.forEach(function(c,i){d.push(c.hex+' '+(i*100/n).toFixed(3)+'% '+((i+1)*100/n).toFixed(3)+'%');});
+  return'linear-gradient(to right,'+d.join(',')+')';
+}
 function kortKandidater(person){
   var pt=personTagsFor(person),nm=normTag(person);
-  var erDen=function(t){var n=normTag(t);return pt.indexOf(n)>=0||n===nm;};
-  var bilder=[],linjer=[];
+  var erDen=function(t){var n=normTag(t);return pt.indexOf(n)>=0||n===nm||n===normTag(kortFornavn(person));};
+  var bilder=[],minner=[],tagTell={},tagNavn={};
+  var grense=new Date(today);grense.setFullYear(grense.getFullYear()-1);var gIso=isoDate(grense);
   entries.slice().sort(function(a,b){return b.date<a.date?-1:(b.date>a.date?1:0);}).forEach(function(e){
     var om=(e.tags||[]).some(erDen);
-    if(om)linjer.push({id:e.id,tekst:e.text,dato:e.date});
+    if(om){
+      minner.push({id:e.id,tekst:e.text,dato:e.date,sisteAar:e.date>=gIso});
+      (e.tags||[]).forEach(function(t){
+        if(erDen(t))return;
+        var k=tagId(t);tagTell[k]=(tagTell[k]||0)+1;if(!tagNavn[k])tagNavn[k]=String(t).replace(/^#/,'');
+      });
+    }
     (e.bilder||[]).forEach(function(b){
       var pinnet=bildeTagger(b).some(function(t){return erDen(t.t);});
       if(pinnet||om)bilder.push({id:b.id,pinnet:pinnet,dato:e.date,navn:bildeTagger(b).map(function(t){return t.t;})});
     });
   });
   bilder=bilder.filter(function(b){return b.pinnet;}).concat(bilder.filter(function(b){return!b.pinnet;}));
-  return{bilder:bilder,linjer:linjer};
+  var tags=Object.keys(tagTell).sort(function(x,y){return tagTell[y]-tagTell[x]||nbSort(x,y);}).map(function(k){return{t:tagNavn[k],n:tagTell[k]};});
+  return{bilder:bilder,minner:minner,tags:tags};
 }
 function openKortForslag(person){
   var bd=bdayForPerson(person),kd=kortKandidater(person);
   var alder=(bd&&!erMinne(bd))?bdayNextAge(bd):null;
-  modal={step:'bursdagskort',form:{person:person,hilsen:'Gratulerer med dagen, '+String(person).split(' ')[0]+'!',fra:'',
-    visAlder:alder!==null,alderNr:alder,bilder:kd.bilder.slice(0,3).map(function(b){return b.id;}),linjer:[]}};
+  var rund=!!(bd&&isRoundBdayNext(bd));
+  var fn=kortFornavn(person);
+  modal={step:'bursdagskort',form:{person:person,alderNr:alder,
+    tittel:(rund&&alder)?fn+' '+alder+' \u00e5r!':'Gratulerer med dagen, '+fn+'!',
+    vimpler:kd.tags.slice(0,5).map(function(x){return x.t;}),_nyVimpel:'',
+    tekst:'',hand:true,fra:'',
+    minneTittel:'Favorittminner fra \u00e5ret som har gått',minner:[],_eldre:false,
+    bilder:kd.bilder.slice(0,KORT_MAKS_BILDER).map(function(b){return b.id;})}};
   render();
 }
 function kortTogglBilde(id){
   var f=mf(),a=f.bilder||[],i=a.indexOf(id);
-  if(i>=0)a.splice(i,1);else if(a.length<4)a.push(id);
+  if(i>=0)a.splice(i,1);else if(a.length<KORT_MAKS_BILDER)a.push(id);
   f.bilder=a;render();
 }
-function kortTogglLinje(id){
-  var f=mf(),a=f.linjer||[],i=a.indexOf(id);
-  if(i>=0)a.splice(i,1);else if(a.length<4)a.push(id);
-  f.linjer=a;render();
+function kortTogglMinne(id){
+  var f=mf(),a=f.minner||[],i=a.indexOf(id);
+  if(i>=0)a.splice(i,1);else if(a.length<KORT_MAKS_MINNER)a.push(id);
+  f.minner=a;render();
 }
-function kortSiderHTML(f,src){
-  var fb=f.bilder||[];
-  var bilder=fb.length?'<div class="kort-bilder n'+fb.length+'">'+fb.map(function(id){return'<img '+src(id)+' alt="">';}).join('')+'</div>':'';
-  var forside='<div class="kort-side"><div class="kort-tittel">'+esc(f.hilsen||'')+'</div>'+bilder
-    +(f.visAlder&&f.alderNr?'<div class="kort-alder">Du fyller '+f.alderNr+' \u00e5r</div>':'')+'</div>';
-  var linjer=(f.linjer||[]).map(function(id){
-    var e=entries.find(function(x){return x.id===id;});
-    return e?'<p class="kort-linje">\u00ab'+esc(e.text)+'\u00bb</p>':'';
+function kortTogglVimpel(t){
+  var f=mf(),a=f.vimpler||[],i=a.map(tagId).indexOf(tagId(t));
+  if(i>=0)a.splice(i,1);else if(a.length<KORT_MAKS_VIMPLER)a.push(t);
+  f.vimpler=a;render();
+}
+function kortLeggTilVimpel(){
+  var f=mf(),t=String(f._nyVimpel||'').replace(/^#/,'').trim();
+  if(!t||(f.vimpler||[]).length>=KORT_MAKS_VIMPLER)return;
+  if((f.vimpler||[]).map(tagId).indexOf(tagId(t))<0)f.vimpler=(f.vimpler||[]).concat([t]);
+  f._nyVimpel='';render();
+}
+function kortSettTittel(type){
+  var f=mf(),fn=kortFornavn(f.person);
+  f.tittel=(type==='alder'&&f.alderNr)?fn+' '+f.alderNr+' \u00e5r!':'Gratulerer med dagen, '+fn+'!';
+  render();
+}
+function kortBallong(person,em){
+  return personBallongSVG(person,40).replace(/height:[\d.]+px/,'height:'+em+'em');
+}
+// Sidene. src(id) gir bildekilden: data-bilde (forhåndsvisning) eller src (utskrift).
+function kortSideForside(f){
+  return'<div class="kp kp-forside" style="background:'+kortStripeCSS()+'"><div class="kp-panel">'
+    +kortBallong(f.person,5.5)
+    +'<div class="kp-tittel">'+esc(f.tittel||'')+'</div></div></div>';
+}
+function kortSideVimpler(f){
+  var vs=(f.vimpler||[]).slice(0,KORT_MAKS_VIMPLER);
+  var pal=[1,6,12,16,19,3,9];
+  var rad=vs.map(function(t,i){
+    var hex=CAT_COLORS[pal[i%pal.length]%CAT_COLORS.length].hex;
+    return'<div class="kp-vk">'
+      +vimpelSVG(46,hex,darkHex(hex,0.3),(String(t).charAt(0)||'').toUpperCase(),30,textOn(hex)).replace(/height:46px;width:[\d.]+px/,'height:4.2em;width:3em')
+      +'<svg class="kp-pil" viewBox="0 0 10 40" aria-hidden="true"><path d="M5 0 V34 M1.5 29 L5 36 L8.5 29" fill="none" stroke="#555" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      +'<div class="kp-tagg">#'+esc(t)+'</div></div>';
   }).join('');
-  var innside='<div class="kort-side"><div>'+linjer+((f.fra||'').trim()?'<div class="kort-fra">'+esc(f.fra)+'</div>':'')+'</div></div>';
-  return forside+innside;
+  var snor=vs.length?'<svg class="kp-snor" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><path d="M0 1 Q50 7 100 1" fill="none" stroke="#8B7A6B" stroke-width=".7"/></svg>':'';
+  return'<div class="kp kp-side2"><div class="kp-vimpelrad">'+snor+rad+'</div>'
+    +'<div class="kp-fritekst'+(f.hand?' kp-linjer':'')+'">'+esc(f.tekst||'')+'</div>'
+    +((f.fra||'').trim()?'<div class="kp-fra">'+esc(f.fra)+'</div>':'')+'</div>';
+}
+function kortSideMinner(f){
+  var pal=[1,6,12,16,19,3,9,14,22,25];
+  var antM=(f.minner||[]).length;
+  var fs=antM>8?.68:antM>6?.74:.84,maksT=antM>8?95:antM>6?120:160;
+  var li=(f.minner||[]).map(function(id,i){
+    var e=entries.find(function(x){return x.id===id;});if(!e)return'';
+    var t=String(e.text||'').replace(/\s+/g,' ').trim();if(t.length>maksT)t=t.slice(0,maksT-3)+'\u2026';
+    return'<li><i style="background:'+CAT_COLORS[pal[i%pal.length]%CAT_COLORS.length].hex+'"></i><div><span class="kp-dato">'+esc(MND_FULL[Number(e.date.slice(5,7))-1]+' '+e.date.slice(0,4))+'</span>'+esc(t)+'</div></li>';
+  }).join('');
+  return'<div class="kp kp-side3"><div class="kp-h">'+esc(f.minneTittel||'')+'</div>'
+    +'<div class="kp-stripe" style="background:'+kortStripeCSS()+'"></div>'
+    +(li?'<ul class="kp-minner" style="font-size:'+fs+'em">'+li+'</ul>':'<div class="kp-tom"></div>')+'</div>';
+}
+function kortSideBilder(f,src){
+  var ids=(f.bilder||[]).slice(0,KORT_MAKS_BILDER),n=ids.length;
+  var kol=n<=1?1:n<=4?2:3;
+  var grid=n?'<div class="kp-rutenett" style="grid-template-columns:repeat('+kol+',minmax(0,1fr))'+(n===1?';padding:0 2em':'')+'">'+ids.map(function(id){return'<img '+src(id)+' alt="">';}).join('')+'</div>'
+    :'<div class="kp-ballongmidt">'+kortBallong(f.person,7)+'</div>';
+  return'<div class="kp kp-side4">'+grid+'<div class="kp-stripe kp-bunn" style="background:'+kortStripeCSS()+'"></div></div>';
+}
+function kortSider(f,src){
+  return[kortSideForside(f),kortSideVimpler(f),kortSideMinner(f),kortSideBilder(f,src)];
+}
+function kortForhandHTML(f,src){
+  var s=kortSider(f,src);
+  return s.map(function(x,i){return'<div class="kp-hold"><div class="kp-nr">Side '+(i+1)+'</div>'+x+'</div>';}).join('');
 }
 function kortOppdaterForhand(){
   var el=document.getElementById('kort-forhand');if(!el||!modal||!modal.form)return;
-  el.innerHTML=kortSiderHTML(modal.form,function(id){return'data-bilde="'+esc(id)+'"';});
+  el.innerHTML=kortForhandHTML(modal.form,function(id){return'data-bilde="'+esc(id)+'"';});
   hydrerBilder();
 }
 function kortModalHTML(f){
-  var kd=kortKandidater(f.person);
-  var h='<div class="modal-title">Kortforslag til '+esc(f.person)+'</div>'
-    +'<div class="hint">Satt sammen av bildene og ordene dine. Du velger hva som tas med.</div>'
-    +'<label class="field-lbl">Hilsen</label>'
-    +'<input class="inp" type="text" value="'+esc(f.hilsen||'')+'" oninput="mf().hilsen=this.value;kortOppdaterForhand()">'
-    +(f.alderNr?'<div class="chips" style="margin-top:6px"><button class="chip'+(f.visAlder?' on':'')+'" onclick="mf().visAlder=!mf().visAlder;render()">Ta med alder ('+f.alderNr+' \u00e5r)</button></div>':'')
-    +'<label class="field-lbl">Bilder <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 opptil fire</span></label>';
+  var kd=kortKandidater(f.person),fn=kortFornavn(f.person);
+  var h='<div class="modal-title">Kort til '+esc(fn)+'</div>'
+    +'<div class="hint">Brettet A5-kort, fire sider. Satt sammen av bildene og ordene dine, og du velger hva som tas med.</div>'
+    // Forside
+    +'<label class="field-lbl">Forside</label>'
+    +'<input class="inp" type="text" value="'+esc(f.tittel||'')+'" oninput="mf().tittel=this.value;kortOppdaterForhand()">'
+    +'<div class="chips" style="margin-top:6px"><button class="chip" onclick="kortSettTittel(\'dag\')">Gratulerer med dagen</button>'
+    +(f.alderNr?'<button class="chip" onclick="kortSettTittel(\'alder\')">'+esc(fn)+' '+f.alderNr+' \u00e5r!</button>':'')+'</div>'
+    // Vimpelrad
+    +'<label class="field-lbl">Side 2: vimpelrad <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 hashtaggene du oftest har brukt sammen med #'+esc(fn.toLowerCase())+'</span></label>';
+  var valgt=(f.vimpler||[]).map(tagId);
+  var forslag=kd.tags.slice(0,10);
+  h+=forslag.length?'<div class="chips">'+forslag.map(function(x){
+    var pa=valgt.indexOf(tagId(x.t))>=0;
+    return'<button class="chip'+(pa?' on':'')+'" onclick="kortTogglVimpel(\''+q(x.t)+'\')">#'+esc(x.t)+' <span style="opacity:.6;font-size:10px">'+x.n+'</span></button>';
+  }).join('')+'</div>':'<div class="hint">Ingen innlegg med #'+esc(fn.toLowerCase())+' ennå. Du kan legge til egne ord under.</div>';
+  var egne=(f.vimpler||[]).filter(function(t){return!forslag.some(function(x){return tagId(x.t)===tagId(t);});});
+  if(egne.length)h+='<div class="chips" style="margin-top:6px">'+egne.map(function(t){return'<button class="chip on" onclick="kortTogglVimpel(\''+q(t)+'\')">#'+esc(t)+' \u00d7</button>';}).join('')+'</div>';
+  h+='<div style="display:flex;gap:6px;margin-top:6px"><input class="inp" style="flex:1" placeholder="Eget ord \u2026" value="'+esc(f._nyVimpel||'')+'" oninput="mf()._nyVimpel=this.value" onkeydown="if(event.key===\'Enter\'){event.preventDefault();kortLeggTilVimpel()}">'
+    +'<button class="icon-btn" onclick="kortLeggTilVimpel()">Legg til</button></div>'
+    +'<label class="field-lbl">Tekst under vimplene <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 skriv her, eller la stå åpent og skriv for hånd</span></label>'
+    +'<textarea class="inp" rows="4" placeholder="Skriv hilsenen din \u2026" oninput="mf().tekst=this.value;kortOppdaterForhand()">'+esc(f.tekst||'')+'</textarea>'
+    +'<div class="chips" style="margin-top:6px"><button class="chip'+(f.hand?' on':'')+'" onclick="mf().hand=!mf().hand;render()">Linjer til håndskrift</button></div>'
+    +'<label class="field-lbl">Fra <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+    +'<input class="inp" type="text" value="'+esc(f.fra||'')+'" placeholder="Din hilsen eller navn \u2026" oninput="mf().fra=this.value;kortOppdaterForhand()">'
+    // Minner
+    +'<label class="field-lbl">Side 3: minner <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 inntil '+KORT_MAKS_MINNER+', ingenting er valgt på forhånd ('+(f.minner||[]).length+' valgt)</span></label>'
+    +'<input class="inp" type="text" value="'+esc(f.minneTittel||'')+'" oninput="mf().minneTittel=this.value;kortOppdaterForhand()">';
+  var sisteAar=kd.minner.filter(function(m){return m.sisteAar;}),eldre=kd.minner.filter(function(m){return!m.sisteAar;});
+  var minneKnapp=function(l){
+    var pa=(f.minner||[]).indexOf(l.id)>=0,t=l.tekst.length>110?l.tekst.slice(0,107)+'\u2026':l.tekst;
+    return'<button class="chip'+(pa?' on':'')+'" style="text-align:left;white-space:normal;border-radius:12px" onclick="kortTogglMinne(\''+q(l.id)+'\')"><span style="opacity:.6;font-size:10px">'+esc(fmtDate(l.dato))+'</span> '+esc(t)+'</button>';
+  };
+  if(kd.minner.length){
+    h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">'
+      +(sisteAar.length?sisteAar.slice(0,40).map(minneKnapp).join(''):'<div class="hint">Ingen innlegg om '+esc(fn)+' det siste året.</div>')
+      +'</div>';
+    if(eldre.length){
+      h+='<div class="chips" style="margin-top:6px"><button class="chip" onclick="mf()._eldre=!mf()._eldre;render()">'+(f._eldre?'Skjul eldre minner':'Vis eldre minner ('+eldre.length+')')+'</button></div>';
+      if(f._eldre)h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">'+eldre.slice(0,40).map(minneKnapp).join('')+'</div>';
+    }
+  } else {
+    h+='<div class="hint">Innlegg som bruker '+esc(fn)+'s hashtagger dukker opp her.</div>';
+  }
+  // Bilder
+  h+='<label class="field-lbl">Side 4: bilder <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 inntil '+KORT_MAKS_BILDER+' ('+(f.bilder||[]).length+' valgt)</span></label>';
   if(kd.bilder.length){
     h+='<div class="bilde-rad" style="margin-top:0">'+kd.bilder.map(function(b){
       var pa=(f.bilder||[]).indexOf(b.id)>=0;
       return'<span class="bilde-miniatyr'+(pa?' on':'')+'"><img data-bilde="'+esc(b.id)+'" alt="" title="'+esc(b.navn.join(', '))+'" onclick="kortTogglBilde(\''+q(b.id)+'\')"></span>';
     }).join('')+'</div>';
   } else {
-    h+='<div class="hint">Ingen bilder av '+esc(String(f.person).split(' ')[0])+' ennå. Legg til bilder på innlegg og tagg dem, så dukker de opp her. Kortet fungerer fint uten også.</div>';
+    h+='<div class="hint">Ingen bilder av '+esc(fn)+' ennå. Legg til bilder på innlegg og tagg dem, så dukker de opp her. Kortet fungerer fint uten også.</div>';
   }
-  h+='<label class="field-lbl">Linjer fra dagboka <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt, ingenting er valgt på forhånd</span></label>';
-  if(kd.linjer.length){
-    h+='<div style="display:flex;flex-direction:column;gap:6px">'+kd.linjer.slice(0,12).map(function(l){
-      var pa=(f.linjer||[]).indexOf(l.id)>=0,t=l.tekst.length>110?l.tekst.slice(0,107)+'\u2026':l.tekst;
-      return'<button class="chip'+(pa?' on':'')+'" style="text-align:left;white-space:normal;border-radius:12px" onclick="kortTogglLinje(\''+q(l.id)+'\')">'+esc(t)+'</button>';
-    }).join('')+'</div>';
-  } else {
-    h+='<div class="hint">Innlegg som bruker '+esc(String(f.person).split(' ')[0])+'s hashtagger dukker opp her.</div>';
-  }
-  h+='<label class="field-lbl">Fra <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
-    +'<input class="inp" type="text" value="'+esc(f.fra||'')+'" placeholder="Din hilsen eller navn \u2026" oninput="mf().fra=this.value;kortOppdaterForhand()">'
-    +'<label class="field-lbl">Forhåndsvisning</label>'
-    +'<div id="kort-forhand" class="kort-forhand">'+kortSiderHTML(f,function(id){return'data-bilde="'+esc(id)+'"';})+'</div>'
+  h+='<label class="field-lbl">Forhåndsvisning <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 sveip til siden</span></label>'
+    +'<div id="kort-forhand" class="kort-forhand">'+kortForhandHTML(f,function(id){return'data-bilde="'+esc(id)+'"';})+'</div>'
+    +'<div class="hint">Skriv ut på A4 liggende, dobbeltsidig (vend på kortsiden), og brett på midten.</div>'
     +'<button class="save-btn" onclick="skrivUtKort()">Skriv ut / lagre som PDF</button>';
   return h;
 }
 function skrivUtKort(){
   var f=mf(),area=document.getElementById('print-area');if(!area)return;
   var urls={};
-  Promise.all((f.bilder||[]).map(function(id){
+  Promise.all((f.bilder||[]).slice(0,KORT_MAKS_BILDER).map(function(id){
     return bildeHent(id).then(function(blob){
       if(!blob)return;
       return new Promise(function(res){
@@ -7168,8 +7293,15 @@ function skrivUtKort(){
     }).catch(function(){});
   })).then(function(){
     var kopi=Object.assign({},f,{bilder:(f.bilder||[]).filter(function(id){return urls[id];})});
-    area.innerHTML=kortSiderHTML(kopi,function(id){return'src="'+urls[id]+'"';});
-    try{window.print();}catch(e){alert('Utskrift st\u00f8ttes ikke her \u2014 \u00e5pne appen i nettleseren og pr\u00f8v derfra.');}
+    var sd=kortSider(kopi,function(id){return'src="'+urls[id]+'"';});
+    // Ark 1 (utsiden): bakside | forside. Ark 2 (innsiden): side 2 | side 3.
+    area.innerHTML='<div class="kort-ark">'+sd[3]+sd[0]+'</div><div class="kort-ark">'+sd[1]+sd[2]+'</div>';
+    var st=document.createElement('style');st.id='kort-sidestil';
+    st.textContent='@page{size:A4 landscape;margin:0}';
+    document.head.appendChild(st);
+    var rydd=function(){var x=document.getElementById('kort-sidestil');if(x)x.remove();window.removeEventListener('afterprint',rydd);};
+    window.addEventListener('afterprint',rydd);
+    try{window.print();}catch(e){rydd();alert('Utskrift st\u00f8ttes ikke her \u2014 \u00e5pne appen i nettleseren og pr\u00f8v derfra.');}
   });
 }
 
