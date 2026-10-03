@@ -84,6 +84,19 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .sec-title{font-size:15px;font-weight:700;color:var(--ink);padding:20px 16px 4px;font-family:var(--font-heading,inherit)}
 .view-sub{font-size:12px;color:var(--muted);padding:0 16px 8px;line-height:1.55}
 .card{background:var(--card);border-radius:14px;overflow:hidden;margin:8px 12px 4px;border:1px solid var(--line)}
+.bilde-rad{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}
+.bilde-rad>img{width:60px;height:60px;object-fit:cover;border-radius:10px;background:var(--line);cursor:pointer}
+.bilde-miniatyr{position:relative;display:inline-block}
+.bilde-miniatyr img{width:60px;height:60px;object-fit:cover;border-radius:10px;background:var(--line);cursor:pointer;display:block;border:2px solid transparent}
+.bilde-miniatyr.on img{border-color:var(--rose)}
+.bilde-miniatyr button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:var(--ink);color:#fff;font-size:10px;line-height:20px;padding:0;cursor:pointer}
+.bilde-legg-til{height:60px;padding:0 14px;border-radius:10px;border:1.5px dashed var(--rose);background:none;color:var(--rose);font-weight:700;cursor:pointer}
+.bilde-wrap{position:relative;display:block;margin-top:6px;border-radius:12px;overflow:hidden;background:var(--line);line-height:0}
+.bilde-wrap>img{width:100%;height:auto;display:block;min-height:80px}
+.bilde-pin{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;pointer-events:none;line-height:1}
+.bilde-pin i{width:14px;height:14px;border-radius:50%;background:var(--rose);border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.bilde-pin.ny i{background:transparent;border-color:#fff;animation:none}
+.bilde-pin b{margin-top:3px;padding:2px 7px;border-radius:9px;background:rgba(255,255,255,.92);color:#222;font-size:11px;font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
 .entry-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
 .entry-row.tett{padding:4px 14px;align-items:center}
 .entry-row.tett .entry-text{font-size:12.5px;line-height:1.3}
@@ -399,6 +412,9 @@ function byttTagOveralt(fra,til){
     });
   };
   bytt(entries);bytt(events);bytt(routines);bytt(inventories);bytt(results);
+  [entries,skjulteEntries].forEach(function(l){(l||[]).forEach(function(e){(e.bilder||[]).forEach(function(b){
+    (b.tagger||[]).forEach(function(t){if(tagId(t.t)===fra)t.t=til;});
+  });});});
   // Kategoritilknytningen følger med, med mindre målet alt har en
   if(tagCats[fra]&&!tagCats[til])tagCats[til]=tagCats[fra];
   delete tagCats[fra];
@@ -3696,6 +3712,9 @@ function load(){
     if(achievements.length!==før)save();
   })();
 
+  // Bilder som ikke hører til noe innlegg (f.eks. fra et avbrutt innlegg) ryddes bort.
+  bildeRydd();
+
   // Eksisterende rutiner uten startdato: anslås fra tidligste avhaking eller
   // koblede innlegg. Rutiner uten spor får dato første gang de hakes av.
   routines.forEach(function(r){
@@ -4184,7 +4203,11 @@ function selectCat(id){selectedCat=(selectedCat===id)?null:id;render();}
 function setEdit(v){editMode=v;render();}
 
 /* ── Dagbok-handlinger ── */
-function deleteEntry(id){entries=entries.filter(function(e){return e.id!==id;});save();render();}
+function deleteEntry(id){
+  var gml=entries.find(function(e){return e.id===id;});
+  if(gml)(gml.bilder||[]).forEach(function(b){bildeSlett(b.id);});
+  entries=entries.filter(function(e){return e.id!==id;});save();render();
+}
 // ── Skjulte innlegg — for dagbokinnlegg brukeren ikke vil skal vises n\u00e5r
 // appen demonstreres for andre. Flyttes helt ut av entries, s\u00e5 ingen andre
 // steder i appen (s\u00f8k, skyer, lister) trenger \u00e5 filtrere dem bort separat.
@@ -4409,6 +4432,36 @@ function evFreqTxt(e){
   if(!e.repeat)return'';
   var iv=Number(e.interval)||1;
   return iv===1?'hvert \u00e5r':'hvert '+iv+'. \u00e5r';
+}
+// ── Notat på gjentakende hendelser ─────────────────────────────────────────
+// Ett notat per år, så lærdom bæres videre: «sist tok dette to timer». Når
+// hendelsen kommer igjen, vises det nyeste eldre notatet stille under den.
+function notaterRenset(n){
+  var ut={};Object.keys(n||{}).forEach(function(y){var t=String(n[y]||'').trim();if(t)ut[y]=t;});
+  return Object.keys(ut).length?ut:undefined;
+}
+function eventNotatSist(e,aar){
+  var n=e.notater||{},best=null;
+  Object.keys(n).forEach(function(y){
+    if(Number(y)<Number(aar)&&String(n[y]||'').trim()&&(best===null||Number(y)>Number(best)))best=y;
+  });
+  return best===null?null:{aar:best,tekst:String(n[best]).trim()};
+}
+function eventNotatLinje(e,aar){
+  if(!e.repeat)return'';
+  var s=eventNotatSist(e,aar);if(!s)return'';
+  var t=s.tekst.replace(/\s+/g,' ');
+  return'Sist ('+s.aar+'): '+(t.length>80?t.slice(0,77)+'\u2026':t);
+}
+function eventNotatSkjemaHTML(f){
+  if(!f.repeat||f.bday)return'';
+  var n=f.notater||{};
+  var aar=[String(curYear)].concat(Object.keys(n).filter(function(y){return y!==String(curYear)&&String(n[y]||'').trim();}).sort(function(a,b){return Number(b)-Number(a);}));
+  return'<label class="field-lbl">Notat <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 det du vil huske til neste gang</span></label>'
+    +aar.map(function(y){
+      return'<div style="font-size:11px;color:var(--muted);margin:6px 0 2px">'+y+'</div>'
+        +'<textarea class="inp" rows="2" placeholder="'+(y===String(curYear)?'F.eks. tok to timer, husk stigen \u2026':'')+'" oninput="mf().notater=mf().notater||{};mf().notater[\''+y+'\']=this.value">'+esc(n[y]||'')+'</textarea>';
+    }).join('');
 }
 function evDone(e,year){return e.repeat?(e.log||[]).includes(Number(year)):!!e.done;}
 function eventIsPast(e){
@@ -6776,9 +6829,224 @@ function toggleFormGoal(id){
   render();
 }
 
+/* ── Bilder på innlegg ──
+   Bildene ligger i nettleserens bildelager (IndexedDB), ikke i vanlig lagring som fort ville
+   blitt full. Innlegget husker bare id-en og hvor i bildet hver person eller ting er tagget
+   (posisjon som andel 0–1, pluss stikkordet). Stikkordet legges også på innlegget, så
+   personen eller tingen dukker opp på stikkordets egen side. */
+var bildeDB=null,bildeCache={},BILDE_MAKS=1280;
+function bildeApne(){
+  return new Promise(function(res){
+    if(bildeDB)return res(bildeDB);
+    if(typeof indexedDB==='undefined'||!indexedDB)return res(null);
+    try{
+      var rq=indexedDB.open('gode-dager-bilder',1);
+      rq.onupgradeneeded=function(){rq.result.createObjectStore('bilder');};
+      rq.onsuccess=function(){bildeDB=rq.result;res(bildeDB);};
+      rq.onerror=function(){res(null);};
+    }catch(e){res(null);}
+  });
+}
+function bildeOp(modus,fn){
+  return bildeApne().then(function(db){
+    if(!db)return null;
+    return new Promise(function(res){
+      try{
+        var tx=db.transaction('bilder',modus),st=tx.objectStore('bilder'),utfall=fn(st);
+        tx.oncomplete=function(){res(utfall&&'result' in utfall?utfall.result:true);};
+        tx.onerror=tx.onabort=function(){res(null);};
+      }catch(e){res(null);}
+    });
+  });
+}
+function bildeLagre(id,blob){return bildeOp('readwrite',function(st){return st.put(blob,id);});}
+function bildeHent(id){return bildeOp('readonly',function(st){return st.get(id);});}
+function bildeSlett(id){delete bildeCache[id];return bildeOp('readwrite',function(st){return st.delete(id);});}
+function bildeAlleIder(){return bildeOp('readonly',function(st){return st.getAllKeys();});}
+function bildeKomprimer(file){
+  return new Promise(function(res,rej){
+    var img=new Image(),url=URL.createObjectURL(file);
+    img.onload=function(){
+      var w=img.naturalWidth,h=img.naturalHeight,k=Math.min(1,BILDE_MAKS/Math.max(w,h));
+      var c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(b){b?res(b):rej(new Error('Kunne ikke lese bildet'));},'image/jpeg',0.82);
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('Kunne ikke lese bildet'));};
+    img.src=url;
+  });
+}
+function bildeVelg(){
+  var inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*';inp.multiple=true;
+  inp.onchange=function(e){
+    var filer=[].slice.call(e.target.files||[]);if(!filer.length||!modal||!modal.form)return;
+    var f=modal.form;f.bilder=f.bilder||[];
+    try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(x){}
+    filer.reduce(function(kjede,fil){
+      return kjede.then(function(){
+        return bildeKomprimer(fil).then(function(blob){
+          var id='b'+Date.now()+Math.random().toString(36).slice(2,6);
+          return bildeLagre(id,blob).then(function(ok){
+            if(!ok){alert('Bildet kunne ikke lagres på denne enheten.');return;}
+            f.bilder.push({id:id,tagger:[]});
+            f._bildeAapen=f.bilder.length-1;f._pin=null;
+            render();
+          });
+        }).catch(function(){alert('Kunne ikke lese bildet.');});
+      });
+    },Promise.resolve());
+  };
+  inp.click();
+}
+// Setter src på alle bilder i DOM-en. Kalles etter hver render().
+function hydrerBilder(){
+  var els=document.querySelectorAll('img[data-bilde]');
+  [].forEach.call(els,function(el){
+    var id=el.getAttribute('data-bilde');
+    if(bildeCache[id]){if(el.getAttribute('src')!==bildeCache[id])el.setAttribute('src',bildeCache[id]);return;}
+    bildeHent(id).then(function(blob){
+      if(!blob||typeof URL.createObjectURL!=='function')return;
+      if(!bildeCache[id])bildeCache[id]=URL.createObjectURL(blob);
+      [].forEach.call(document.querySelectorAll('img[data-bilde="'+id+'"]'),function(e2){e2.setAttribute('src',bildeCache[id]);});
+    });
+  });
+}
+function bildeIderI(lister){
+  var ider={};
+  lister.forEach(function(l){(l||[]).forEach(function(e){(e.bilder||[]).forEach(function(b){ider[b.id]=1;});});});
+  return ider;
+}
+// Rydder bort bilder som ikke hører til noe innlegg (f.eks. fra et avbrutt innlegg).
+// Gjør ingenting hvis det ikke finnes innlegg, så en tom eller feillest lagring aldri tømmer bildene.
+function bildeRydd(){
+  if(!entries.length&&!skjulteEntries.length)return Promise.resolve();
+  return bildeAlleIder().then(function(keys){
+    if(!keys)return;
+    var brukt=bildeIderI([entries,skjulteEntries]);
+    if(modal&&modal.form&&modal.form.bilder)modal.form.bilder.forEach(function(b){brukt[b.id]=1;});
+    keys.forEach(function(k){if(!brukt[k])bildeSlett(k);});
+  });
+}
+function bildeTagger(b){return(b&&b.tagger)||[];}
+// Selve bildet med tagger. Posisjonene er andeler, så de passer i alle størrelser.
+function bildeMedTaggerHTML(b,onclick){
+  var h='<div class="bilde-wrap"'+(onclick?' onclick="'+onclick+'"':'')+'><img data-bilde="'+esc(b.id)+'" alt="">';
+  bildeTagger(b).forEach(function(t){
+    h+='<span class="bilde-pin" style="left:'+(t.x*100).toFixed(1)+'%;top:'+(t.y*100).toFixed(1)+'%"><i></i><b>'+esc(t.t)+'</b></span>';
+  });
+  return h+'</div>';
+}
+function bilderRadHTML(e){
+  var bs=e.bilder||[];if(!bs.length)return'';
+  return'<div class="bilde-rad">'+bs.map(function(b,i){
+    return'<img data-bilde="'+esc(b.id)+'" alt="Bilde '+(i+1)+'" onclick="event.stopPropagation();apneBilde(\''+q(e.id)+'\','+i+')">';
+  }).join('')+'</div>';
+}
+function apneBilde(eid,i){modal={step:'bildevis',form:{eid:eid,i:i}};render();}
+function bildeVisHTML(){
+  var f=modal.form,e=entries.find(function(x){return x.id===f.eid;});
+  if(!e||!(e.bilder||[]).length){return'<div class="modal-overlay" onclick="closeModal()"><div class="modal"><button class="close-btn" onclick="closeModal()">×</button><div class="empty">Bildet finnes ikke lenger.</div></div></div>';}
+  var n=e.bilder.length,i=Math.max(0,Math.min(f.i,n-1)),b=e.bilder[i];
+  var navn=bildeTagger(b).map(function(t){return t.t;}).filter(function(t,k,a){return a.indexOf(t)===k;});
+  return'<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal"><button class="close-btn" onclick="closeModal()">×</button>'
+    +bildeMedTaggerHTML(b)
+    +(navn.length?'<div class="entry-cats" style="margin-top:8px">'+navn.map(function(t){return tagPillHTML(t);}).join('')+'</div>':'')
+    +'<div class="entry-text" style="margin-top:8px">'+esc(e.text)+'</div>'
+    +'<div class="entry-date">'+fmtDate(e.date)+'</div>'
+    +(n>1?'<div class="chips" style="justify-content:center;margin-top:10px">'
+      +'<button class="chip" '+(i===0?'disabled':'')+' onclick="modal.form.i='+(i-1)+';render()">\u2039</button>'
+      +'<span style="align-self:center;font-size:12px;color:var(--muted)">'+(i+1)+' / '+n+'</span>'
+      +'<button class="chip" '+(i===n-1?'disabled':'')+' onclick="modal.form.i='+(i+1)+';render()">\u203a</button></div>':'')
+    +'</div></div>';
+}
+// ── Bilder i innleggsskjemaet ──
+function bildeFjernFraSkjema(i){
+  var f=mf();f.bilder.splice(i,1);f._bildeAapen=null;f._pin=null;render();
+}
+function bildeAapneEditor(i){var f=mf();f._bildeAapen=(f._bildeAapen===i)?null:i;f._pin=null;render();}
+function bildePlasser(ev,el){
+  var f=mf();var r=el.getBoundingClientRect();if(!r.width||!r.height)return;
+  f._pin={x:Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(ev.clientY-r.top)/r.height))};
+  f._pinTekst='';render();
+}
+function bildeLeggTilTagg(tekst){
+  var f=mf();var t=String(tekst||'').replace(/^#/,'').trim();
+  if(!t||!f._pin||f._bildeAapen==null)return;
+  var b=f.bilder[f._bildeAapen];if(!b)return;
+  b.tagger=b.tagger||[];
+  b.tagger.push({x:f._pin.x,y:f._pin.y,t:t});
+  f._pin=null;f._pinTekst='';render();
+}
+function bildeFjernTagg(k){
+  var f=mf();var b=f.bilder[f._bildeAapen];if(!b)return;
+  b.tagger.splice(k,1);render();
+}
+function bildeForslag(f){
+  var egne=unionAv(f.bolker||[{cats:f.cats,tags:f.tags}],'tags').concat(f.tags||[]);
+  var ut=[];egne.forEach(function(t){if(ut.indexOf(t)<0)ut.push(t);});
+  var pool=allTagsPool();
+  Object.keys(pool).sort(function(a,b){return pool[b]-pool[a]||nbSort(a,b);}).forEach(function(t){
+    if(ut.length<14&&ut.indexOf(t)<0)ut.push(t);
+  });
+  return ut;
+}
+function bilderSkjemaHTML(f){
+  var bs=f.bilder||[];
+  var h='<label class="field-lbl">Bilder <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>';
+  h+='<div class="bilde-rad" style="margin-top:0">'+bs.map(function(b,i){
+    var pa=f._bildeAapen===i;
+    return'<span class="bilde-miniatyr'+(pa?' on':'')+'"><img data-bilde="'+esc(b.id)+'" alt="Bilde '+(i+1)+'" onclick="bildeAapneEditor('+i+')">'
+      +'<button type="button" onclick="bildeFjernFraSkjema('+i+')" aria-label="Fjern bildet">\u2715</button></span>';
+  }).join('')+'<button type="button" class="bilde-legg-til" onclick="bildeVelg()">+ Bilde</button></div>';
+  var i=f._bildeAapen;
+  if(i!=null&&bs[i]){
+    var b=bs[i];
+    h+='<div class="hint" style="margin-top:8px">Trykk i bildet der en person eller ting er, og velg hvem eller hva det er.</div>';
+    h+='<div class="bilde-wrap" onclick="bildePlasser(event,this)"><img data-bilde="'+esc(b.id)+'" alt="">';
+    bildeTagger(b).forEach(function(t){
+      h+='<span class="bilde-pin" style="left:'+(t.x*100).toFixed(1)+'%;top:'+(t.y*100).toFixed(1)+'%"><i></i><b>'+esc(t.t)+'</b></span>';
+    });
+    if(f._pin)h+='<span class="bilde-pin ny" style="left:'+(f._pin.x*100).toFixed(1)+'%;top:'+(f._pin.y*100).toFixed(1)+'%"><i></i></span>';
+    h+='</div>';
+    if(f._pin){
+      h+='<label class="field-lbl">Hvem eller hva er dette?</label><div class="chips">'
+        +bildeForslag(f).map(function(t){return'<button type="button" class="chip" onclick="bildeLeggTilTagg(\''+q(t)+'\')">#'+esc(t)+'</button>';}).join('')+'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:6px"><input class="inp" id="bilde-tagg-inp" style="flex:1" placeholder="Eller skriv et nytt navn …" oninput="mf()._pinTekst=this.value">'
+        +'<button type="button" class="icon-btn" onclick="bildeLeggTilTagg(mf()._pinTekst)">Legg til</button></div>';
+    }
+    if(bildeTagger(b).length){
+      h+='<div class="chips" style="margin-top:8px">'+bildeTagger(b).map(function(t,k){
+        return'<span class="tag-pill">#'+esc(t.t)+' <button type="button" style="border:0;background:none;padding:0 0 0 4px;cursor:pointer;color:inherit" onclick="bildeFjernTagg('+k+')" aria-label="Fjern tagg">\u2715</button></span>';
+      }).join('')+'</div>';
+    }
+  }
+  return h;
+}
+// Tagger i bilder blir også stikkord på innlegget, så de kan søkes opp og får egen side.
+function bildeTaggerTilStikkord(bk,bilder){
+  (bilder||[]).forEach(function(b){bildeTagger(b).forEach(function(t){
+    var alle=unionAv(bk,'tags').map(tagId);
+    if(alle.indexOf(tagId(t.t))<0)bk[0].tags=[].concat(bk[0].tags||[],[t.t]);
+  });});
+}
+
 /* ── Eksport / import ── */
 function exportJSON(){
-  var data=JSON.stringify({entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,stillingKriterier:stillingKriterier,stillinger:stillinger,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,ordValg:ordValg,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var ider=Object.keys(bildeIderI([entries,skjulteEntries])),bilderMap={};
+  Promise.all(ider.map(function(id){
+    return bildeHent(id).then(function(blob){
+      if(!blob)return;
+      return new Promise(function(res){
+        try{var fr=new FileReader();fr.onload=function(){bilderMap[id]=fr.result;res();};fr.onerror=function(){res();};fr.readAsDataURL(blob);}
+        catch(x){res();}
+      });
+    }).catch(function(){});
+  })).then(function(){exportJSONMed(bilderMap);},function(){exportJSONMed(bilderMap);});
+}
+function exportJSONMed(bilderMap){
+  var data=JSON.stringify({bilder:bilderMap,entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,stillingKriterier:stillingKriterier,stillinger:stillinger,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,ordValg:ordValg,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -6798,6 +7066,10 @@ function importJSON(){
         var d=JSON.parse(ev.target.result);
         if(!d.entries)throw new Error('Ugyldig fil');
         entries=d.entries||[];cats=d.cats||[];routines=d.routines||[];events=d.events||[];goals=d.goals||[];laters=d.laters||[];results=d.results||[];inventories=d.inventories||[];budgetRows=d.budgetRows||[];deposits=d.deposits||[];timeLogs=d.timeLogs||[];mens=d.mens||[];mensDag=d.mensDag||[];maalinger=d.maalinger||[];kvartalNotat=d.kvartalNotat||{};mensSyklusNotat=d.mensSyklusNotat||{};investeringer=d.investeringer||[];datingKriterier=d.datingKriterier||[];datingPersoner=d.datingPersoner||[];stillingKriterier=d.stillingKriterier||[];stillinger=d.stillinger||[];skjulteEntries=d.skjulteEntries||[];investGlobalOrder=d.investGlobalOrder||[];gifts=d.gifts||[];tagCats=d.tagCats||{};ordValg=d.ordValg||{ignorer:[],taMed:[]};customUnits=d.customUnits||[];places=d.places||{l1:[],l2:[],l3:[]};achievements=d.achievements||[];
+        var bm=d.bilder||{};
+        Object.keys(bm).forEach(function(id){
+          try{fetch(bm[id]).then(function(r){return r.blob();}).then(function(bl){return bildeLagre(id,bl);}).then(function(){render();});}catch(x){}
+        });
         save();render();
       }catch(err){alert('Kunne ikke lese filen: '+err.message);}
     };
@@ -6849,7 +7121,7 @@ function openEntryModal(){
 function openEditEntry(id){
   var e=entries.find(function(x){return x.id===id;});if(!e)return;
   var bk=bolkerFra(e);
-  modal={step:'entry_edit',form:{id:id,text:e.text,cats:[].concat(bk[0].cats),tags:[].concat(bk[0].tags),bolker:bk,_bolk:0,routineIds:[].concat(e.routineIds||[]),date:e.date,_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'entry_edit',form:{id:id,bilder:JSON.parse(JSON.stringify(e.bilder||[])),text:e.text,cats:[].concat(bk[0].cats),tags:[].concat(bk[0].tags),bolker:bk,_bolk:0,routineIds:[].concat(e.routineIds||[]),date:e.date,_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 function openRoutineModal(){
@@ -7112,7 +7384,7 @@ function openEventModal(){
 }
 function openEditEvent(id){
   var e=events.find(function(x){return x.id===id;});if(!e)return;
-  modal={step:'event_edit',form:{id:id,name:e.name,cats:[].concat(e.cats||[]),tags:[].concat(e.tags||[]),month:e.month,year:e.year,day:e.day||'',toMonth:e.toMonth||'',toDay:e.toDay||'',repeat:!!e.repeat,bday:!!e.bday,memorial:!!e.memorial,interval:Number(e.interval)||1,sinceYear:e.sinceYear||'',goalIds:[].concat(e.goalIds||[]),resultIds:[].concat(e.resultIds||[]),equipmentIds:[].concat(e.equipmentIds||[]),ease:e.ease||'',personTags:[].concat(e.personTags||[]),_ptInput:'',_newSub:'',_newSubParent:'',_newMain:''}};
+  modal={step:'event_edit',form:{id:id,name:e.name,cats:[].concat(e.cats||[]),tags:[].concat(e.tags||[]),month:e.month,year:e.year,day:e.day||'',toMonth:e.toMonth||'',toDay:e.toDay||'',repeat:!!e.repeat,bday:!!e.bday,memorial:!!e.memorial,interval:Number(e.interval)||1,sinceYear:e.sinceYear||'',goalIds:[].concat(e.goalIds||[]),resultIds:[].concat(e.resultIds||[]),equipmentIds:[].concat(e.equipmentIds||[]),ease:e.ease||'',notater:JSON.parse(JSON.stringify(e.notater||{})),personTags:[].concat(e.personTags||[]),_ptInput:'',_newSub:'',_newSubParent:'',_newMain:''}};
   render();
 }
 var confirmArm=null;
@@ -7459,7 +7731,8 @@ function submitEntry(){
   var text=(f.text||'').trim();if(!text)return;
   if(!f.cats.length)return;
   var bk=bolkerUt(f);
-  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:unionAv(bk,'cats'),tags:unionAv(bk,'tags'),bolker:bk,routineIds:f.routineIds||[],date:isoDate(today)});
+  bildeTaggerTilStikkord(bk,f.bilder);
+  entries.unshift({id:'e'+Date.now()+Math.random().toString(36).slice(2,6),text:text,cats:unionAv(bk,'cats'),tags:unionAv(bk,'tags'),bolker:bk,bilder:(f.bilder||[]).length?f.bilder:undefined,routineIds:f.routineIds||[],date:isoDate(today)});
   save();closeModal();
 }
 function saveEditEntry(){
@@ -7468,6 +7741,10 @@ function saveEditEntry(){
   if(!f.cats.length)return;
   var e=entries.find(function(x){return x.id===f.id;});if(!e)return;
   var bk=bolkerUt(f);
+  bildeTaggerTilStikkord(bk,f.bilder);
+  var beholdt={};(f.bilder||[]).forEach(function(b){beholdt[b.id]=1;});
+  (e.bilder||[]).forEach(function(b){if(!beholdt[b.id])bildeSlett(b.id);});
+  e.bilder=(f.bilder||[]).length?f.bilder:undefined;
   e.text=text;e.bolker=bk;e.cats=unionAv(bk,'cats');e.tags=unionAv(bk,'tags');e.routineIds=f.routineIds||[];
   if(f.date)e.date=f.date;
   save();closeModal();
@@ -7501,7 +7778,7 @@ function submitEvent(){
   if(f.bday&&!f.memorial&&bdayCount()>=BDAY_MAX)return;
   // Bursdager har ikke egen kategorivelger \u2014 de h\u00f8rer alltid til Folk
   if(f.bday){var fk=folkCat();f.cats=fk?[fk.id]:[];}
-  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:(f.cats||[]).filter(function(cid){return!!catById(cid);}),month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,tags:f.tags||[],repeat:!!f.repeat,bday:!!f.bday,memorial:!!f.memorial,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],done:false,log:[]});
+  events.push({id:'v'+Date.now()+Math.random().toString(36).slice(2,6),name:name,cats:(f.cats||[]).filter(function(cid){return!!catById(cid);}),month:Number(f.month),year:Number(f.year),day:f.day?Number(f.day):null,toMonth:(!f.bday&&f.day&&f.toDay)?Number(f.toMonth||f.month):null,toDay:(!f.bday&&f.day&&f.toDay)?Number(f.toDay):null,tags:f.tags||[],repeat:!!f.repeat,bday:!!f.bday,memorial:!!f.memorial,interval:Number(f.interval)||1,sinceYear:f.sinceYear?Number(f.sinceYear):null,goalIds:f.bday?[]:(f.goalIds||[]),resultIds:f.bday?[]:(f.resultIds||[]),equipmentIds:f.bday?[]:(f.equipmentIds||[]),ease:(f.ease||'').trim(),personTags:f.personTags||[],notater:notaterRenset(f.notater),done:false,log:[]});
   if(f._fromLater)laters=laters.filter(function(l){return l.id!==f._fromLater;});
   save();closeModal();
 }
@@ -7515,6 +7792,10 @@ function saveEditEvent(){
   e.sinceYear=f.sinceYear?Number(f.sinceYear):null;
   e.goalIds=f.bday?[]:(f.goalIds||[]);e.resultIds=f.bday?[]:(f.resultIds||[]);e.equipmentIds=f.bday?[]:(f.equipmentIds||[]);e.ease=(f.ease||'').trim();
   e.personTags=f.personTags||[];
+  (function(){
+    var n={};Object.keys(f.notater||{}).forEach(function(y){var t=String(f.notater[y]||'').trim();if(t)n[y]=t;});
+    if(Object.keys(n).length)e.notater=n;else delete e.notater;
+  })();
   if(e.repeat&&!e.log)e.log=[];
   save();closeModal();
 }
@@ -7650,6 +7931,7 @@ function tagSectionHTML(f){
 function modalHTML(){
   if(!modal)return'';
   var f=mf(),step=modal.step,body='';
+  if(step==='bildevis')return bildeVisHTML();
 
   if(step==='info'){
     body='<div class="modal-title">'+esc(modal.tekst)+'</div>'
@@ -8973,6 +9255,7 @@ function modalHTML(){
       +(!f.bday?'<label class="field-lbl">Stikkord <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'+tagSectionHTML(f):'')
       +(!f.bday?'<label class="field-lbl">Kategori(er)</label>'
       +'<div class="chips">'+catChipSection(f)+'</div>':'')
+      +eventNotatSkjemaHTML(f)
       +(isEditE?'<button class="del-full-btn" onclick="deleteEvent(\''+q(f.id)+'\')">Slett hendelse</button>':'')
       +'<button class="save-btn" onclick="'+(isEditE?'saveEditEvent()':'submitEvent()')+'" '+(routineValid()?'':'disabled')+'>'+(isEditE?'Lagre endringer':'Lagre hendelse')+'</button>';
 
@@ -8989,6 +9272,7 @@ function modalHTML(){
       +'<div class="chips">'+catChipSection(f)+'</div>'
       +'<label class="field-lbl">Stikkord (valgfritt)</label>'
       +tagSectionHTML(f)
+      +bilderSkjemaHTML(f)
       +(function(){
         var rang=rutinerRangert(f.text,unionAv(f.bolker||[{cats:f.cats,tags:f.tags}],'tags').concat(f.tags||[]),unionAv(f.bolker||[{cats:f.cats,tags:f.tags}],'cats').concat(f.cats||[]),f.routineIds);
         if(!rang.length)return'';
@@ -9030,6 +9314,7 @@ function entryRowDeltHTML(e){
     +'<div class="entry-dot"></div>'
     +'<div class="entry-body">'
     +'<div class="entry-text">'+esc(e.text)+'</div>'
+    +bilderRadHTML(e)
     +'<div class="entry-date">'+fmtDate(e.date)+'</div>'
     +deler
     +(rIds?'<div class="entry-cats">'+rIds+'</div>':'')
@@ -9058,6 +9343,7 @@ function entryRowHTML(e){
     +'<div class="entry-dot"></div>'
     +'<div class="entry-body">'
     +'<div class="entry-text">'+esc(e.text)+'</div>'
+    +bilderRadHTML(e)
     +'<div class="entry-date">'+fmtDate(e.date)+'</div>'
     +pills
     +'</div>'
@@ -9313,7 +9599,7 @@ function periodTodoItems(scope){
           if(done&&!recentDone['e_'+k])return;
           var isTod=isoDate(d)===isoDate(today);
           var sub=o.e.toDay?evSpanTxt(o.e):(isTod?'i dag':UKEDAGER_FULL[dow(d)]+' '+dd+'.');
-          out.push({label:o.e.name,sub:sub,done:done,cat:mainCatOf(o.e.cats),click:"boxToggleEvent('"+q(o.e.id)+"',"+o.occYear+")"});
+          out.push({label:o.e.name,sub:sub,anker:eventNotatLinje(o.e,o.occYear),done:done,cat:mainCatOf(o.e.cats),click:"boxToggleEvent('"+q(o.e.id)+"',"+o.occYear+")"});
         });
       })(d);
     }
@@ -9324,7 +9610,7 @@ function periodTodoItems(scope){
       total++;
       var done=evDone(e,scope.y);
       if(done&&!recentDone['e_'+e.id+'_'+scope.y])return;
-      out.push({label:e.name,sub:'i l\u00f8pet av m\u00e5neden',done:done,cat:mainCatOf(e.cats),click:"boxToggleEvent('"+q(e.id)+"',"+scope.y+")"});
+      out.push({label:e.name,sub:'i l\u00f8pet av m\u00e5neden',anker:eventNotatLinje(e,scope.y),done:done,cat:mainCatOf(e.cats),click:"boxToggleEvent('"+q(e.id)+"',"+scope.y+")"});
     });
   }
   return{items:out,total:total};
@@ -12446,6 +12732,7 @@ function render(){
   if(tgi&&wasTagInp){tgi.focus();tgi.setSelectionRange(tagInpPos,tagInpPos);}
   var ta=document.querySelector('.modal textarea');
   if(ta&&!ta.value)ta.focus();
+  hydrerBilder();
 }
 
 
