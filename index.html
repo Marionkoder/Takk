@@ -84,6 +84,14 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .sec-title{font-size:15px;font-weight:700;color:var(--ink);padding:20px 16px 4px;font-family:var(--font-heading,inherit)}
 .view-sub{font-size:12px;color:var(--muted);padding:0 16px 8px;line-height:1.55}
 .card{background:var(--card);border-radius:14px;overflow:hidden;margin:8px 12px 4px;border:1px solid var(--line)}
+.kort-forhand .kort-side{border:1px solid var(--line);border-radius:12px;padding:16px 12px;margin:8px 0;text-align:center;background:#fff;color:#222}
+.kort-forhand .kort-tittel{font-size:20px;font-weight:800;line-height:1.2;margin-bottom:10px}
+.kort-forhand .kort-bilder{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:8px}
+.kort-forhand .kort-bilder img{height:90px;max-width:46%;object-fit:cover;border-radius:8px;background:var(--line)}
+.kort-forhand .kort-bilder.n1 img{height:150px;max-width:90%}
+.kort-forhand .kort-alder{font-size:14px;color:#555}
+.kort-forhand .kort-linje{font-size:14px;font-style:italic;margin:0 0 8px}
+.kort-forhand .kort-fra{margin-top:10px;font-size:13px}
 .bilde-rad{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}
 .bilde-rad>img{width:60px;height:60px;object-fit:cover;border-radius:10px;background:var(--line);cursor:pointer}
 .bilde-miniatyr{position:relative;display:inline-block}
@@ -267,6 +275,15 @@ textarea.inp{min-height:80px;resize:vertical}
   #print-area .p-note{font-size:9.5pt;color:#444;margin-left:16pt}
   #print-area .p-meta{font-size:10pt;margin:1pt 0}
   #print-area .p-foot{margin-top:16pt;font-size:9pt;color:#666}
+  #print-area .kort-side{box-sizing:border-box;min-height:240mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12mm;page-break-after:always;break-after:page}
+  #print-area .kort-side:last-child{page-break-after:auto;break-after:auto}
+  #print-area .kort-tittel{font-size:30pt;line-height:1.15;margin-bottom:10mm}
+  #print-area .kort-bilder{display:flex;flex-wrap:wrap;gap:4mm;justify-content:center;margin-bottom:8mm}
+  #print-area .kort-bilder img{height:70mm;max-width:80mm;object-fit:cover;border-radius:3mm}
+  #print-area .kort-bilder.n1 img{height:120mm;max-width:150mm}
+  #print-area .kort-alder{font-size:16pt;color:#444}
+  #print-area .kort-linje{font-size:14pt;font-style:italic;margin:0 0 6mm}
+  #print-area .kort-fra{margin-top:10mm;font-size:14pt}
 }
 </style>
 </head>
@@ -461,7 +478,7 @@ var KAT_SIDER=[
   {n:'okonomi',navn:'\u00d8konomi'},{n:'beredskap',navn:'Beredskap'},{n:'utstyr',navn:'Utstyr'},
   {n:'opplevelser',navn:'Opplevelser'},{n:'dating',navn:'Dating'}
 ];
-var KAT_STANDARD={folk:true,utstyr:true,opplevelser:true,dating:true};
+var KAT_STANDARD={folk:true,hjem:true,opplevelser:true,dating:true};
 var katVis={};
 function katPaa(n){return katVis[n]===undefined?!!KAT_STANDARD[n]:!!katVis[n];}
 function toggleKatSide(n){
@@ -480,7 +497,7 @@ function toggleKatSide(n){
 function sidebarKinds(n){
   var t={folk:['folk','grupper','gruppe','bursdager','bursdagsliste','gaver','gaveperson'],
     kreativitet:['kreativitet','strikkeverksted','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch'],
-    helse:['helse','mens'],matdrikke:['matdrikke'],hjem:['hjemkat'],kompetanse:['kompetanse'],
+    helse:['helse','mens'],matdrikke:['matdrikke'],hjem:['hjemkat','utstyrkat','utstyr'],kompetanse:['kompetanse'],
     natur:['natur'],reiser:['reiser'],kultur:['kultur'],
     okonomi:['okonomikat','okonomi','budsjett','forbruksvarer'],
     beredskap:['beredskapkat','beredskap'],utstyr:['utstyrkat','utstyr']};
@@ -1620,6 +1637,16 @@ function goKompetanse(){view={kind:'kompetanse'};drawerOpen=false;render();}
 function goNatur(){view={kind:'natur'};drawerOpen=false;render();}
 function goOkonomiKat(){view={kind:'okonomikat'};drawerOpen=false;render();}
 function goBeredskapKat(){view={kind:'beredskapkat'};drawerOpen=false;render();}
+// Utstyr bor under Hjem: ting står i hjemmet, og Hjem er stedet de hører til.
+// Utstyrssiden har fortsatt sin egen ordsky, pakkelister og egne lister.
+function utstyrKortHTML(){
+  var inv=findFixedList('utstyr');
+  var c=inv?invCounts(inv):null;
+  return'<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goUtstyrKat()">'
+    +'<div class="entry-body"><div class="entry-text">Utstyr</div>'
+    +'<div class="entry-date">ting du eier, ordnet etter bruk og plassering'+(c?' \u00b7 '+c.have+' av '+c.total:'')+'</div></div>'
+    +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+}
 function goUtstyrKat(){view={kind:'utstyrkat'};drawerOpen=false;render();}
 function goReiser(){view={kind:'reiser'};drawerOpen=false;render();}
 function goOpplevelser(){view={kind:'opplevelser'};drawerOpen=false;render();}
@@ -3712,6 +3739,16 @@ function load(){
     if(achievements.length!==før)save();
   })();
 
+  // Utstyr ble flyttet under Hjem. Står Hjem av i menyen, skrus den på én gang,
+  // ellers ville Utstyr blitt uten inngang.
+  (function(){
+    var gjort=false;try{gjort=!!localStorage.getItem(SK+'_utstyrunderhjem1');}catch(e){}
+    if(gjort)return;
+    if(katVis.utstyr!==false&&katVis.hjem===false)katVis.hjem=true;
+    try{localStorage.setItem(SK+'_utstyrunderhjem1','1');}catch(e){}
+    save();
+  })();
+
   // Bilder som ikke hører til noe innlegg (f.eks. fra et avbrutt innlegg) ryddes bort.
   bildeRydd();
 
@@ -4833,6 +4870,7 @@ function gavePersonViewHTML(){
       +'<div class="chips">'
       +'<button class="chip" style="font-size:11px" onclick="openPersonTags(\''+q(pn)+'\')">'+(pTags.length?'Rediger hashtagger':'Tilknytt hashtagger')+'</button>'
       +'<button class="chip" style="font-size:11px" onclick="openEditEvent(\''+q(bd.id)+'\')">Rediger navn og dato</button>'
+      +(erMinne(bd)?'':'<button class="chip" style="font-size:11px" onclick="openKortForslag(\''+q(pn)+'\')">Lag kortforslag</button>')
       +(erMinne(bd)?'':'<button class="chip'+(view._fargevelger?' on':'')+'" style="font-size:11px" onclick="view._fargevelger=!view._fargevelger;render()">Ballongfarge</button>')
       +'</div>'
       +(view._fargevelger&&!erMinne(bd)?ballongFargevelgerHTML(pn):'')
@@ -5054,7 +5092,7 @@ function personligViewHTML(){
   h+='<div class="sec-title">Menypunkter</div>'
     +'<div class="view-sub">Sl\u00e5 p\u00e5 de livsomr\u00e5dene du vil ha i menyen.</div>'
     +'<div class="card">'
-    +KAT_SIDER.map(function(k){
+    +KAT_SIDER.filter(function(k){return k.n!=='utstyr';}).map(function(k){
       var paa=katPaa(k.n);
       return'<div class="entry-row tett">'
         +'<div class="entry-body"><div class="entry-text">'+esc(k.navn)+'</div></div>'
@@ -7032,6 +7070,109 @@ function bildeTaggerTilStikkord(bk,bilder){
   });});
 }
 
+/* ── Kortforslag til bursdag ──
+   Et forslag satt sammen av det du allerede har: bilder av personen (tagget eller fra
+   innlegg om personen) og linjer fra dagboken. Ingenting skrives for deg. Du velger hva
+   som tas med. Linjer fra dagboka er av seg selv ikke valgt, de er private til du sier noe annet. */
+function kortKandidater(person){
+  var pt=personTagsFor(person),nm=normTag(person);
+  var erDen=function(t){var n=normTag(t);return pt.indexOf(n)>=0||n===nm;};
+  var bilder=[],linjer=[];
+  entries.slice().sort(function(a,b){return b.date<a.date?-1:(b.date>a.date?1:0);}).forEach(function(e){
+    var om=(e.tags||[]).some(erDen);
+    if(om)linjer.push({id:e.id,tekst:e.text,dato:e.date});
+    (e.bilder||[]).forEach(function(b){
+      var pinnet=bildeTagger(b).some(function(t){return erDen(t.t);});
+      if(pinnet||om)bilder.push({id:b.id,pinnet:pinnet,dato:e.date,navn:bildeTagger(b).map(function(t){return t.t;})});
+    });
+  });
+  bilder=bilder.filter(function(b){return b.pinnet;}).concat(bilder.filter(function(b){return!b.pinnet;}));
+  return{bilder:bilder,linjer:linjer};
+}
+function openKortForslag(person){
+  var bd=bdayForPerson(person),kd=kortKandidater(person);
+  var alder=(bd&&!erMinne(bd))?bdayNextAge(bd):null;
+  modal={step:'bursdagskort',form:{person:person,hilsen:'Gratulerer med dagen, '+String(person).split(' ')[0]+'!',fra:'',
+    visAlder:alder!==null,alderNr:alder,bilder:kd.bilder.slice(0,3).map(function(b){return b.id;}),linjer:[]}};
+  render();
+}
+function kortTogglBilde(id){
+  var f=mf(),a=f.bilder||[],i=a.indexOf(id);
+  if(i>=0)a.splice(i,1);else if(a.length<4)a.push(id);
+  f.bilder=a;render();
+}
+function kortTogglLinje(id){
+  var f=mf(),a=f.linjer||[],i=a.indexOf(id);
+  if(i>=0)a.splice(i,1);else if(a.length<4)a.push(id);
+  f.linjer=a;render();
+}
+function kortSiderHTML(f,src){
+  var fb=f.bilder||[];
+  var bilder=fb.length?'<div class="kort-bilder n'+fb.length+'">'+fb.map(function(id){return'<img '+src(id)+' alt="">';}).join('')+'</div>':'';
+  var forside='<div class="kort-side"><div class="kort-tittel">'+esc(f.hilsen||'')+'</div>'+bilder
+    +(f.visAlder&&f.alderNr?'<div class="kort-alder">Du fyller '+f.alderNr+' \u00e5r</div>':'')+'</div>';
+  var linjer=(f.linjer||[]).map(function(id){
+    var e=entries.find(function(x){return x.id===id;});
+    return e?'<p class="kort-linje">\u00ab'+esc(e.text)+'\u00bb</p>':'';
+  }).join('');
+  var innside='<div class="kort-side"><div>'+linjer+((f.fra||'').trim()?'<div class="kort-fra">'+esc(f.fra)+'</div>':'')+'</div></div>';
+  return forside+innside;
+}
+function kortOppdaterForhand(){
+  var el=document.getElementById('kort-forhand');if(!el||!modal||!modal.form)return;
+  el.innerHTML=kortSiderHTML(modal.form,function(id){return'data-bilde="'+esc(id)+'"';});
+  hydrerBilder();
+}
+function kortModalHTML(f){
+  var kd=kortKandidater(f.person);
+  var h='<div class="modal-title">Kortforslag til '+esc(f.person)+'</div>'
+    +'<div class="hint">Satt sammen av bildene og ordene dine. Du velger hva som tas med.</div>'
+    +'<label class="field-lbl">Hilsen</label>'
+    +'<input class="inp" type="text" value="'+esc(f.hilsen||'')+'" oninput="mf().hilsen=this.value;kortOppdaterForhand()">'
+    +(f.alderNr?'<div class="chips" style="margin-top:6px"><button class="chip'+(f.visAlder?' on':'')+'" onclick="mf().visAlder=!mf().visAlder;render()">Ta med alder ('+f.alderNr+' \u00e5r)</button></div>':'')
+    +'<label class="field-lbl">Bilder <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 opptil fire</span></label>';
+  if(kd.bilder.length){
+    h+='<div class="bilde-rad" style="margin-top:0">'+kd.bilder.map(function(b){
+      var pa=(f.bilder||[]).indexOf(b.id)>=0;
+      return'<span class="bilde-miniatyr'+(pa?' on':'')+'"><img data-bilde="'+esc(b.id)+'" alt="" title="'+esc(b.navn.join(', '))+'" onclick="kortTogglBilde(\''+q(b.id)+'\')"></span>';
+    }).join('')+'</div>';
+  } else {
+    h+='<div class="hint">Ingen bilder av '+esc(String(f.person).split(' ')[0])+' ennå. Legg til bilder på innlegg og tagg dem, så dukker de opp her. Kortet fungerer fint uten også.</div>';
+  }
+  h+='<label class="field-lbl">Linjer fra dagboka <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt, ingenting er valgt på forhånd</span></label>';
+  if(kd.linjer.length){
+    h+='<div style="display:flex;flex-direction:column;gap:6px">'+kd.linjer.slice(0,12).map(function(l){
+      var pa=(f.linjer||[]).indexOf(l.id)>=0,t=l.tekst.length>110?l.tekst.slice(0,107)+'\u2026':l.tekst;
+      return'<button class="chip'+(pa?' on':'')+'" style="text-align:left;white-space:normal;border-radius:12px" onclick="kortTogglLinje(\''+q(l.id)+'\')">'+esc(t)+'</button>';
+    }).join('')+'</div>';
+  } else {
+    h+='<div class="hint">Innlegg som bruker '+esc(String(f.person).split(' ')[0])+'s hashtagger dukker opp her.</div>';
+  }
+  h+='<label class="field-lbl">Fra <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 valgfritt</span></label>'
+    +'<input class="inp" type="text" value="'+esc(f.fra||'')+'" placeholder="Din hilsen eller navn \u2026" oninput="mf().fra=this.value;kortOppdaterForhand()">'
+    +'<label class="field-lbl">Forhåndsvisning</label>'
+    +'<div id="kort-forhand" class="kort-forhand">'+kortSiderHTML(f,function(id){return'data-bilde="'+esc(id)+'"';})+'</div>'
+    +'<button class="save-btn" onclick="skrivUtKort()">Skriv ut / lagre som PDF</button>';
+  return h;
+}
+function skrivUtKort(){
+  var f=mf(),area=document.getElementById('print-area');if(!area)return;
+  var urls={};
+  Promise.all((f.bilder||[]).map(function(id){
+    return bildeHent(id).then(function(blob){
+      if(!blob)return;
+      return new Promise(function(res){
+        try{var fr=new FileReader();fr.onload=function(){urls[id]=fr.result;res();};fr.onerror=function(){res();};fr.readAsDataURL(blob);}
+        catch(x){res();}
+      });
+    }).catch(function(){});
+  })).then(function(){
+    var kopi=Object.assign({},f,{bilder:(f.bilder||[]).filter(function(id){return urls[id];})});
+    area.innerHTML=kortSiderHTML(kopi,function(id){return'src="'+urls[id]+'"';});
+    try{window.print();}catch(e){alert('Utskrift st\u00f8ttes ikke her \u2014 \u00e5pne appen i nettleseren og pr\u00f8v derfra.');}
+  });
+}
+
 /* ── Eksport / import ── */
 function exportJSON(){
   var ider=Object.keys(bildeIderI([entries,skjulteEntries])),bilderMap={};
@@ -7932,6 +8073,7 @@ function modalHTML(){
   if(!modal)return'';
   var f=mf(),step=modal.step,body='';
   if(step==='bildevis')return bildeVisHTML();
+  if(step==='bursdagskort')return'<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal"><button class="close-btn" onclick="closeModal()">×</button>'+kortModalHTML(f)+'</div></div>';
 
   if(step==='info'){
     body='<div class="modal-title">'+esc(modal.tekst)+'</div>'
@@ -9371,12 +9513,11 @@ function sidebarHTML(){
    {n:'kreativitet',navn:'Kreativitet',fn:'goKreativitet()',kat:'kreativitet',kinds:['kreativitet','strikkeprosjekter','garnlager','garntyper','strikkeoppskrifter','strikkeutstyr','garnmatch']},
    {n:'helse',navn:'Helse',fn:'goHelse()',kat:'helse',kinds:['helse','mens']},
    {n:'matdrikke',navn:'Mat og drikke',fn:'goMatDrikke()',kat:'mat og drikke',kinds:['matdrikke']},
-   {n:'hjem',navn:'Hjem',fn:'goHjem2()',kat:'hjem',kinds:['hjemkat']},
+   {n:'hjem',navn:'Hjem',fn:'goHjem2()',kat:'hjem',kinds:['hjemkat','utstyrkat','utstyr']},
    {n:'kompetanse',navn:'Faglig utvikling og trivsel',fn:'goKompetanse()',kat:'faglig utvikling og trivsel',kinds:['kompetanse']},
    {n:'natur',navn:'Natur',fn:'goNatur()',kat:'natur',kinds:['natur']},
    {n:'okonomi',navn:'\u00d8konomi',fn:'goOkonomiKat()',kat:'\u00f8konomi',kinds:['okonomikat','okonomi','budsjett','forbruksvarer']},
    {n:'beredskap',navn:'Beredskap',fn:'goBeredskapKat()',kat:'beredskap',kinds:['beredskapkat','beredskap']},
-   {n:'utstyr',navn:'Utstyr',fn:'goUtstyrKat()',kat:'utstyr',kinds:['utstyrkat','utstyr']},
    {n:'opplevelser',navn:'Opplevelser',fn:'goOpplevelser()',kat:'opplevelser',kinds:['opplevelser']},
    {n:'dating',navn:'Dating',fn:'goDating()',kat:'dating',kinds:['dating']}]
   .filter(function(k){return katPaa(k.n);})
@@ -12640,7 +12781,7 @@ function render(){
     ('<div style="padding:14px 12px 0"><button class="icon-btn" onclick="goHelse()">\u2039</button></div>'
     +'<div class="card"><div class="empty">Syklus er sl\u00e5tt av. Skru den p\u00e5 igjen under Innstillinger \u2192 Personlig.</div></div>');
   else if(view.kind==='matdrikke')content=katSideHTML('mat og drikke','Mat og drikke','kat_mat');
-  else if(view.kind==='hjemkat')content=katSideHTML('hjem','Hjem','kat_hjem');
+  else if(view.kind==='hjemkat')content=katSideHTML('hjem','Hjem','kat_hjem',utstyrKortHTML());
   else if(view.kind==='kompetanse')content=katSideHTML('faglig utvikling og trivsel','Faglig utvikling og trivsel','kat_komp',
     '<div class="card"><div class="entry-row" style="cursor:pointer" onclick="goStillingRelevans()">'
     +'<div class="entry-body"><div class="entry-text">Stillingsrelevans</div>'
@@ -12669,7 +12810,7 @@ function render(){
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>');
   else if(view.kind==='beredskapkat')content=katSideHTML('beredskap','Beredskap','kat_beredskap',
     listeKortHTML('beredskap','Beredskapslageret','tvilling av utstyr og forbruksvarer merket beredskapsrelevant','goBeredskap'));
-  else if(view.kind==='utstyrkat')content=katSideHTML('utstyr','Utstyr','kat_utstyr',
+  else if(view.kind==='utstyrkat')content='<div style="padding:12px 12px 0"><button class="icon-btn" onclick="goHjem2()">\u2039 Hjem</button></div>'+katSideHTML('utstyr','Utstyr','kat_utstyr',
     listeKortHTML('utstyr','Utstyrslista','ting du eier, ordnet etter bruk og plassering','goUtstyr')
     +pakkelisteKortHTML()
     +egneListerHTML());
