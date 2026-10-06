@@ -98,13 +98,13 @@ h1{font-size:24px;font-weight:800;letter-spacing:0.5px;flex:1;color:var(--title,
 .kp-tittel{font-size:2.1em;font-weight:700;line-height:1.15}
 .kp-alder{font-size:3.6em;font-weight:700;line-height:1;margin-top:-.1em}
 .kp-side2{display:flex;flex-direction:column;padding:1.2em 1.2em 1.4em}
-.kp-vimpelrad{position:relative;display:flex;justify-content:space-around;align-items:flex-start;padding-top:.6em}
-.kp-snor{position:absolute;left:0;top:0;width:100%;height:2.2em}
-.kp-vk{position:relative;display:flex;flex-direction:column;align-items:center;width:2.5em}
-.kp-vk>svg:first-child{margin-top:.5em}
-.kp-pil{width:.9em;height:3.2em;margin-top:.2em}
-.kp-tagg{writing-mode:vertical-rl;font-size:.95em;font-weight:700;white-space:nowrap;margin-top:.1em;max-height:8em;overflow:hidden}
-.kp-fritekst{flex:1;margin-top:1em;font-size:1em;line-height:1.7em;white-space:pre-wrap;overflow:hidden}
+.kp-hjerter{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.5em .7em;padding:.4em 0 .2em;flex-shrink:0}
+.kp-hjerte{position:relative;flex-shrink:0}
+.kp-hjerte svg{position:absolute;left:0;top:0;width:100%;height:100%}
+.kp-ht{position:absolute;left:12%;right:12%;top:27%;text-align:center;color:#fff;line-height:1.1;display:flex;flex-direction:column;align-items:center}
+.kp-ht b{font-weight:700;white-space:nowrap}
+.kp-ht span{font-size:.62em;margin-top:.15em;opacity:.95}
+.kp-fritekst{flex:1;min-height:7em;margin-top:1em;font-size:1em;line-height:1.7em;white-space:pre-wrap;overflow:hidden}
 .kp-fritekst.kp-linjer{background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 1.62em,#cfcfcf 1.62em,#cfcfcf 1.7em)}
 .kp-fra{text-align:right;font-style:italic;font-size:1em;margin-top:.6em}
 .kp-side3{padding:1.6em 1.5em}
@@ -7098,7 +7098,7 @@ function bildeTaggerTilStikkord(bk,bilder){
 }
 
 /* ── Bursdagskort (brettet A5) ──
-   Fire sider: 1 forside, 2 vimpelrad og plass til egen tekst, 3 favorittminner, 4 bilder.
+   Fire sider: 1 forside, 2 hjerter og plass til egen tekst, 3 favorittminner, 4 bilder.
    Alt er satt sammen av det du allerede har, ingenting skrives for deg. Linjer fra dagboka
    er av seg selv ikke valgt, de er private til du sier noe annet. Utskrift: A4 liggende,
    dobbeltsidig (vend på kortsiden), brett på midten. */
@@ -7189,20 +7189,34 @@ function kortSideForside(f){
     +(f.visAlder&&f.alderNr?'<div class="kp-alder">'+f.alderNr+' \u00e5r!</div>':'')
     +'</div></div>';
 }
+// Hjerter på side 2, ett per hashtagg. Hjertet vokser ett trinn for hver milepæl ordet passerer,
+// Milepæler: første ved 20 ganger, neste ved 50, deretter hver 100. gang (100, 200, 300 …).
+var KORT_HJERTE_MAKS_NIVAA=8;
+var KORT_HJERTE_FARGER=['#C64739','#388A87','#8C5A74','#B8661F','#4E7B8C','#883A2B','#553C67'];
+function kortHjerteNivaa(n){
+  n=n||0;
+  var lv=n<20?0:n<50?1:n<100?2:2+Math.floor(n/100);
+  return Math.min(KORT_HJERTE_MAKS_NIVAA,lv);
+}
+function kortHjerteBredde(n){return 5.6+kortHjerteNivaa(n)*.9;}
+function kortHjerteHTML(t,n,farge,i,k){
+  var lv=kortHjerteNivaa(n),w=kortHjerteBredde(n);
+  var navn=String(t).length>14?String(t).slice(0,13)+'\u2026':String(t);
+  var fs=navn.length>11?.58:navn.length>8?.7:.82;
+  return'<div class="kp-hjerte" style="font-size:'+k.toFixed(3)+'em;width:'+w.toFixed(1)+'em;height:'+(w*.88).toFixed(2)+'em;transform:rotate('+(i%2?3:-3)+'deg)">'
+    +'<svg viewBox="0 0 100 88" aria-hidden="true"><path d="M50 88 C16 62 0 44 0 26 C0 11 11 0 26 0 C36 0 45 5 50 15 C55 5 64 0 74 0 C89 0 100 11 100 26 C100 44 84 62 50 88Z" fill="'+farge+'"/>'
+    +'<path d="M15 24 C14 15 19 9 27 8" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".35"/></svg>'
+    +'<div class="kp-ht"><b style="font-size:'+fs+'em">#'+esc(navn)+'</b>'+(n?'<span>'+n+'</span>':'')+'</div></div>';
+}
 function kortSideVimpler(f){
   var vs=(f.vimpler||[]).slice(0,KORT_MAKS_VIMPLER);
   // Antall ganger ordet er brukt sammen med personens hashtagger
   var antall={};kortKandidater(f.person).tags.forEach(function(x){antall[tagId(x.t)]=x.n;});
-  var pal=[1,6,12,16,19,3,9];
-  var rad=vs.map(function(t,i){
-    var hex=CAT_COLORS[pal[i%pal.length]%CAT_COLORS.length].hex;
-    return'<div class="kp-vk">'
-      +vimpelSVG(46,hex,darkHex(hex,0.3),(antall[tagId(t)]?String(antall[tagId(t)]):''),(antall[tagId(t)]>=100?22:antall[tagId(t)]>=10?28:32),textOn(hex)).replace(/height:46px;width:[\d.]+px/,'height:4.2em;width:3em')
-      +'<svg class="kp-pil" viewBox="0 0 10 40" aria-hidden="true"><path d="M5 0 V34 M1.5 29 L5 36 L8.5 29" fill="none" stroke="#555" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-      +'<div class="kp-tagg">#'+esc(t)+'</div></div>';
-  }).join('');
-  var snor=vs.length?'<svg class="kp-snor" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><path d="M0 1 Q50 7 100 1" fill="none" stroke="#8B7A6B" stroke-width=".7"/></svg>':'';
-  return'<div class="kp kp-side2"><div class="kp-vimpelrad">'+snor+rad+'</div>'
+  // Mange eller store hjerter krymper litt, så de ikke tar plassen til teksten under
+  var areal=0;vs.forEach(function(t){var w=kortHjerteBredde(antall[tagId(t)]||0);areal+=w*w*.88+3;});
+  var k=areal>170?Math.sqrt(170/areal):1;
+  var rad=vs.map(function(t,i){return kortHjerteHTML(t,antall[tagId(t)]||0,KORT_HJERTE_FARGER[i%KORT_HJERTE_FARGER.length],i,k);}).join('');
+  return'<div class="kp kp-side2"><div class="kp-hjerter">'+rad+'</div>'
     +'<div class="kp-fritekst'+(f.hand?' kp-linjer':'')+'">'+esc(f.tekst||'')+'</div>'
     +((f.fra||'').trim()?'<div class="kp-fra">'+esc(f.fra)+'</div>':'')+'</div>';
 }
@@ -7288,7 +7302,7 @@ function kortModalHTML(f){
     +'<input class="inp" type="text" value="'+esc(f.tittel||'')+'" oninput="mf().tittel=this.value;kortOppdaterForhand()">'
     +(f.alderNr?'<div class="chips" style="margin-top:6px"><button class="chip'+(f.visAlder?' on':'')+'" onclick="mf().visAlder=!mf().visAlder;render()">Legg til \u00ab'+f.alderNr+' \u00e5r!\u00bb</button></div>':'')
     // Vimpelrad
-    +'<label class="field-lbl">Side 2: vimpelrad <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 hashtaggene du oftest har brukt sammen med #'+esc(fn.toLowerCase())+'</span></label>';
+    +'<label class="field-lbl">Side 2: hjerter <span style="font-weight:400;text-transform:none;letter-spacing:0">\u2013 hashtaggene du oftest har brukt sammen med #'+esc(fn.toLowerCase())+'</span></label>';
   var antall={};kd.tags.forEach(function(x){antall[tagId(x.t)]=x.n;});
   if((f.vimpler||[]).length)h+='<div class="chips">'+(f.vimpler||[]).map(function(t){
     return'<button class="chip on" onclick="kortTogglVimpel(\''+q(t)+'\')">#'+esc(t)+(antall[tagId(t)]?' <span style="opacity:.6;font-size:10px">'+antall[tagId(t)]+'</span>':'')+' \u00d7</button>';
