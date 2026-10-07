@@ -322,6 +322,8 @@ textarea.inp{min-height:80px;resize:vertical}
 'use strict';
 
 var SK='takknemlighet-v2';
+// Byttes for hver ny fil, så du kan se hvilken versjon som faktisk er åpen (Innstillinger, nederst).
+var APP_VERSJON='2026-10-07.1';
 var MND_FULL=['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];
 var UKEDAGER_FULL=['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag'];
 
@@ -7424,7 +7426,7 @@ function exportJSON(){
   })).then(function(){exportJSONMed(bilderMap);},function(){exportJSONMed(bilderMap);});
 }
 function exportJSONMed(bilderMap){
-  var data=JSON.stringify({bilder:bilderMap,entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,stillingKriterier:stillingKriterier,stillinger:stillinger,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,ordValg:ordValg,customUnits:customUnits,places:places,achievements:achievements},null,2);
+  var data=JSON.stringify({versjon:APP_VERSJON,bilder:bilderMap,entries:entries,cats:cats,routines:routines,events:events,goals:goals,laters:laters,results:results,inventories:inventories,budgetRows:budgetRows,deposits:deposits,timeLogs:timeLogs,mens:mens,mensDag:mensDag,maalinger:maalinger,kvartalNotat:kvartalNotat,mensSyklusNotat:mensSyklusNotat,investeringer:investeringer,datingKriterier:datingKriterier,datingPersoner:datingPersoner,stillingKriterier:stillingKriterier,stillinger:stillinger,skjulteEntries:skjulteEntries,investGlobalOrder:investGlobalOrder,gifts:gifts,tagCats:tagCats,ordValg:ordValg,customUnits:customUnits,places:places,achievements:achievements},null,2);
   var blob=new Blob([data],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -10882,11 +10884,47 @@ function hjerteskyHTML(rader){
   });
   if(rad.length)rader2.push(rad);
   var midtUt=function(liste){var u=[];liste.forEach(function(x,i){if(i%2===0)u.push(x);else u.unshift(x);});return u;};
-  var h='<div class="card hjertesky">';
-  midtUt(rader2).forEach(function(r){
+  var rekker=midtUt(rader2).map(midtUt);
+
+  // Plassene har fast størrelse, så mønsteret (størst i midten) ligger fast. Hjerter av samme
+  // størrelse kan bytte plass, og det brukes til å skille like farger.
+  var plasser=[];
+  rekker.forEach(function(r,i){
+    var tot=0;r.forEach(function(x){tot+=x.hw-8;});
+    var cx=(BREDDE-tot)/2;
+    r.forEach(function(x){plasser.push({rad:i,hw:x.hw,cx:cx+x.hw/2,x:x});cx+=x.hw-8;});
+  });
+  var n=plasser.length,grupper={};
+  plasser.forEach(function(pl,i){(grupper[pl.hw]=grupper[pl.hw]||[]).push(i);});
+  var fargeAv=function(i){return plasser[i].x.item.farge;};
+  // Like farger ved siden av hverandre i raden teller mest, i raden over eller under litt
+  var kost=function(i){
+    var c=0,pi=plasser[i],f=fargeAv(i);
+    for(var j=0;j<n;j++){
+      if(j===i||fargeAv(j)!==f)continue;
+      var pj=plasser[j];
+      if(pj.rad===pi.rad){if(Math.abs(j-i)===1)c+=3;}
+      else if(Math.abs(pj.rad-pi.rad)===1&&Math.abs(pj.cx-pi.cx)<(pi.hw+pj.hw)*.38)c+=1;
+    }
+    return c;
+  };
+  var frø=n*7919+rader.length;
+  var tilfeldig=function(m){frø=(frø*1103515245+12345)%2147483648;return frø%m;};
+  for(var it=0;it<n*40;it++){
+    var i=tilfeldig(n),g=grupper[plasser[i].hw];
+    if(g.length<2)continue;
+    var j=g[tilfeldig(g.length)];
+    if(i===j||fargeAv(i)===fargeAv(j))continue;
+    var før=kost(i)+kost(j);
+    var t=plasser[i].x;plasser[i].x=plasser[j].x;plasser[j].x=t;
+    if(kost(i)+kost(j)>før){t=plasser[i].x;plasser[i].x=plasser[j].x;plasser[j].x=t;}
+  }
+
+  var h='<div class="card hjertesky">',k=0;
+  rekker.forEach(function(r){
     h+='<div class="hjerterad">';
-    midtUt(r).forEach(function(x){
-      var item=x.item;
+    r.forEach(function(){
+      var x=plasser[k++].x,item=x.item;
       h+='<svg viewBox="0 0 100 88" role="img" aria-label="'+esc(item.info)+'" style="width:'+x.hw+'px;height:'+(x.hw*.88).toFixed(1)+'px;transform:rotate('+x.rot+'deg)" onclick="'+infoPopupOnclick(item.info,item.videre,item.knapp)+'">'
         +'<title>'+esc(item.info)+'</title>'
         +'<path d="'+HJERTE_PATH+'" style="fill:'+item.farge+'"/>'
@@ -12351,6 +12389,7 @@ function innstillingerViewHTML(){
     +'<div class="entry-body"><div class="entry-text">Skjulte innlegg</div>'
     +'<div class="entry-date">'+skjulteEntries.length+' innlegg tatt ut av dagboka'+(hasPin?'':' \u2014 sett en kode f\u00f8rst')+'</div></div>'
     +'<span style="align-self:center;color:var(--rose)">\u203a</span></div></div>';
+  h+='<div class="hint" style="text-align:center;margin-top:18px">Gode dager \u00b7 versjon '+esc(APP_VERSJON)+'</div>';
   return h;
 }
 
