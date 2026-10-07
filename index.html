@@ -323,7 +323,7 @@ textarea.inp{min-height:80px;resize:vertical}
 
 var SK='takknemlighet-v2';
 // Byttes for hver ny fil, så du kan se hvilken versjon som faktisk er åpen (Innstillinger, nederst).
-var APP_VERSJON='2026-10-07.1';
+var APP_VERSJON='2026-10-07.2';
 var MND_FULL=['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];
 var UKEDAGER_FULL=['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag'];
 
@@ -379,6 +379,7 @@ var CAT_COLORS=[
   {id:'lyslilla',name:'Lys lilla',hex:'#D2C4DE'},
   {id:'morkerod',name:'Mørkerød',hex:'#883A2B'},
   {id:'signalrod',name:'Signalrød',hex:'#C64739'},
+  {id:'rosenrod',name:'Rosenrød',hex:'#D86A6A',utenStripe:true},
   {id:'rosa',name:'Rosa',hex:'#C46E7E'},
   {id:'fersken',name:'Fersken',hex:'#DE9273'},
   {id:'blekrosa',name:'Blekrosa',hex:'#E7C5CB'},
@@ -393,6 +394,8 @@ var CAT_COLORS=[
 // Fjernet: Aubergine, Gammelrosa, Teglstein, Varmgrå, Bringebær. Kategorier som
 // fortsatt peker på en av dem migreres ved oppstart, se lengre ned.
 var FJERNEDE_FARGER={aubergine:'fiolett',gammelrosa:'fersken',teglstein:'rust',varmgraa:'himmelblaa',bringebaer:'rosa'};
+// Stripene i appen (og på kortet) har de opprinnelige 27 fargene; nyere kategorifarger er ikke med.
+var STRIPE_COLORS=CAT_COLORS.filter(function(c){return!c.utenStripe;});
 function colorHexById(colId){var p=CAT_COLORS.find(function(x){return x.id===colId;});return p?p.hex:null;}
 function catColor(catId){
   var c=catById(catId);if(!c)return null;
@@ -7110,8 +7113,8 @@ function bildeTaggerTilStikkord(bk,bilder){
 var KORT_MAKS_MINNER=10,KORT_MAKS_BILDER=12,KORT_MAKS_VIMPLER=7;
 function kortFornavn(person){return String(person||'').trim().split(/\s+/)[0];}
 function kortStripeCSS(){
-  var n=CAT_COLORS.length,d=[];
-  CAT_COLORS.forEach(function(c,i){d.push(c.hex+' '+(i*100/n).toFixed(3)+'% '+((i+1)*100/n).toFixed(3)+'%');});
+  var n=STRIPE_COLORS.length,d=[];
+  STRIPE_COLORS.forEach(function(c,i){d.push(c.hex+' '+(i*100/n).toFixed(3)+'% '+((i+1)*100/n).toFixed(3)+'%');});
   return'linear-gradient(to right,'+d.join(',')+')';
 }
 // Samme test brukes for kort og for bildene øverst på personsiden: stikkordet er et av personens
@@ -7232,7 +7235,7 @@ function kortSideMinner(f){
   var li=(f.minner||[]).map(function(id,i){
     var e=entries.find(function(x){return x.id===id;});if(!e)return'';
     var t=String(e.text||'').replace(/\s+/g,' ').trim();if(t.length>maksT)t=t.slice(0,maksT-3)+'\u2026';
-    return'<li><i style="background:'+CAT_COLORS[pal[i%pal.length]%CAT_COLORS.length].hex+'"></i><div><span class="kp-dato">'+esc(MND_FULL[Number(e.date.slice(5,7))-1]+' '+e.date.slice(0,4))+'</span>'+esc(t)+'</div></li>';
+    return'<li><i style="background:'+STRIPE_COLORS[pal[i%pal.length]%STRIPE_COLORS.length].hex+'"></i><div><span class="kp-dato">'+esc(MND_FULL[Number(e.date.slice(5,7))-1]+' '+e.date.slice(0,4))+'</span>'+esc(t)+'</div></li>';
   }).join('');
   return'<div class="kp kp-side3"><div class="kp-h">'+esc(f.minneTittel||'')+'</div>'
     +'<div class="kp-stripe" style="background:'+kortStripeCSS()+'"></div>'
